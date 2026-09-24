@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "an-tam-ai",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./client/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // API do Worker xử lý, không để SPA fallback nuốt mất
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "an-tam-db",
+      // Thay bằng id thật sau khi chạy `wrangler d1 create an-tam-db` để deploy production
+      "database_id": "local-an-tam-db",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // 08:00 giờ Việt Nam — "AI theo dõi" chạy lại cảnh báo cho mọi người dùng
+  "triggers": { "crons": ["0 1 * * *"] },
+  "observability": { "enabled": true }
+}

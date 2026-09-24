@@ -1,0 +1,51 @@
+/* Animation cho pixel art — dùng steps() để giữ cảm giác "nhảy pixel". */
+
+.px-drift {
+  animation: px-drift 48s steps(24) infinite alternate;
+}
+.px-drift-slow {
+  animation: px-drift 72s steps(24) infinite alternate-reverse;
+}
+.px-twinkle {
+  animation: px-twinkle 2.4s steps(2, jump-none) infinite;
+}
+.px-twinkle-alt {
+  animation: px-twinkle 3.2s steps(2, jump-none) infinite 1.1s;
+}
+.px-blink {
+  animation: px-blink 6s steps(1) infinite;
+}
+.px-steam {
+  animation: px-steam 2.8s steps(4) infinite;
+}
+.px-bob {
+  animation: px-bob 3s steps(2, jump-none) infinite;
+}
+
+@keyframes px-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(24px); }
+}
+@keyframes px-twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+@keyframes px-blink {
+  0%, 70% { opacity: 1; }
+  71%, 85% { opacity: 0.2; }
+  86%, 100% { opacity: 1; }
+}
+@keyframes px-steam {
+  0% { transform: translateY(0); opacity: 0.9; }
+  100% { transform: translateY(-4px); opacity: 0; }
+}
+@keyframes px-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .px-drift, .px-drift-slow, .px-twinkle, .px-twinkle-alt, .px-blink, .px-steam, .px-bob {
+    animation: none;
+  }
+}

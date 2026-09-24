@@ -1,0 +1,30 @@
+{
+  "name": "an-tam-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "An Tâm AI - Hiểu tiền của bạn. Chuẩn bị cho tương lai.",
+  "scripts": {
+    "dev": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "preview": "npm --prefix client run preview",
+    "worker:dev": "wrangler dev",
+    "worker:deploy": "npm run build && wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply an-tam-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply an-tam-db --remote",
+    "db:seed": "wrangler d1 execute an-tam-db --local --file=./seed.sql",
+    "db:reset": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate && npm run db:seed",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260924.1",
+    "typescript": "~6.0.2",
+    "vitest": "^5.0.1",
+    "wrangler": "^4.138.0"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.9.1",
+    "hono": "^4.13.9",
+    "zod": "^4.6.5"
+  }
+}
