@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "an-tam-ai",
+  "name": "antam",
   "main": "worker/index.ts",
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -15,8 +15,8 @@
     {
       "binding": "DB",
       "database_name": "an-tam-db",
-      // Thay bằng id thật sau khi chạy `wrangler d1 create an-tam-db` để deploy production
-      "database_id": "local-an-tam-db",
+      // D1 production (wrangler d1 create an-tam-db)
+      "database_id": "2b46538a-ac46-4bf4-8ed2-93a8f33b0587",
       "migrations_dir": "migrations"
     }
   ],

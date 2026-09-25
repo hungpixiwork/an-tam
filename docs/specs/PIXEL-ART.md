@@ -33,6 +33,7 @@ const CUP: Sprite = {
 
 ### Quy ước scene
 - Pixel logic: banner 320×56, card 160×64, promo 96×112 (tùy scene).
+- Scene có thể tăng mật độ bằng `new PixelCanvas(w, h, scale)`; tọa độ vẽ vẫn theo lưới cũ, còn SVG path và `PixelScene` dùng kích thước đầu ra `w * scale` × `h * scale`. Dùng `finePx()` cho chi tiết một pixel ở độ phân giải mới.
 - Lớp từ xa đến gần: gradient trời → mặt trời/mây → skyline xa (nhạt) → skyline gần → mặt nước → bờ/cây → nhân vật.
 - Scene nằm bên phải banner, mép trái **fade** về màu nền banner bằng mask gradient để chữ đọc rõ.
 - Tất cả scene nhận `className` và co giãn theo khung cha (`width: 100%; height: 100%`).

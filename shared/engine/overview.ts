@@ -1,4 +1,4 @@
-import type { OverviewData, Kpi } from '../types/api';
+import type { OverviewData, Kpi, SetupStatus } from '../types/api';
 import type { Salutation, Snapshot, UserState } from '../types/domain';
 import { formatMonth } from '../format';
 import { nearestMajorGoal } from './goals';
@@ -28,6 +28,13 @@ const kpi = (value: number, previous: number | null, compareLabel: string): Kpi 
 });
 
 const snapshotAt = (snapshots: Snapshot[], month: string) => snapshots.find((s) => s.month === month) ?? null;
+
+export const setupStatus = (state: UserState): SetupStatus => ({
+  profile: state.profile.monthlyIncome > 0 || state.profile.monthlyExpense > 0,
+  holdings: state.holdings.length > 0,
+  goals: state.goals.length > 0,
+  transactions: state.ledger.length > 0,
+});
 
 export interface OverviewUser {
   fullName: string;
@@ -75,17 +82,21 @@ export function buildOverview(
     };
   }
 
+  const setup = setupStatus(state);
+  // Chưa có thu chi lẫn tài sản: điểm chưa có ý nghĩa, lời chào mời bắt đầu nhập
+  const empty = !setup.profile && !setup.holdings;
+
   return {
     greeting: {
       title: greetingName(user.fullName, user.salutation),
-      headline: narrator.narrate(levelKey('greeting', peace.level), { s: user.salutation }),
-      sub: narrator.narrate(levelKey('greeting.sub', peace.level)),
+      headline: narrator.narrate(empty ? 'greeting.empty' : levelKey('greeting', peace.level), { s: user.salutation }),
+      sub: narrator.narrate(empty ? 'greeting.sub.empty' : levelKey('greeting.sub', peace.level), { s: user.salutation }),
     },
     peace: {
       score: peace.score,
       level: peace.level,
-      label: peace.label,
-      description: narrator.narrate(levelKey('peace', peace.level)),
+      label: empty ? 'Chưa đủ dữ liệu' : peace.label,
+      description: narrator.narrate(empty ? 'peace.empty' : levelKey('peace', peace.level)),
       factors: peace.factors,
     },
     kpis: {
@@ -101,5 +112,6 @@ export function buildOverview(
     allocation: { total, slices: allocation(state.holdings) },
     tip,
     openAlerts: opts.openAlerts ?? 0,
+    setup,
   };
 }

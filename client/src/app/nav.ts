@@ -1,4 +1,4 @@
-import { Bot, ChartColumn, CircleCheck, House, PieChart, Settings, ShieldCheck, Target, Users, type LucideIcon } from 'lucide-react';
+import { Bot, ChartColumn, CircleCheck, House, NotebookPen, PieChart, Settings, ShieldCheck, Target, Users, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   to: string;
@@ -10,6 +10,7 @@ export interface NavItem {
 
 export const NAV: NavItem[] = [
   { to: '/', label: 'Tổng quan', title: 'Tổng quan tài chính', icon: House },
+  { to: '/thu-chi', label: 'Sổ thu chi', title: 'Sổ thu chi', icon: NotebookPen },
   { to: '/muc-tieu', label: 'Mục tiêu', title: 'Mục tiêu cuộc sống', icon: Target },
   { to: '/mo-phong', label: 'Mô phỏng tương lai', title: 'Mô phỏng tương lai', icon: ChartColumn },
   { to: '/thoi-quen', label: 'Kiểm tra thói quen', title: 'Kiểm tra thói quen', icon: CircleCheck },

@@ -1,6 +1,6 @@
 // Các "cọ vẽ" dùng lại giữa các scene: bầu trời, mặt trời, mây, thành phố, mặt nước, cây, người.
 
-import { PixelCanvas, type Color, type Rng } from './canvas';
+import { PixelCanvas, rng, type Color, type Rng } from './canvas';
 import { P } from './palette';
 
 /** Dải màu ngang, chỗ giao nhau được dither 2 hàng cho mềm. */
@@ -18,7 +18,7 @@ export function bands(c: PixelCanvas, x: number, y0: number, w: number, y1: numb
 
 /** Mặt trời có quầng sáng dither. */
 export function sun(c: PixelCanvas, cx: number, cy: number, r: number) {
-  const halo = new PixelCanvas(c.w, c.h);
+  const halo = new PixelCanvas(c.w, c.h, c.scale);
   halo.disc(cx, cy, r + 6, P.sunGlow2);
   for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) if (halo.get(x, y) && (x + y) % 2 === 0) c.px(x, y, P.sunGlow2);
   c.disc(cx, cy, r + 3, P.sunGlow);
@@ -81,7 +81,11 @@ export function skyline(c: PixelCanvas, r: Rng, o: SkylineOpts, litOut?: PixelCa
         const lit = o.lit && r.chance(o.litChance ?? 0.1);
         (lit && litOut ? litOut : c).px(wx, wy, lit ? o.lit! : o.win);
         if (lit && litOut) c.px(wx, wy, o.win);
+        if (!lit && r.chance(0.25)) c.finePx(wx + 0.5, wy + 0.5, P.cloud);
       }
+    }
+    if (w >= 6) {
+      c.finePx(x + 0.5, top + 1.5, o.win).finePx(x + w - 0.5, o.base - 2.5, o.shade ?? o.body);
     }
     out.push({ x, w, h });
     x += w + (r.chance(0.3) ? 1 : 0);
@@ -119,6 +123,11 @@ export function roundTree(c: PixelCanvas, r: Rng, x: number, baseY: number, size
   for (let k = 0; k < Math.round(size * 0.75); k++) {
     c.px(x + r.int(-size, size), cy + r.int(0, Math.ceil(size * 0.55)), P.leafShadow);
   }
+  for (let k = 0; k < Math.round(size * 2.5); k++) {
+    const lx = x + r.int(-Math.round(size * 0.8), Math.round(size * 0.8)) + (r.next() - 0.5) / c.scale;
+    const ly = cy + r.int(-Math.round(size * 0.9), Math.round(size * 0.4)) + (r.next() - 0.5) / c.scale;
+    c.finePx(lx, ly, r.chance(0.22) ? P.leafHighlight : tones[3]);
+  }
 }
 
 /** Bụi cây thấp. */
@@ -130,6 +139,11 @@ export function bush(c: PixelCanvas, x: number, baseY: number, w: number, tones:
   c.px(x + r - 1, baseY - r * 1.6, tones[2]).px(x + r, baseY - r * 1.8, tones[2]);
   c.px(x + w * 0.65, baseY - r * 1.5, P.leafHighlight).px(x + w * 0.72, baseY - r * 1.2, tones[2]);
   c.px(x + w * 0.35, baseY - r * 0.45, P.leafShadow);
+  // `r` ở đây là bán kính — chi tiết lá dùng PRNG riêng, seed theo vị trí để bụi cây luôn vẽ giống nhau
+  const leaf = rng(Math.round(x * 131 + baseY * 17 + w * 7));
+  for (let k = 0; k < Math.round(w * 0.8); k++) {
+    c.finePx(x + leaf.next() * w, baseY - r * (0.4 + leaf.next() * 1.2), leaf.chance(0.3) ? P.leafHighlight : tones[2]);
+  }
   c.hline(x, x + w, baseY, tones[0]);
 }
 
@@ -154,7 +168,7 @@ export interface BustOpts {
  * (cx, top) = tâm ngang và đỉnh đầu. Vai kéo xuống tới `bottom`.
  */
 export function bust(target: PixelCanvas, cx: number, top: number, bottom: number, o: BustOpts, outline: Color | null = P.outline) {
-  const c = new PixelCanvas(target.w, target.h);
+  const c = new PixelCanvas(target.w, target.h, target.scale);
   const r = o.head;
   const cy = top + r;
   const skin = o.skin ?? P.skin;
@@ -217,6 +231,11 @@ export function bust(target: PixelCanvas, cx: number, top: number, bottom: numbe
     c.hline(cx - ex - 1, cx + ex + 1, ey - 1, P.ink);
   }
   if (r >= 5) c.px(cx, ey + 1, P.skinShade);
+  if (r >= 5) {
+    c.finePx(cx - ex + 0.5, ey + 0.5, '#FFFFFF');
+    c.finePx(cx + ex + 0.5, ey + 0.5, '#FFFFFF');
+    c.finePx(cx + r * 0.45, cy + r * 0.55, skin);
+  }
   if (r >= 4) c.px(cx - ex - 1, ey + 2, '#F2A7A0').px(cx + ex + 1, ey + 2, '#F2A7A0');
   if (o.smile !== false) {
     if (r >= 4) c.hline(cx - 1, cx + 1, ey + Math.round(r * 0.5), P.skinDark);

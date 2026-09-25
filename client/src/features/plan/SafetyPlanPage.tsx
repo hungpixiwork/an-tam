@@ -5,6 +5,7 @@ import type { PlanMetrics, PlanProposal } from '@shared/engine/plan';
 import { formatPct } from '@shared/format';
 import { HeroLakeCity } from '@/components/pixel';
 import { Badge, Button, ButtonLink, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, Select, cx, type Tone } from '@/components/ui';
+import { NeedData } from '@/components/NeedData';
 import { useApplyPlan, usePlans, useToggleTask, type PlansData, type PlanTask } from '@/lib/queries';
 
 export default function SafetyPlanPage() {
@@ -14,6 +15,12 @@ export default function SafetyPlanPage() {
   const { proposal, applied } = data;
 
   return (
+    <NeedData
+      anyOf={['profile', 'holdings']}
+      icon={ShieldCheck}
+      title="AI cần biết thêm để lập kế hoạch"
+      body="Kế hoạch an toàn dựa trên chi tiêu hằng tháng, quỹ dự phòng và danh mục của bạn. Nhập thu chi hoặc tài sản để AI đề xuất 3 bước phù hợp."
+    >
     <div className="space-y-4">
       <PageHero
         title="Không cần lợi nhuận cao nhất."
@@ -37,6 +44,7 @@ export default function SafetyPlanPage() {
         <ApplyCard applied={applied} />
       </div>
     </div>
+    </NeedData>
   );
 }
 

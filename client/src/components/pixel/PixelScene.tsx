@@ -18,7 +18,7 @@ interface Props {
   label: string;
 }
 
-/** Khung SVG cho pixel art: viewBox theo pixel logic, luôn sắc nét ở mọi kích thước. */
+/** Khung SVG cho pixel art: viewBox khớp lưới path đầu ra, luôn sắc nét ở mọi kích thước. */
 export const PixelScene = memo(function PixelScene({ width, height, layers, className, preserve = 'xMaxYMax slice', label }: Props) {
   return (
     <svg

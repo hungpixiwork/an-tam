@@ -1,14 +1,14 @@
 // Đọc / ghi dữ liệu người dùng từ D1 và chuyển sang kiểu miền của engine.
 
 import type { Me } from '../../shared/types/api';
-import type { Goal, Holding, Salutation, Snapshot, UserState } from '../../shared/types/domain';
-import { DEMO_EVENTS, DEMO_GOALS, DEMO_HABIT_ANSWERS, DEMO_HOLDINGS, DEMO_PROFILE, demoGoalMonth, demoSnapshots } from '../../shared/demo';
+import type { FinancialProfile, Goal, Holding, MonthTotal, Salutation, Snapshot, UserState } from '../../shared/types/domain';
 import { evaluateAlerts, type AlertCandidate } from '../../shared/engine/alerts';
-import { currentMonth } from '../../shared/engine/month';
+import { effectiveProfile, type EffectiveProfile } from '../../shared/engine/ledger';
+import { addMonths, currentMonth } from '../../shared/engine/month';
 
 interface UserRow {
   id: string; email: string; full_name: string; salutation: Salutation;
-  avatar_seed: number; member_status: string; is_demo_data: number;
+  avatar_seed: number; member_status: string; onboarded_at: string | null;
 }
 interface HoldingRow {
   id: string; name: string; category: Holding['category']; value: number; role: string;
@@ -26,7 +26,7 @@ export const toMe = (u: UserRow): Me => ({
   salutation: u.salutation,
   avatarSeed: u.avatar_seed,
   memberStatus: u.member_status,
-  isDemoData: u.is_demo_data === 1,
+  onboarded: u.onboarded_at !== null,
 });
 
 export const loadMe = async (db: D1Database, userId: string): Promise<Me | null> => {
@@ -34,22 +34,39 @@ export const loadMe = async (db: D1Database, userId: string): Promise<Me | null>
   return row ? toMe(row) : null;
 };
 
-export async function loadUserState(db: D1Database, userId: string, today = currentMonth()): Promise<UserState> {
-  const [profile, holdings, goals, snapshots] = await db.batch([
+/** State cho engine + số nền người dùng tự nhập và nguồn của thu / chi đang dùng. */
+export interface LoadedState extends UserState {
+  baseline: FinancialProfile;
+  sources: Omit<EffectiveProfile, 'profile'>;
+}
+
+export async function loadUserState(db: D1Database, userId: string, today = currentMonth()): Promise<LoadedState> {
+  const [profile, holdings, goals, snapshots, ledger] = await db.batch([
     db.prepare('SELECT * FROM financial_profiles WHERE user_id = ?').bind(userId),
     db.prepare('SELECT * FROM holdings WHERE user_id = ? ORDER BY order_idx').bind(userId),
     db.prepare('SELECT * FROM goals WHERE user_id = ? ORDER BY order_idx').bind(userId),
     db.prepare('SELECT month, total, emergency, invested, cashflow FROM net_worth_snapshots WHERE user_id = ? ORDER BY month').bind(userId),
+    db.prepare(
+      `SELECT substr(occurred_on, 1, 7) AS month,
+              SUM(CASE WHEN kind = 'income' THEN amount ELSE 0 END) AS income,
+              SUM(CASE WHEN kind = 'expense' THEN amount ELSE 0 END) AS expense
+       FROM transactions WHERE user_id = ? AND occurred_on >= ? GROUP BY month ORDER BY month`,
+    ).bind(userId, `${addMonths(today, -11)}-01`),
   ]);
   const p = (profile.results[0] ?? {}) as Record<string, number>;
+  const baseline: FinancialProfile = {
+    monthlyIncome: p.monthly_income ?? 0,
+    monthlyExpense: p.monthly_expense ?? 0,
+    emergencyTargetMonths: p.emergency_target_months ?? 6,
+    riskSelfScore: p.risk_self_score ?? 5,
+  };
+  const months = ledger.results as unknown as MonthTotal[];
+  const { profile: effective, ...sources } = effectiveProfile(baseline, months, today);
   return {
     today,
-    profile: {
-      monthlyIncome: p.monthly_income ?? 0,
-      monthlyExpense: p.monthly_expense ?? 0,
-      emergencyTargetMonths: p.emergency_target_months ?? 6,
-      riskSelfScore: p.risk_self_score ?? 5,
-    },
+    profile: effective,
+    baseline,
+    sources,
     holdings: (holdings.results as unknown as HoldingRow[]).map((h) => ({
       id: h.id, name: h.name, category: h.category, value: h.value, role: h.role,
       volatility: h.volatility, riskGroup: h.risk_group, isMain: h.is_main === 1,
@@ -59,36 +76,8 @@ export async function loadUserState(db: D1Database, userId: string, today = curr
       targetMonth: g.target_month, monthlyContribution: g.monthly_contribution, priority: g.priority,
     })),
     snapshots: snapshots.results as unknown as Snapshot[],
+    ledger: months,
   };
-}
-
-/** Nạp bộ dữ liệu tài chính demo cho người dùng mới. */
-export function demoDataStatements(db: D1Database, userId: string, today = currentMonth()): D1PreparedStatement[] {
-  const id = () => crypto.randomUUID();
-  return [
-    db.prepare('INSERT INTO financial_profiles (user_id, monthly_income, monthly_expense, emergency_target_months, risk_self_score) VALUES (?, ?, ?, ?, ?)')
-      .bind(userId, DEMO_PROFILE.monthlyIncome, DEMO_PROFILE.monthlyExpense, DEMO_PROFILE.emergencyTargetMonths, DEMO_PROFILE.riskSelfScore),
-    ...DEMO_HOLDINGS.map((h, i) =>
-      db.prepare('INSERT INTO holdings (id, user_id, name, category, value, role, volatility, risk_group, is_main, order_idx) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .bind(id(), userId, h.name, h.category, h.value, h.role, h.volatility, h.riskGroup, h.isMain ? 1 : 0, i),
-    ),
-    ...DEMO_GOALS.map((g, i) =>
-      db.prepare('INSERT INTO goals (id, user_id, kind, title, target_amount, current_amount, target_month, monthly_contribution, priority, order_idx) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .bind(id(), userId, g.kind, g.title, g.targetAmount, g.currentAmount, demoGoalMonth(today, g), g.monthlyContribution, g.priority, i),
-    ),
-    // Chỉ chèn nếu câu hỏi đã được seed (tránh lỗi khóa ngoại)
-    ...Object.entries(DEMO_HABIT_ANSWERS).map(([scenarioId, choice]) =>
-      db.prepare('INSERT INTO habit_answers (user_id, scenario_id, choice) SELECT ?, id, ? FROM habit_scenarios WHERE id = ?').bind(userId, choice, scenarioId),
-    ),
-    ...DEMO_EVENTS.map((e) =>
-      db.prepare('INSERT INTO ai_events (id, user_id, type, title, body, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-        .bind(id(), userId, e.type, e.title, e.body, new Date(Date.now() - e.hoursAgo * 3_600_000).toISOString()),
-    ),
-    ...demoSnapshots(today).map((s) =>
-      db.prepare('INSERT INTO net_worth_snapshots (user_id, month, total, emergency, invested, cashflow) VALUES (?, ?, ?, ?, ?, ?)')
-        .bind(userId, s.month, s.total, s.emergency, s.invested, s.cashflow),
-    ),
-  ];
 }
 
 const SNOOZE_DAYS = 7;

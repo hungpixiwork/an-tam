@@ -1,128 +1,91 @@
-import { useState } from 'react';
-import { X, AlertCircle } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { Trash2 } from 'lucide-react';
 import type { GoalCard } from '@shared/engine/analysis';
+import { addMonths, currentMonth } from '@shared/engine/month';
 import type { GoalKind } from '@shared/types/domain';
-import { Button } from '@/components/ui';
-import { useSaveGoal, useDeleteGoal, type GoalInput } from '@/lib/queries';
+import { Button, FormAlert, FormField, Modal, MoneyInput, Segmented, Select, TextInput } from '@/components/ui';
+import { useDeleteGoal, useSaveGoal, type GoalInput } from '@/lib/queries';
 
-interface GoalFormModalProps {
-  open: boolean;
-  goal: GoalCard | null;
-  onClose: () => void;
-}
+const KINDS: { value: GoalKind; label: string }[] = [
+  { value: 'home', label: 'Mua nhà' },
+  { value: 'education', label: 'Học cho con' },
+  { value: 'retirement', label: 'Nghỉ hưu' },
+  { value: 'emergency', label: 'Quỹ dự phòng' },
+  { value: 'custom', label: 'Khác' },
+];
 
-export function GoalFormModal({ open, goal, onClose }: GoalFormModalProps) {
-  const [form, setForm] = useState<{
-    title: string;
-    kind: GoalKind;
-    targetAmount: string;
-    currentAmount: string;
-    targetMonth: string;
-    monthlyContribution: string;
-  }>({
-    title: goal?.title ?? '',
-    kind: goal?.kind ?? 'custom',
-    targetAmount: goal ? (goal.targetAmount / 1_000_000).toString() : '',
-    currentAmount: goal ? (goal.currentAmount / 1_000_000).toString() : '',
-    targetMonth: goal?.targetMonth ?? new Date().toISOString().slice(0, 7),
-    monthlyContribution: goal ? (goal.monthlyContribution / 1_000_000).toString() : '',
-  });
+const PRIORITIES = [
+  { value: '1', label: 'Cao' },
+  { value: '2', label: 'Vừa' },
+  { value: '3', label: 'Thấp' },
+] as const;
 
+/** Thêm / sửa mục tiêu. Mount lại theo `key` mỗi lần mở để form luôn khớp mục tiêu đang sửa. */
+export function GoalFormModal({ goal, onClose }: { goal: GoalCard | null; onClose: () => void }) {
+  const [kind, setKind] = useState<GoalKind>(goal?.kind ?? 'home');
+  const [title, setTitle] = useState(goal?.title ?? '');
+  const [targetAmount, setTargetAmount] = useState(goal?.targetAmount ?? 0);
+  const [currentAmount, setCurrentAmount] = useState(goal?.currentAmount ?? 0);
+  const [targetMonth, setTargetMonth] = useState(goal?.targetMonth ?? addMonths(currentMonth(), 36));
+  const [monthlyContribution, setMonthlyContribution] = useState(goal?.monthlyContribution ?? 0);
+  const [priority, setPriority] = useState<'1' | '2' | '3'>(String(goal?.priority ?? 2) as '1' | '2' | '3');
   const save = useSaveGoal();
   const del = useDeleteGoal();
 
-  if (!open) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
+  function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const payload: GoalInput & { id?: string } = {
-      title: form.title,
-      kind: form.kind,
-      targetAmount: Math.round(Number(form.targetAmount) * 1_000_000),
-      currentAmount: Math.round(Number(form.currentAmount) * 1_000_000),
-      targetMonth: form.targetMonth,
-      monthlyContribution: Math.round(Number(form.monthlyContribution) * 1_000_000),
-      priority: goal?.priority ?? 0,
+    const input: GoalInput = {
+      kind,
+      title: title.trim() || KINDS.find((k) => k.value === kind)!.label,
+      targetAmount,
+      currentAmount,
+      targetMonth,
+      monthlyContribution,
+      priority: Number(priority),
     };
-    if (goal) payload.id = goal.id;
+    save.mutate(goal ? { ...input, id: goal.id } : input, { onSuccess: onClose });
+  }
 
-    save.mutate(payload as any, { onSuccess: onClose });
-  };
-
-  const handleDelete = () => {
-    if (goal && confirm('Bạn chắc chắn muốn xóa mục tiêu này?')) {
-      del.mutate(goal.id, { onSuccess: onClose });
-    }
-  };
-
-  const error = save.error || del.error;
+  const busy = save.isPending || del.isPending;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30" onClick={onClose} role="dialog" aria-modal="true" aria-label={goal ? 'Chỉnh sửa mục tiêu' : 'Thêm mục tiêu mới'}>
-      <div className="w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-lift" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-ink">{goal ? 'Chỉnh sửa mục tiêu' : 'Thêm mục tiêu mới'}</h2>
-          <button type="button" onClick={onClose} className="rounded-lg p-2 text-ink-soft hover:bg-slate-100" aria-label="Đóng">
-            <X className="h-5 w-5" />
-          </button>
+    <Modal title={goal ? 'Chỉnh sửa mục tiêu' : 'Thêm mục tiêu mới'} onClose={onClose}>
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="mb-1.5 text-sm font-semibold text-ink">Loại mục tiêu</p>
+            <Select label="Loại mục tiêu" value={kind} onChange={setKind} options={KINDS} className="h-11 w-full text-[15px]" />
+          </div>
+          <FormField label="Tên mục tiêu">
+            {(id) => <TextInput id={id} value={title} maxLength={60} placeholder={KINDS.find((k) => k.value === kind)!.label} onChange={(e) => setTitle(e.target.value)} />}
+          </FormField>
         </div>
-
-        {error && (
-          <div className="mb-4 flex gap-3 rounded-lg bg-danger-50 p-3">
-            <AlertCircle className="h-5 w-5 shrink-0 text-danger-600" />
-            <p className="text-sm text-danger-600">{error instanceof Error ? error.message : 'Đã có lỗi'}</p>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-ink">Tên mục tiêu</label>
-            <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-100" placeholder="VD: Mua nhà riêng" required />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-ink">Loại mục tiêu</label>
-            <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as GoalKind })} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-100">
-              <option value="home">Mua nhà</option>
-              <option value="education">Giáo dục</option>
-              <option value="retirement">Nghỉ hưu</option>
-              <option value="emergency">Quỹ dự phòng</option>
-              <option value="custom">Khác</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-ink">Mục tiêu (triệu đ)</label>
-            <input type="number" step="0.1" value={form.targetAmount} onChange={(e) => setForm({ ...form, targetAmount: e.target.value })} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-100" placeholder="500" required />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-ink">Đã có (triệu đ)</label>
-            <input type="number" step="0.1" value={form.currentAmount} onChange={(e) => setForm({ ...form, currentAmount: e.target.value })} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-100" placeholder="100" required />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-ink">Thời gian mục tiêu</label>
-            <input type="month" value={form.targetMonth} onChange={(e) => setForm({ ...form, targetMonth: e.target.value })} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-100" required />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-ink">Mỗi tháng để dành (triệu đ)</label>
-            <input type="number" step="0.1" value={form.monthlyContribution} onChange={(e) => setForm({ ...form, monthlyContribution: e.target.value })} className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-100" placeholder="10" required />
-          </div>
-
-          <div className="flex gap-2 pt-4">
-            <Button type="submit" variant="primary" className="flex-1" disabled={save.isPending || del.isPending}>
-              {goal ? 'Cập nhật' : 'Thêm mục tiêu'}
+        <FormField label="Cần bao nhiêu">{(id) => <MoneyInput id={id} value={targetAmount} onChange={setTargetAmount} />}</FormField>
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Đã có">{(id) => <MoneyInput id={id} value={currentAmount} onChange={setCurrentAmount} />}</FormField>
+          <FormField label="Muốn đạt vào">
+            {(id) => <TextInput id={id} type="month" value={targetMonth} min={currentMonth()} onChange={(e) => e.target.value && setTargetMonth(e.target.value)} />}
+          </FormField>
+        </div>
+        <FormField label="Mỗi tháng để dành" hint="Số tiền bạn đang thực sự dành riêng cho mục tiêu này mỗi tháng.">
+          {(id) => <MoneyInput id={id} value={monthlyContribution} onChange={setMonthlyContribution} />}
+        </FormField>
+        <div>
+          <p className="mb-1.5 text-sm font-semibold text-ink">Mức ưu tiên</p>
+          <Segmented label="Mức ưu tiên" value={priority} onChange={setPriority} options={[...PRIORITIES]} />
+        </div>
+        <FormAlert error={save.error ?? del.error} />
+        <div className="flex gap-2 pt-2">
+          <Button type="submit" className="flex-1" disabled={busy || targetAmount <= 0}>
+            {save.isPending ? 'Đang lưu…' : goal ? 'Lưu thay đổi' : 'Thêm mục tiêu'}
+          </Button>
+          {goal && (
+            <Button variant="danger" icon={Trash2} disabled={busy} onClick={() => confirm(`Xóa mục tiêu "${goal.title}"?`) && del.mutate(goal.id, { onSuccess: onClose })}>
+              Xóa
             </Button>
-            {goal && (
-              <Button type="button" variant="danger" onClick={handleDelete} disabled={save.isPending || del.isPending}>
-                Xóa
-              </Button>
-            )}
-          </div>
-        </form>
-      </div>
-    </div>
+          )}
+        </div>
+      </form>
+    </Modal>
   );
 }

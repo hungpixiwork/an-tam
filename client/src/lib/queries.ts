@@ -3,8 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { GoalsSummary, HabitScenario, HabitsProfile, PortfolioAnalysis, SimulationReport } from '@shared/engine/analysis';
 import type { PlanProposal } from '@shared/engine/plan';
-import type { NotificationItem, OverviewData, SearchResult } from '@shared/types/api';
-import type { Goal, SimulationParams } from '@shared/types/domain';
+import type { LedgerData, Me, NotificationItem, OnboardingResult, OverviewData, ProfileData, SearchResult } from '@shared/types/api';
+import type { AssetCategory, Goal, Holding, SimulationParams, Transaction, Volatility } from '@shared/types/domain';
 import { api } from './api';
 
 /* ───────── Kiểu dữ liệu riêng của client ───────── */
@@ -34,6 +34,10 @@ export interface Settings {
 }
 
 export type GoalInput = Omit<Goal, 'id'>;
+export interface HoldingInput { name: string; category: AssetCategory; value: number; volatility?: Volatility }
+export type TransactionInput = Omit<Transaction, 'id'>;
+export interface ProfileInput { monthlyIncome: number; monthlyExpense: number; emergencyTargetMonths: number }
+export interface OnboardingInput { profile?: ProfileInput; holdings: HoldingInput[]; goals: GoalInput[] }
 
 /* ───────── Khóa cache ───────── */
 
@@ -51,12 +55,15 @@ export const qk = {
   lessons: ['lessons'] as const,
   lesson: (slug: string) => ['lesson', slug] as const,
   settings: ['settings'] as const,
+  profile: ['profile'] as const,
+  holdings: ['holdings'] as const,
+  transactions: (month: string) => ['transactions', month] as const,
   notifications: ['notifications'] as const,
   search: (q: string) => ['search', q] as const,
 };
 
 /** Dữ liệu tài chính thay đổi → làm mới các màn phụ thuộc. */
-const FINANCE_KEYS = [['overview'], ['goals'], ['portfolio'], ['plans'], ['ai'], ['notifications']];
+const FINANCE_KEYS = [['overview'], ['goals'], ['portfolio'], ['plans'], ['ai'], ['notifications'], ['transactions'], ['profile'], ['holdings'], ['preview']];
 const useInvalidateFinance = () => {
   const qc = useQueryClient();
   return () => FINANCE_KEYS.forEach((key) => qc.invalidateQueries({ queryKey: key }));
@@ -72,7 +79,7 @@ export function useSaveGoal() {
   const refresh = useInvalidateFinance();
   return useMutation({
     mutationFn: ({ id, ...goal }: Partial<GoalInput> & { id?: string }) =>
-      id ? api.patch<null>(`/goals/${id}`, goal) : api.post<{ id: string }>('/goals', goal),
+      id ? api.patch<null>(`/goals/${id}`, goal) : api.post<null>('/goals', goal),
     onSuccess: refresh,
   });
 }
@@ -91,14 +98,14 @@ export const useRun = (id: string) => useQuery({ queryKey: qk.run(id), queryFn: 
 export const useSimulationPreview = (params: SimulationParams) =>
   useQuery({
     queryKey: ['preview', params],
-    queryFn: () => api.post<SimulationReport>('/simulations/preview', params as unknown as Record<string, unknown>),
+    queryFn: () => api.post<SimulationReport>('/simulations/preview', params),
     placeholderData: (prev) => prev,
   });
 
 export function useRunSimulation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (params: SimulationParams) => api.post<{ runId: string }>('/simulations/run', params as unknown as Record<string, unknown>),
+    mutationFn: (params: SimulationParams) => api.post<{ runId: string }>('/simulations/run', params),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.runs });
       qc.invalidateQueries({ queryKey: ['ai'] });
@@ -127,6 +134,57 @@ export function useSetSelfScore() {
 
 /* ───────── 06 · Danh mục ───────── */
 export const usePortfolio = () => useQuery({ queryKey: qk.portfolio, queryFn: () => api.get<PortfolioAnalysis>('/portfolio') });
+export const useHoldings = () => useQuery({ queryKey: qk.holdings, queryFn: () => api.get<Holding[]>('/holdings') });
+
+export function useSaveHolding() {
+  const refresh = useInvalidateFinance();
+  return useMutation({
+    mutationFn: ({ id, ...h }: Partial<HoldingInput> & { id?: string }) => (id ? api.patch<null>(`/holdings/${id}`, h) : api.post<null>('/holdings', h)),
+    onSuccess: refresh,
+  });
+}
+
+export function useDeleteHolding() {
+  const refresh = useInvalidateFinance();
+  return useMutation({ mutationFn: (id: string) => api.del<null>(`/holdings/${id}`), onSuccess: refresh });
+}
+
+/* ───────── Sổ thu chi ───────── */
+export const useTransactions = (month: string) =>
+  useQuery({ queryKey: qk.transactions(month), queryFn: () => api.get<LedgerData>(`/transactions?month=${month}`), placeholderData: (prev) => prev });
+
+export function useSaveTransaction() {
+  const refresh = useInvalidateFinance();
+  return useMutation({
+    mutationFn: ({ id, ...t }: TransactionInput & { id?: string }) => (id ? api.patch<null>(`/transactions/${id}`, t) : api.post<{ id: string }>('/transactions', t)),
+    onSuccess: refresh,
+  });
+}
+
+export function useDeleteTransaction() {
+  const refresh = useInvalidateFinance();
+  return useMutation({ mutationFn: (id: string) => api.del<null>(`/transactions/${id}`), onSuccess: refresh });
+}
+
+/* ───────── Hồ sơ tài chính & bắt đầu ───────── */
+export const useProfile = () => useQuery({ queryKey: qk.profile, queryFn: () => api.get<ProfileData>('/profile') });
+
+export function useSaveProfile() {
+  const refresh = useInvalidateFinance();
+  return useMutation({ mutationFn: (p: Partial<ProfileInput>) => api.put<ProfileData>('/profile', p), onSuccess: refresh });
+}
+
+/** Gửi dữ liệu màn "Bắt đầu". Chưa cập nhật `me` ngay để màn còn hiện bước kết quả — gọi `finish` khi người dùng bấm tiếp. */
+export function useOnboarding() {
+  const qc = useQueryClient();
+  return {
+    submit: useMutation({ mutationFn: (input: OnboardingInput) => api.post<OnboardingResult>('/onboarding', input) }),
+    finish: (me: Me) => {
+      FINANCE_KEYS.forEach((key) => qc.removeQueries({ queryKey: key }));
+      qc.setQueryData(qk.me, me);
+    },
+  };
+}
 
 /* ───────── 07 · Kế hoạch an toàn ───────── */
 export const usePlans = () => useQuery({ queryKey: qk.plans, queryFn: () => api.get<PlansData>('/plans') });
@@ -187,6 +245,20 @@ export function useUpdateSettings() {
     onError: () => qc.invalidateQueries({ queryKey: qk.settings }),
   });
 }
+
+export function useUpdateMe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { fullName?: string; salutation?: Me['salutation'] }) => api.patch<Me>('/me', v),
+    onSuccess: (me) => {
+      qc.setQueryData(qk.me, me);
+      qc.invalidateQueries({ queryKey: ['overview'] });
+    },
+  });
+}
+
+export const useChangePassword = () =>
+  useMutation({ mutationFn: (v: { currentPassword: string; newPassword: string }) => api.post<null>('/me/password', v) });
 
 export function useDeleteAccount() {
   const qc = useQueryClient();

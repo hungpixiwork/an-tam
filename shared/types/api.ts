@@ -2,7 +2,9 @@
 
 import type { AllocationSlice } from '../engine/portfolio';
 import type { PeaceFactor, PeaceLevel } from '../engine/peace';
-import type { Salutation } from './domain';
+import type { ProfileSource, TransactionCategory } from '../engine/ledger';
+import type { AlertSeverity } from '../engine/alerts';
+import type { MonthTotal, Salutation, Transaction } from './domain';
 
 export interface ApiOk<T> { success: true; data: T }
 export interface ApiErr { success: false; error: { code: string; message: string } }
@@ -15,7 +17,8 @@ export interface Me {
   salutation: Salutation;
   avatarSeed: number;
   memberStatus: string;
-  isDemoData: boolean;
+  /** Đã hoàn tất màn "Bắt đầu" (nhập hoặc bỏ qua). */
+  onboarded: boolean;
 }
 
 export interface Kpi {
@@ -54,6 +57,15 @@ export interface OverviewData {
     presetSlug: string;
   };
   openAlerts: number;
+  /** Người dùng đã nhập những phần nào — màn hiển thị gợi ý nhập tiếp cho phần còn thiếu. */
+  setup: SetupStatus;
+}
+
+export interface SetupStatus {
+  profile: boolean;
+  holdings: boolean;
+  goals: boolean;
+  transactions: boolean;
 }
 
 export interface NotificationItem {
@@ -68,4 +80,34 @@ export interface SearchResult {
   title: string;
   subtitle: string;
   to: string;
+}
+
+/** Con số thu / chi engine đang dùng và nguồn của nó. */
+export interface ProfileUsage {
+  income: number;
+  expense: number;
+  incomeSource: ProfileSource;
+  expenseSource: ProfileSource;
+  ledgerMonths: number;
+}
+
+export interface ProfileData {
+  baseline: { monthlyIncome: number; monthlyExpense: number; emergencyTargetMonths: number };
+  used: ProfileUsage;
+}
+
+export interface LedgerData {
+  month: string;
+  items: Transaction[];
+  totals: { income: number; expense: number; net: number };
+  byCategory: (Pick<TransactionCategory, 'key' | 'kind' | 'label' | 'icon'> & { amount: number; pct: number })[];
+  months: MonthTotal[];
+  used: ProfileUsage;
+}
+
+export interface OnboardingResult {
+  me: Me;
+  peace: { score: number; label: string; level: PeaceLevel };
+  alerts: { severity: AlertSeverity; title: string }[];
+  setup: SetupStatus;
 }

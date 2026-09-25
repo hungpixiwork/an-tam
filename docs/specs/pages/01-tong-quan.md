@@ -25,4 +25,6 @@ Cho người dùng biết trong 5 giây: tài chính đang ổn tới đâu, ti�
 - Không có mục tiêu → gợi ý "Hãy thêm mục tiêu đầu tiên…".
 
 ## Kiểm tra
-Seed demo: 82 "Ổn định", 1,24 tỷ ↑6%, 180 triệu ↑12%, 740 triệu ↑8%, +18 triệu Tốt hơn, gợi ý "chậm 8 tháng".
+Fixture test (`tests/demo-data.ts`, không nạp vào tài khoản thật): 82 "Ổn định", 1,24 tỷ ↑6%, 180 triệu ↑12%, 740 triệu ↑8%, +18 triệu Tốt hơn, gợi ý "chậm 8 tháng".
+
+Tài khoản mới: thẻ "Giúp An Tâm AI hiểu bạn rõ hơn" (checklist 4 phần `setup`, ẩn khi đủ), vòng điểm xám "Chưa đủ dữ liệu" khi chưa có thu chi lẫn tài sản, card phân bổ trống có nút "Thêm tài sản", gợi ý hôm nay → "Đặt mục tiêu" khi chưa có mục tiêu.

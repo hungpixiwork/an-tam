@@ -10,8 +10,9 @@ import { DEFAULT_PARAMS } from '@shared/engine/simulate';
 import { formatPct, formatVnd } from '@shared/format';
 import type { SimulationParams } from '@shared/types/domain';
 import { HeroLakeCity } from '@/components/pixel';
-import { Bot } from 'lucide-react';
+import { Bot, Target } from 'lucide-react';
 import { Button, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, Select, cx, type Tone } from '@/components/ui';
+import { NeedData } from '@/components/NeedData';
 import { usePresets, useRunSimulation, useSimulationPreview, type Preset } from '@/lib/queries';
 
 /* ───────── Cấu hình slider ───────── */
@@ -62,7 +63,16 @@ export default function SimulationPage() {
   // Khởi tạo từ ?preset= (mặc định "Năm khó khăn")
   const slug = search.get('preset') ?? 'nam-kho-khan';
   const initial = presets.data.find((p) => p.slug === slug)?.params ?? DEFAULT_PARAMS;
-  return <Simulator key={slug} presets={presets.data} initial={initial} />;
+  return (
+    <NeedData
+      anyOf={['holdings', 'goals']}
+      icon={Target}
+      title="Chưa có gì để mô phỏng"
+      body="Mô phỏng cho thấy tài sản và mục tiêu của bạn thay đổi thế nào khi thị trường giảm, lạm phát tăng hay mất thu nhập. Hãy thêm tài sản hoặc mục tiêu trước."
+    >
+      <Simulator key={slug} presets={presets.data} initial={initial} />
+    </NeedData>
+  );
 }
 
 function Simulator({ presets, initial }: { presets: Preset[]; initial: SimulationParams }) {

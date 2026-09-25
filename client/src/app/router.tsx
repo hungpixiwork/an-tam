@@ -2,7 +2,10 @@ import { lazy } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppShell } from '@/layouts/AppShell';
 import { AuthLayout } from '@/layouts/AuthLayout';
+import { OnboardingLayout } from '@/layouts/OnboardingLayout';
 
+const OnboardingPage = lazy(() => import('@/features/onboarding/OnboardingPage'));
+const LedgerPage = lazy(() => import('@/features/ledger/LedgerPage'));
 const OverviewPage = lazy(() => import('@/features/overview/OverviewPage'));
 const GoalsPage = lazy(() => import('@/features/goals/GoalsPage'));
 const SimulationPage = lazy(() => import('@/features/simulation/SimulationPage'));
@@ -25,10 +28,12 @@ export const router = createBrowserRouter([
       { path: '/dang-ky', element: <RegisterPage /> },
     ],
   },
+  { element: <OnboardingLayout />, children: [{ path: '/bat-dau', element: <OnboardingPage /> }] },
   {
     element: <AppShell />,
     children: [
       { path: '/', element: <OverviewPage /> },
+      { path: '/thu-chi', element: <LedgerPage /> },
       { path: '/muc-tieu', element: <GoalsPage /> },
       { path: '/mo-phong', element: <SimulationPage /> },
       { path: '/mo-phong/ket-qua/:runId', element: <SimulationResultPage /> },

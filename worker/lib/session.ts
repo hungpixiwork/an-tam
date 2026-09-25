@@ -39,3 +39,11 @@ export async function destroySession(c: Context<AppEnv>): Promise<void> {
   if (token) await c.env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await hashToken(token)).run();
   deleteCookie(c, SESSION_COOKIE, { path: '/' });
 }
+
+/** Đăng xuất mọi thiết bị khác, giữ phiên hiện tại (sau khi đổi mật khẩu). */
+export async function destroyOtherSessions(c: Context<AppEnv>, userId: string): Promise<void> {
+  const token = getCookie(c, SESSION_COOKIE);
+  await c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?')
+    .bind(userId, token ? await hashToken(token) : '')
+    .run();
+}

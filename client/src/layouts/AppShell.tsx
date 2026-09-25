@@ -20,6 +20,8 @@ export function AppShell() {
 
   if (loading) return <div className="min-h-screen bg-canvas" aria-busy="true" />;
   if (!me) return <Navigate to="/dang-nhap" replace state={{ from: pathname }} />;
+  // Tài khoản mới: nhập dữ liệu ban đầu (hoặc bỏ qua) trước khi vào ứng dụng
+  if (!me.onboarded) return <Navigate to="/bat-dau" replace />;
 
   return (
     <div className="flex min-h-screen bg-canvas">

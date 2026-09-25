@@ -30,7 +30,7 @@ export default function RegisterPage() {
         password: String(form.get('password')),
         salutation,
       });
-      navigate('/', { replace: true });
+      navigate('/bat-dau', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Đăng ký thất bại');
     } finally {
@@ -42,7 +42,7 @@ export default function RegisterPage() {
     <form onSubmit={onSubmit} className="space-y-5" noValidate>
       <div>
         <h1 className="text-[28px] font-extrabold tracking-tight text-ink">Tạo tài khoản</h1>
-        <p className="mt-1 text-sm text-ink-soft">Tài khoản mới có sẵn bộ dữ liệu mẫu để bạn khám phá ngay.</p>
+        <p className="mt-1 text-sm text-ink-soft">Chỉ mất khoảng 2 phút để An Tâm AI hiểu tình hình tài chính của bạn.</p>
       </div>
       <FormError message={error} />
       <fieldset>
@@ -64,7 +64,7 @@ export default function RegisterPage() {
           ))}
         </div>
       </fieldset>
-      <Field label="Họ và tên" name="fullName" autoComplete="name" required placeholder="Nguyễn Văn Minh" />
+      <Field label="Họ và tên" name="fullName" autoComplete="name" required placeholder="Họ và tên của bạn" />
       <Field label="Email" name="email" type="email" autoComplete="email" required />
       <Field label="Mật khẩu" name="password" type="password" autoComplete="new-password" required minLength={8} hint="Ít nhất 8 ký tự" />
       <Button type="submit" size="lg" className="w-full" disabled={pending}>

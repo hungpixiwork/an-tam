@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { ArrowDown, ArrowUp, RefreshCw } from 'lucide-react';
+import { ArrowDown, ArrowUp, RefreshCw, type LucideIcon } from 'lucide-react';
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
 import { formatPct } from '@shared/format';
-import { Button, cx } from './core';
+import { Button, IconTile, cx, type Tone } from './core';
 
 /* ───────── Số liệu ───────── */
 
@@ -102,6 +102,29 @@ export function ErrorState({ error, onRetry, className }: { error: unknown; onRe
           Thử lại
         </Button>
       )}
+    </div>
+  );
+}
+
+/** Chưa có dữ liệu: icon + câu giải thích + hành động gợi ý nhập. */
+export function EmptyState({ icon, tone = 'blue', title, body, action, className, compact }: {
+  icon: LucideIcon;
+  tone?: Tone;
+  title: string;
+  body?: ReactNode;
+  action?: ReactNode;
+  className?: string;
+  /** Dùng bên trong card (không viền, padding nhỏ). */
+  compact?: boolean;
+}) {
+  return (
+    <div className={cx('flex flex-col items-center justify-center gap-3 text-center', compact ? 'py-6' : 'rounded-2xl border border-dashed border-line bg-white px-6 py-10', className)}>
+      <IconTile icon={icon} tone={tone} size="lg" />
+      <div className="max-w-md">
+        <p className="font-bold text-ink">{title}</p>
+        {body && <p className="mt-1 text-sm leading-relaxed text-ink-soft">{body}</p>}
+      </div>
+      {action}
     </div>
   );
 }

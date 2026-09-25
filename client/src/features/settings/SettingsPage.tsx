@@ -1,11 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Bell, Bot, CheckCircle2, Database, Download, Lock, ShieldCheck, Trash2, Users, XCircle } from 'lucide-react';
 import { HeroLakeCity, WindingPath } from '@/components/pixel';
 import { Badge, Button, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, Rich, Toggle, type Tone } from '@/components/ui';
 import { useDeleteAccount, useSettings, useUpdateSettings, type Settings } from '@/lib/queries';
+import { FinanceBasicsCard, PasswordCard, ProfileCard } from './AccountCards';
 
 export default function SettingsPage() {
   const { data: settings, error, refetch, isPending } = useSettings();
+  const { hash } = useLocation();
+
+  // Link "/cai-dat#tai-chinh" từ Tổng quan: cuộn tới card sau khi màn đã hiện
+  useEffect(() => {
+    if (!isPending && hash) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth' });
+  }, [isPending, hash]);
 
   if (isPending) return <PageSkeleton />;
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />;
@@ -17,6 +25,14 @@ export default function SettingsPage() {
         subtitle={<Rich text="An Tâm AI ưu tiên bảo vệ dữ liệu và minh bạch cách AI hoạt động." />}
         scene={(cls) => <HeroLakeCity className={cls} />}
       />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-[1.25fr_1fr_1fr]">
+        <div className="lg:col-span-2 xl:col-span-1">
+          <FinanceBasicsCard />
+        </div>
+        <ProfileCard />
+        <PasswordCard />
+      </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.15fr]">
         <PrivacyCard settings={settings} />

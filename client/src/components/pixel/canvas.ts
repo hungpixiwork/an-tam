@@ -13,29 +13,58 @@ export interface PixelPath {
 export class PixelCanvas {
   readonly w: number;
   readonly h: number;
+  readonly scale: number;
+  readonly pixelWidth: number;
+  readonly pixelHeight: number;
   readonly data: (Color | undefined)[];
 
-  constructor(w: number, h: number) {
+  constructor(w: number, h: number, scale = 1) {
     this.w = w;
     this.h = h;
-    this.data = new Array(w * h);
+    this.scale = Math.max(1, Math.floor(scale));
+    this.pixelWidth = w * this.scale;
+    this.pixelHeight = h * this.scale;
+    this.data = new Array(this.pixelWidth * this.pixelHeight);
   }
 
   get(x: number, y: number): Color | undefined {
     if (x < 0 || y < 0 || x >= this.w || y >= this.h) return undefined;
-    return this.data[y * this.w + x];
+    return this.data[Math.round(y) * this.scale * this.pixelWidth + Math.round(x) * this.scale];
   }
 
   px(x: number, y: number, c: Color): this {
     x = Math.round(x);
     y = Math.round(y);
-    if (x >= 0 && y >= 0 && x < this.w && y < this.h) this.data[y * this.w + x] = c;
+    if (x < 0 || y < 0 || x >= this.w || y >= this.h) return this;
+    const sx = x * this.scale;
+    const sy = y * this.scale;
+    for (let j = 0; j < this.scale; j++) {
+      const row = (sy + j) * this.pixelWidth + sx;
+      for (let i = 0; i < this.scale; i++) this.data[row + i] = c;
+    }
+    return this;
+  }
+
+  /** One output pixel at fractional logical coordinates for fine-detail clusters. */
+  finePx(x: number, y: number, c: Color): this {
+    const px = Math.round(x * this.scale);
+    const py = Math.round(y * this.scale);
+    if (px >= 0 && py >= 0 && px < this.pixelWidth && py < this.pixelHeight) this.data[py * this.pixelWidth + px] = c;
     return this;
   }
 
   /** Xóa pixel (trong suốt). */
   clear(x: number, y: number): this {
-    if (x >= 0 && y >= 0 && x < this.w && y < this.h) this.data[y * this.w + x] = undefined;
+    x = Math.round(x);
+    y = Math.round(y);
+    if (x >= 0 && y >= 0 && x < this.w && y < this.h) {
+      const sx = x * this.scale;
+      const sy = y * this.scale;
+      for (let j = 0; j < this.scale; j++) {
+        const row = (sy + j) * this.pixelWidth + sx;
+        for (let i = 0; i < this.scale; i++) this.data[row + i] = undefined;
+      }
+    }
     return this;
   }
 
@@ -128,10 +157,16 @@ export class PixelCanvas {
 
   /** Dán canvas khác lên canvas này. */
   draw(other: PixelCanvas, dx = 0, dy = 0): this {
-    for (let y = 0; y < other.h; y++) {
-      for (let x = 0; x < other.w; x++) {
-        const c = other.data[y * other.w + x];
-        if (c) this.px(x + dx, y + dy, c);
+    const offsetX = Math.round(dx * this.scale);
+    const offsetY = Math.round(dy * this.scale);
+    for (let y = 0; y < other.pixelHeight; y++) {
+      for (let x = 0; x < other.pixelWidth; x++) {
+        const color = other.data[y * other.pixelWidth + x];
+        const px = x + offsetX;
+        const py = y + offsetY;
+        if (color && px >= 0 && py >= 0 && px < this.pixelWidth && py < this.pixelHeight) {
+          this.data[py * this.pixelWidth + px] = color;
+        }
       }
     }
     return this;
@@ -140,10 +175,12 @@ export class PixelCanvas {
   /** Viền ngoài 1 pixel quanh mọi vùng đã tô (4 hướng). */
   outline(c: Color): this {
     const add: number[] = [];
-    for (let y = 0; y < this.h; y++) {
-      for (let x = 0; x < this.w; x++) {
-        if (this.get(x, y)) continue;
-        if (this.get(x - 1, y) || this.get(x + 1, y) || this.get(x, y - 1) || this.get(x, y + 1)) add.push(y * this.w + x);
+    for (let y = 0; y < this.pixelHeight; y++) {
+      for (let x = 0; x < this.pixelWidth; x++) {
+        const index = y * this.pixelWidth + x;
+        if (this.data[index]) continue;
+        if ((x > 0 && this.data[index - 1]) || (x + 1 < this.pixelWidth && this.data[index + 1]) ||
+          (y > 0 && this.data[index - this.pixelWidth]) || (y + 1 < this.pixelHeight && this.data[index + this.pixelWidth])) add.push(index);
       }
     }
     for (const i of add) this.data[i] = c;
@@ -158,13 +195,13 @@ export class PixelCanvas {
 
   toPaths(): PixelPath[] {
     const byColor = new Map<Color, string[]>();
-    for (let y = 0; y < this.h; y++) {
+    for (let y = 0; y < this.pixelHeight; y++) {
       let x = 0;
-      while (x < this.w) {
-        const c = this.data[y * this.w + x];
+      while (x < this.pixelWidth) {
+        const c = this.data[y * this.pixelWidth + x];
         if (!c) { x++; continue; }
         let run = 1;
-        while (x + run < this.w && this.data[y * this.w + x + run] === c) run++;
+        while (x + run < this.pixelWidth && this.data[y * this.pixelWidth + x + run] === c) run++;
         let parts = byColor.get(c);
         if (!parts) byColor.set(c, (parts = []));
         parts.push(`M${x} ${y}h${run}v1h-${run}z`);

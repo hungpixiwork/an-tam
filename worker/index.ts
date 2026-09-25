@@ -13,6 +13,10 @@ import { plans, portfolio } from './routes/plans';
 import { ai } from './routes/ai';
 import { lessons } from './routes/lessons';
 import { settings } from './routes/settings';
+import { onboarding } from './routes/onboarding';
+import { profile } from './routes/profile';
+import { holdings } from './routes/holdings';
+import { transactions } from './routes/transactions';
 import { runMonitor } from './jobs/monitor';
 
 const app = new Hono<AppEnv>();
@@ -28,6 +32,10 @@ app.route('/api/auth', auth);
 
 // Mọi API còn lại yêu cầu đăng nhập
 app.use('/api/*', requireAuth);
+app.route('/api/onboarding', onboarding);
+app.route('/api/profile', profile);
+app.route('/api/holdings', holdings);
+app.route('/api/transactions', transactions);
 app.route('/api/overview', overview);
 app.route('/api/goals', goals);
 app.route('/api/simulations', simulations);

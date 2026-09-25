@@ -5,36 +5,56 @@ import type { GoalCard, GoalsSummary } from '@shared/engine/analysis';
 import type { GoalKind } from '@shared/types/domain';
 import { formatVnd, formatMonth, formatPct } from '@shared/format';
 import { FamilyCity, HouseCalendar } from '@/components/pixel';
-import { Button, ButtonLink, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, ProgressBar, Rich, cx, type Tone } from '@/components/ui';
+import { Button, ButtonLink, Card, CardTitle, EmptyState, ErrorState, IconTile, PageHero, PageSkeleton, ProgressBar, Rich, cx, type Tone } from '@/components/ui';
 import { useGoals } from '@/lib/queries';
 import { GoalFormModal } from './GoalFormModal';
 
 export default function GoalsPage() {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingGoal, setEditingGoal] = useState<GoalCard | null>(null);
+  // undefined = đóng; null = thêm mới; GoalCard = đang sửa
+  const [editing, setEditing] = useState<GoalCard | null | undefined>(undefined);
   const { data, error, refetch, isPending } = useGoals();
 
   if (isPending) return <PageSkeleton />;
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />;
 
+  const hero = (
+    <PageHero
+      title="Tiền không chỉ để đầu tư,"
+      highlight={<Rich text="mà để đạt những điều quan trọng trong {em:cuộc sống}." />}
+      subtitle="Đặt mục tiêu rõ ràng để AI giúp bạn giữ kế hoạch đi đúng hướng."
+      scene={(cls) => <FamilyCity className={cls} />}
+      sceneWidth="42%"
+    />
+  );
+  const modal = editing !== undefined && <GoalFormModal key={editing?.id ?? 'new'} goal={editing} onClose={() => setEditing(undefined)} />;
+
+  if (data.goals.length === 0) {
+    return (
+      <div className="space-y-4">
+        {hero}
+        <EmptyState
+          icon={Target}
+          title="Bạn chưa đặt mục tiêu nào"
+          body="Mua nhà, quỹ học cho con, nghỉ hưu hay đơn giản là quỹ dự phòng. AI sẽ ước tính khả năng đạt đúng hạn và cảnh báo sớm khi kế hoạch lệch hướng."
+          action={<Button onClick={() => setEditing(null)}>+ Thêm mục tiêu đầu tiên</Button>}
+        />
+        {modal}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <PageHero
-        title="Tiền không chỉ để đầu tư,"
-        highlight={<Rich text="mà để đạt những điều quan trọng trong {em:cuộc sống}." />}
-        subtitle="Đặt mục tiêu rõ ràng để AI giúp bạn giữ kế hoạch đi đúng hướng."
-        scene={(cls) => <FamilyCity className={cls} />}
-        sceneWidth="42%"
-      />
+      {hero}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
         {data.goals.map((goal) => (
-          <GoalCardItem key={goal.id} goal={goal} index={data.goals.indexOf(goal)} onEdit={(g) => { setEditingGoal(g); setModalOpen(true); }} />
+          <GoalCardItem key={goal.id} goal={goal} index={data.goals.indexOf(goal)} onEdit={setEditing} />
         ))}
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr]">
-        <MilestonesCard milestones={data.milestones} onAdd={() => { setEditingGoal(null); setModalOpen(true); }} />
+        <MilestonesCard milestones={data.milestones} onAdd={() => setEditing(null)} />
         <MonthlyChartCard goals={data.goals} />
       </div>
 
@@ -50,7 +70,7 @@ export default function GoalsPage() {
         </div>
       )}
 
-      <GoalFormModal open={modalOpen} goal={editingGoal} onClose={() => { setModalOpen(false); setEditingGoal(null); }} />
+      {modal}
     </div>
   );
 }

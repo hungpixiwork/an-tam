@@ -11,11 +11,11 @@ hệ thống minh họa pixel art và đặc tả 10 màn hình theo mockup.
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Kiến trúc tổng thể, cấu trúc thư mục, luồng dev / build / deploy |
 | [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) | Token màu, chữ, khoảng cách, component UI, định dạng tiền VN |
 | [PIXEL-ART.md](PIXEL-ART.md) | Engine sprite, palette, danh sách scene, animation |
-| [DATABASE.md](DATABASE.md) | Schema D1, quan hệ, migration, dữ liệu demo |
+| [DATABASE.md](DATABASE.md) | Schema D1, quan hệ, migration, luồng ghi dữ liệu |
 | [API.md](API.md) | Toàn bộ endpoint, request / response, mã lỗi |
 | [ENGINE.md](ENGINE.md) | Công thức điểm an tâm, xác suất mục tiêu, mô phỏng, cảnh báo, gợi ý |
 | [AUTH.md](AUTH.md) | Đăng ký, đăng nhập, session, bảo mật |
-| [pages/](pages/) | Đặc tả từng màn hình (01 → 10) |
+| [pages/](pages/) | Đặc tả từng màn hình (00 → 11) |
 
 ## Phạm vi & quyết định sản phẩm
 - **AI = rule-based, tất định.** Mọi con số và câu gợi ý đều sinh từ engine trong `shared/engine`. Không gọi LLM.
@@ -28,6 +28,7 @@ hệ thống minh họa pixel art và đặc tả 10 màn hình theo mockup.
 ## Danh sách màn hình
 | # | Màn | Route | Mockup |
 |---|---|---|---|
+| 00 | Bắt đầu (tài khoản mới) | `/bat-dau` | — |
 | 01 | Tổng quan tài chính | `/` | ảnh (1) |
 | 02 | Mục tiêu cuộc sống | `/muc-tieu` | ảnh (2) |
 | 03 | Mô phỏng tương lai | `/mo-phong` | ảnh (3) |
@@ -38,6 +39,7 @@ hệ thống minh họa pixel art và đặc tả 10 màn hình theo mockup.
 | 08 | AI theo dõi | `/ai-theo-doi` | ảnh (8) |
 | 09 | Bài học cộng đồng | `/cong-dong` | ảnh (9) |
 | 10 | Cài đặt & quyền riêng tư | `/cai-dat` | ảnh (10) |
+| 11 | Sổ thu chi | `/thu-chi` | — |
 
 ## Lộ trình
 | Milestone | Nội dung | Trạng thái |

@@ -51,6 +51,21 @@ Cú sốc áp lên trạng thái → trạng thái mới, rồi đo lại mọi 
 | `emergency_low` | action | quỹ dự phòng < chi tiêu × số tháng mục tiêu |
 `syncAlerts` (Worker) mở cảnh báo mới, đóng cảnh báo hết vi phạm, không mở lại cảnh báo vừa được đánh dấu xử lý trong 7 ngày. Chạy khi đăng ký, khi mở Tổng quan và theo Cron hằng ngày.
 
+## Sổ thu chi (`ledger.ts`)
+- `TRANSACTION_CATEGORIES`: 5 danh mục thu, 8 danh mục chi (`key`, `kind`, `label`, `icon`).
+- `effectiveProfile(baseline, ledger, today)` quyết định thu nhập / chi tiêu tháng engine dùng, **từng trường riêng**:
+  1. trung bình các tháng **đã trọn** trong 3 tháng gần nhất có ghi sổ → nguồn `ledger`;
+  2. số nền người dùng nhập (màn Bắt đầu / Cài đặt) → `baseline`;
+  3. số đã ghi trong tháng hiện tại → `current_month` (để người chưa nhập số nền vẫn thấy AI phản ứng);
+  4. không có gì → `0`, `none`.
+- `loadUserState` áp hàm này nên phần còn lại của engine (peace, goals, simulate, alerts, plan) không đổi.
+- `HOLDING_DEFAULTS[category]` → `role`, `volatility`, `riskGroup` mặc định để form tài sản chỉ cần tên, loại, giá trị.
+
+## Tài khoản trống
+`setupStatus(state)` → `{ profile, holdings, goals, transactions }`. Khi chưa có cả thu chi lẫn tài sản, `buildOverview`
+dùng câu chào `greeting.empty` và nhãn "Chưa đủ dữ liệu" (điểm thô vẫn được tính nhưng client không hiển thị).
+Mọi hàm engine chạy được trên state rỗng, không sinh NaN / Infinity (có test `tests/ledger.test.ts`).
+
 ## Câu chữ (`narrate.ts`)
 Mọi câu "AI nói" là template + số liệu. Đánh dấu `{em:…}`, `{danger:…}`, `{success:…}` để client tô màu (`<Rich/>`).
 Interface `Narrator` cho phép thay bằng bộ diễn đạt khác (ví dụ Workers AI) mà **không đổi số liệu**.

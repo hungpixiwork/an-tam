@@ -2,37 +2,44 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppEnv } from '../env';
 import { goalsSummary } from '../../shared/engine/analysis';
+import { formatVnd } from '../../shared/format';
 import { notFound, ok } from '../lib/http';
+import { afterChange } from '../lib/refresh';
 import { loadUserState } from '../lib/state';
-import { body } from '../lib/validate';
+import { body, money, monthString } from '../lib/validate';
 
-const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Tháng không hợp lệ (YYYY-MM)');
-const goalSchema = z.object({
+export const goalSchema = z.object({
   kind: z.enum(['home', 'education', 'retirement', 'emergency', 'custom']),
   title: z.string().trim().min(2, 'Tên mục tiêu quá ngắn').max(60),
-  targetAmount: z.number().int().positive('Số tiền mục tiêu phải lớn hơn 0'),
-  currentAmount: z.number().int().min(0),
-  targetMonth: month,
-  monthlyContribution: z.number().int().min(0),
+  targetAmount: money.positive('Số tiền mục tiêu phải lớn hơn 0'),
+  currentAmount: money,
+  targetMonth: monthString,
+  monthlyContribution: money,
   priority: z.number().int().min(1).max(3).default(2),
 });
+export type GoalInput = z.infer<typeof goalSchema>;
+
+export const insertGoal = (db: D1Database, userId: string, g: GoalInput) =>
+  db
+    .prepare(
+      `INSERT INTO goals (id, user_id, kind, title, target_amount, current_amount, target_month, monthly_contribution, priority, order_idx)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(order_idx), 0) + 1 FROM goals WHERE user_id = ?))`,
+    )
+    .bind(crypto.randomUUID(), userId, g.kind, g.title, g.targetAmount, g.currentAmount, g.targetMonth, g.monthlyContribution, g.priority, userId);
 
 export const goals = new Hono<AppEnv>()
   .get('/summary', async (c) => ok(c, goalsSummary(await loadUserState(c.env.DB, c.get('userId')))))
   .post('/', body(goalSchema), async (c) => {
     const g = c.req.valid('json');
     const userId = c.get('userId');
-    const id = crypto.randomUUID();
-    await c.env.DB.prepare(
-      `INSERT INTO goals (id, user_id, kind, title, target_amount, current_amount, target_month, monthly_contribution, priority, order_idx)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(order_idx), 0) + 1 FROM goals WHERE user_id = ?))`,
-    )
-      .bind(id, userId, g.kind, g.title, g.targetAmount, g.currentAmount, g.targetMonth, g.monthlyContribution, g.priority, userId)
-      .run();
-    return ok(c, { id }, 201);
+    const before = await loadUserState(c.env.DB, userId);
+    await insertGoal(c.env.DB, userId, g).run();
+    await afterChange(c.env.DB, userId, { title: 'Thêm mục tiêu', detail: `Mục tiêu "${g.title}" ${formatVnd(g.targetAmount)}.`, before });
+    return ok(c, null, 201);
   })
   .patch('/:id', body(goalSchema.partial()), async (c) => {
     const g = c.req.valid('json');
+    const userId = c.get('userId');
     const cols: Record<string, unknown> = {
       kind: g.kind,
       title: g.title,
@@ -44,14 +51,19 @@ export const goals = new Hono<AppEnv>()
     };
     const entries = Object.entries(cols).filter(([, v]) => v !== undefined);
     if (entries.length === 0) return ok(c, null);
+    const before = await loadUserState(c.env.DB, userId);
     const res = await c.env.DB.prepare(`UPDATE goals SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ? AND user_id = ?`)
-      .bind(...entries.map(([, v]) => v), c.req.param('id'), c.get('userId'))
+      .bind(...entries.map(([, v]) => v), c.req.param('id'), userId)
       .run();
     if (!res.meta.changes) throw notFound('Không tìm thấy mục tiêu');
+    await afterChange(c.env.DB, userId, { title: 'Cập nhật mục tiêu', before });
     return ok(c, null);
   })
   .delete('/:id', async (c) => {
-    const res = await c.env.DB.prepare('DELETE FROM goals WHERE id = ? AND user_id = ?').bind(c.req.param('id'), c.get('userId')).run();
+    const userId = c.get('userId');
+    const before = await loadUserState(c.env.DB, userId);
+    const res = await c.env.DB.prepare('DELETE FROM goals WHERE id = ? AND user_id = ?').bind(c.req.param('id'), userId).run();
     if (!res.meta.changes) throw notFound('Không tìm thấy mục tiêu');
+    await afterChange(c.env.DB, userId, { title: 'Xóa mục tiêu', before });
     return ok(c, null);
   });

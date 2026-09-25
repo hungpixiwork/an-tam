@@ -5,14 +5,15 @@ import { PixelScene, type PixelLayer } from '../PixelScene';
 
 const W = 80;
 const H = 96;
+const SCALE = 2;
 
 /** Đường chân đồi: y theo x, dao động nhẹ. */
 const ridge = (x: number, base: number, amp: number, freq: number, phase: number) => base - amp * Math.sin(x * freq + phase);
 
 function build(): PixelLayer[] {
   const r = rng(5);
-  const c = new PixelCanvas(W, H);
-  const clouds = new PixelCanvas(W, H);
+  const c = new PixelCanvas(W, H, SCALE);
+  const clouds = new PixelCanvas(W, H, SCALE);
 
   bands(c, 0, 0, W, 54, ['#D3E9F8', '#DFF0F9', '#ECF5F1', '#F7F1DC']);
   sun(c, 50, 44, 5);
@@ -40,10 +41,17 @@ function build(): PixelLayer[] {
     const half = Math.max(0.5, 15 * Math.pow(1 - t, 1.4));
     c.hline(Math.round(cx - half), Math.round(cx + half), y, P.path);
     c.px(Math.round(cx + half), y, P.pathShade).px(Math.round(cx - half), y, P.pathShade);
+    if (y % 4 === 0) {
+      c.finePx(cx - half - 0.5, y + 0.5, P.sunGlow);
+      c.finePx(cx + half + 0.5, y + 0.5, P.pathShade);
+    }
   }
   // Tiny stepping stones catch the warm light along the bend.
   for (const [x, y] of [[40, 89], [48, 83], [38, 76], [50, 69], [45, 63]] as const) {
-    if (c.get(x, y) === P.path) c.hline(x, x + 1, y, P.sunGlow);
+    if (c.get(x, y) === P.path) {
+      c.hline(x, x + 1, y, P.sunGlow);
+      c.finePx(x + 0.5, y + 0.5, P.sun);
+    }
   }
 
   // Cây
@@ -53,15 +61,20 @@ function build(): PixelLayer[] {
   roundTree(c, r, 74, 78, 7);
 
   // Hoa, cỏ
-  for (let k = 0; k < 40; k++) {
-    const x = r.int(0, W - 1);
-    const y = r.int(72, H - 1);
-    if (c.get(x, y) === P.grass1) c.px(x, y, r.pick([P.grass2, P.grass2, '#FFFFFF', P.shirtYellow]));
+  const flowers = [
+    [3, 91], [5, 89], [7, 92], [15, 94], [18, 91], [21, 93],
+    [72, 91], [75, 88], [77, 93], [68, 95],
+  ] as const;
+  for (const [x, y] of flowers) {
+    if (c.get(x, y) !== P.grass1) continue;
+    const petal = (x + y) % 3 === 0 ? P.shirtYellow : '#FFFFFF';
+    c.px(x, y, petal).px(x + 1, y, P.grass2).px(x, y + 1, P.leafHighlight);
+    c.finePx(x + 0.5, y + 0.5, P.sun);
   }
-  for (let k = 0; k < 18; k++) {
-    const x = r.int(0, W - 1);
-    const y = r.int(76, H - 1);
-    if (c.get(x, y) === P.grass1) c.px(x, y, r.pick([P.grassShadow, P.grass2, P.leaf3]));
+  for (const [x, y] of [[11, 87], [24, 90], [30, 95], [64, 92], [70, 96], [79, 88]] as const) {
+    if (c.get(x, y) !== P.grass1) continue;
+    c.px(x, y, P.grassShadow).px(x + 1, y - 1, P.grass2);
+    c.finePx(x + 0.5, y - 0.5, P.leaf3);
   }
 
   return [{ paths: c.toPaths() }, { paths: clouds.toPaths(), className: 'px-drift-slow' }];
@@ -71,5 +84,5 @@ let cache: PixelLayer[] | null = null;
 
 export function WindingPath({ className }: { className?: string }) {
   cache ??= build();
-  return <PixelScene width={W} height={H} layers={cache} className={className} preserve="xMidYMax slice" label="Con đường xanh dẫn về phía mặt trời" />;
+  return <PixelScene width={W * SCALE} height={H * SCALE} layers={cache} className={className} preserve="xMidYMax slice" label="Con đường xanh dẫn về phía mặt trời" />;
 }

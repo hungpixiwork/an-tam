@@ -28,28 +28,28 @@
 an-tam/
 ├─ docs/specs/                 # tài liệu này
 ├─ migrations/                 # D1 migrations (wrangler d1 migrations)
-│  └─ 0001_init.sql
-├─ seed.sql                    # dữ liệu dùng chung (preset, bài học, kịch bản thói quen)
+│  ├─ 0001_init.sql
+│  └─ 0002_real_data.sql       # onboarded_at, bảng transactions
+├─ seeds/catalog.sql           # danh mục dùng chung (preset, bài học, kịch bản thói quen) — không có dữ liệu cá nhân
 ├─ shared/
 │  ├─ types/                   # kiểu dữ liệu API (request/response)
-│  ├─ engine/                  # peaceScore, goals, simulate, alerts, suggest, narrate
-│  ├─ format/                  # formatVnd, formatPct, formatMonth...
-│  └─ demo.ts                  # bộ dữ liệu tài chính demo nạp cho user mới
+│  ├─ engine/                  # peaceScore, goals, simulate, alerts, ledger, narrate
+│  └─ format/                  # formatVnd, formatPct, formatMonth...
 ├─ worker/
 │  ├─ index.ts                 # app Hono, export { fetch, scheduled }
 │  ├─ env.ts                   # kiểu Env / Variables
 │  ├─ middleware/auth.ts
-│  ├─ lib/                     # password, session, db, http, state (load UserState từ D1)
+│  ├─ lib/                     # password, session, http, validate, state (load UserState từ D1), refresh (afterChange)
 │  ├─ routes/*.ts
 │  └─ jobs/monitor.ts
-├─ tests/                      # vitest (engine, format, password)
+├─ tests/                      # vitest (engine, ledger, format); demo-data.ts = fixture số liệu mockup
 ├─ client/
 │  ├─ index.html
 │  ├─ vite.config.ts           # alias @shared, proxy /api → :8787
 │  └─ src/
 │     ├─ main.tsx
 │     ├─ app/                  # router.tsx, providers.tsx, auth.tsx
-│     ├─ layouts/              # AppShell, AuthLayout
+│     ├─ layouts/              # AppShell, AuthLayout, OnboardingLayout
 │     ├─ components/
 │     │  ├─ ui/                # Card, StatCard, ScoreRing, DonutChart, Badge, Button...
 │     │  ├─ layout/            # Sidebar, Topbar, UserMenu, NotificationBell, SearchBox
@@ -66,13 +66,15 @@ an-tam/
 2. **Một request cho mỗi màn** khi có thể (`/api/overview`, `/api/goals/summary`...) để giảm round-trip.
 3. **Cùng origin**: Worker phục vụ cả SPA và API → không cần CORS, cookie `SameSite=Lax`.
 4. **Tiền = số nguyên VND**. Chỉ định dạng ở tầng hiển thị (`shared/format`).
-5. **Không fallback dữ liệu giả ở client**. Lỗi API → hiển thị trạng thái lỗi + nút thử lại.
+5. **Không fallback dữ liệu giả ở client**. Lỗi API → hiển thị trạng thái lỗi + nút thử lại. Chưa có dữ liệu → `EmptyState` + nút nhập.
+6. **Không có dữ liệu demo**. Tài khoản mới trống; dữ liệu chỉ đến từ người dùng (màn Bắt đầu, Sổ thu chi, Danh mục, Mục tiêu, Cài đặt).
+7. **AI phản ứng ngay khi dữ liệu đổi**: mọi route ghi dữ liệu tài chính gọi `afterChange()` (cảnh báo, snapshot, nhật ký).
 
 ## Luồng dev
 ```bash
 npm install && npm --prefix client install
 npm run db:migrate          # wrangler d1 migrations apply an-tam-db --local
-npm run db:seed             # preset + bài học + kịch bản thói quen
+npm run db:seed             # seeds/catalog.sql: preset + bài học + kịch bản thói quen
 npm run worker:dev          # wrangler dev  → http://localhost:8787
 npm run dev                 # vite          → http://localhost:5173 (proxy /api → 8787)
 npm test                    # vitest

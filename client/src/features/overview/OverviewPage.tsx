@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipContentProps } from 'recharts';
-import { BarChart3, Bot, ChevronRight, CircleDollarSign, Coins, Info, Lightbulb, PieChart, ShieldPlus, Target, TrendingUp, Users, Wallet, X } from 'lucide-react';
+import { BarChart3, Bot, Check, ChevronRight, CircleDollarSign, Coins, Info, Lightbulb, NotebookPen, PieChart, Plus, ShieldPlus, Target, TrendingUp, Users, Wallet, X, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { OverviewData } from '@shared/types/api';
 import { formatVnd } from '@shared/format';
 import { FamilyCity, HeroLakeCity, HouseCalendar } from '@/components/pixel';
-import { Badge, ButtonLink, Card, CardTitle, DeltaBadge, DonutChart, ErrorState, IconTile, PageHero, PageSkeleton, ProgressBar, Rich, ScoreRing, Select, TextLink, cx, type Tone } from '@/components/ui';
+import { Badge, ButtonLink, Card, CardTitle, DeltaBadge, DonutChart, EmptyState, ErrorState, IconTile, PageHero, PageSkeleton, ProgressBar, Rich, ScoreRing, Select, TextLink, cx, type Tone } from '@/components/ui';
 import { useOverview } from '@/lib/queries';
 
 export default function OverviewPage() {
@@ -24,8 +24,10 @@ export default function OverviewPage() {
         scene={(cls) => <HeroLakeCity className={cls} />}
       />
 
+      <SetupCard setup={data.setup} />
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-[1.75fr_repeat(4,1fr)]">
-        <PeaceCard peace={data.peace} />
+        <PeaceCard peace={data.peace} ready={data.setup.profile || data.setup.holdings} />
         <StatCard icon={Coins} tone="violet" label="Tổng tài sản" kpi={data.kpis.netWorth} />
         <StatCard icon={Wallet} tone="green" label="Tiền dự phòng" kpi={data.kpis.emergency} />
         <StatCard icon={BarChart3} tone="orange" label="Tiền đầu tư" kpi={data.kpis.invested} />
@@ -46,12 +48,66 @@ export default function OverviewPage() {
   );
 }
 
+/* ───────── Checklist nhập liệu ───────── */
+
+const SETUP_STEPS: { key: keyof OverviewData['setup']; icon: LucideIcon; title: string; body: string; to: string; cta: string }[] = [
+  { key: 'profile', icon: Wallet, title: 'Thu chi hằng tháng', body: 'Số ước lượng để AI tính khả năng để dành.', to: '/cai-dat#tai-chinh', cta: 'Nhập thu chi' },
+  { key: 'holdings', icon: PieChart, title: 'Tài sản đang có', body: 'Tiết kiệm, quỹ, cổ phiếu, vàng...', to: '/danh-muc', cta: 'Thêm tài sản' },
+  { key: 'goals', icon: Target, title: 'Mục tiêu', body: 'Mua nhà, học cho con, nghỉ hưu...', to: '/muc-tieu', cta: 'Đặt mục tiêu' },
+  { key: 'transactions', icon: NotebookPen, title: 'Ghi sổ thu chi', body: 'AI dùng số thực tế thay cho số ước lượng.', to: '/thu-chi', cta: 'Ghi khoản đầu tiên' },
+];
+
+/** Ẩn khi người dùng đã nhập đủ cả 4 phần. */
+function SetupCard({ setup }: { setup: OverviewData['setup'] }) {
+  const done = SETUP_STEPS.filter((s) => setup[s.key]).length;
+  if (done === SETUP_STEPS.length) return null;
+  return (
+    <Card tone="mint">
+      <CardTitle icon={Bot} tone="teal" title="Giúp An Tâm AI hiểu bạn rõ hơn" subtitle={`Đã hoàn thành ${done}/${SETUP_STEPS.length} phần — càng đủ dữ liệu, phân tích càng chính xác.`} />
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {SETUP_STEPS.map((s) => (
+          <li key={s.key} className="flex items-start gap-3 rounded-xl border border-[#D7EFE2] bg-white p-3">
+            <IconTile icon={setup[s.key] ? Check : s.icon} tone={setup[s.key] ? 'green' : 'teal'} size="sm" />
+            <div className="min-w-0">
+              <p className={cx('text-sm font-semibold', setup[s.key] ? 'text-ink-soft line-through' : 'text-ink')}>{s.title}</p>
+              {setup[s.key] ? (
+                <p className="text-xs text-success-600">Đã có dữ liệu</p>
+              ) : (
+                <>
+                  <p className="text-xs text-ink-soft">{s.body}</p>
+                  <TextLink to={s.to} className="mt-1">
+                    {s.cta}
+                  </TextLink>
+                </>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 /* ───────── Mức an tâm ───────── */
 
 const LEVEL_TONE: Record<OverviewData['peace']['level'], Tone> = { stable: 'green', watch: 'orange', action: 'red' };
 
-function PeaceCard({ peace }: { peace: OverviewData['peace'] }) {
+function PeaceCard({ peace, ready }: { peace: OverviewData['peace']; ready: boolean }) {
   const [open, setOpen] = useState(false);
+  if (!ready) {
+    return (
+      <Card className="flex items-center gap-5 md:col-span-2 lg:col-span-4 xl:col-span-1">
+        <ScoreRing score={0} size={124} stroke={15} color="#94A3B8" label="Chưa đủ dữ liệu để tính mức an tâm">
+          <span className="text-2xl font-bold text-ink-mute">—</span>
+        </ScoreRing>
+        <div className="min-w-0">
+          <p className="text-[15px] font-bold text-ink">Mức an tâm tài chính</p>
+          <Badge tone="gray" className="mt-3">{peace.label}</Badge>
+          <p className="mt-3 text-xs leading-relaxed text-ink-soft">{peace.description}</p>
+        </div>
+      </Card>
+    );
+  }
   return (
     <Card className="relative flex items-center gap-5 md:col-span-2 lg:col-span-4 xl:col-span-1">
       <ScoreRing score={peace.score} size={124} stroke={15} label={`Mức an tâm tài chính ${peace.score}/100`} />
@@ -150,10 +206,17 @@ function ChartTooltip({ active, payload, label }: Partial<TooltipContentProps<nu
   );
 }
 
+/** Mốc trục Y "tròn" (1-2-2,5-5 × 10ⁿ) phủ được giá trị lớn nhất, khoảng 4 khoảng chia. */
+function niceTicks(max: number): number[] {
+  const raw = Math.max(max, 10_000_000) / 4;
+  const pow = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((x) => x * pow).find((x) => x >= raw)!;
+  return Array.from({ length: Math.max(2, Math.ceil(max / step) + 1) }, (_, i) => i * step);
+}
+
 function NetWorthChart({ series, range, onRange }: { series: OverviewData['netWorthSeries']; range: number; onRange: (v: number) => void }) {
   const last = series.at(-1);
-  const max = Math.max(1_500_000_000, ...series.map((s) => s.total));
-  const ticks = Array.from({ length: Math.ceil(max / 500_000_000) + 1 }, (_, i) => i * 500_000_000);
+  const ticks = niceTicks(Math.max(...series.map((s) => s.total)));
   return (
     <Card>
       <CardTitle
@@ -189,6 +252,14 @@ function NetWorthChart({ series, range, onRange }: { series: OverviewData['netWo
 /* ───────── Phân bổ ───────── */
 
 function AllocationCard({ allocation }: { allocation: OverviewData['allocation'] }) {
+  if (allocation.total === 0) {
+    return (
+      <Card>
+        <CardTitle icon={PieChart} title="Tiền của bạn đang nằm ở đâu?" />
+        <EmptyState compact icon={Coins} title="Chưa có tài sản nào" body="Thêm tài sản để xem tiền của bạn đang phân bổ thế nào." action={<ButtonLink to="/danh-muc" variant="soft" size="sm" icon={Plus}>Thêm tài sản</ButtonLink>} />
+      </Card>
+    );
+  }
   return (
     <Card>
       <CardTitle icon={PieChart} title="Tiền của bạn đang nằm ở đâu?" action={<TextLink to="/danh-muc">Chi tiết</TextLink>} />
@@ -255,9 +326,15 @@ function TipCard({ tip }: { tip: OverviewData['tip'] }) {
       <HouseCalendar className="-mx-2 h-[104px] w-[calc(100%+16px)]" />
       <p className="mt-2 text-[14.5px] leading-relaxed text-ink">{tip.text}</p>
       <div className="mt-auto pt-4">
-        <ButtonLink to={`/mo-phong?preset=${tip.presetSlug}`} arrow>
-          Xem mô phỏng
-        </ButtonLink>
+        {tip.goalTitle ? (
+          <ButtonLink to={`/mo-phong?preset=${tip.presetSlug}`} arrow>
+            Xem mô phỏng
+          </ButtonLink>
+        ) : (
+          <ButtonLink to="/muc-tieu" arrow>
+            Đặt mục tiêu
+          </ButtonLink>
+        )}
       </div>
     </Card>
   );

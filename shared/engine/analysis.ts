@@ -1,6 +1,6 @@
 // Phân tích cho các màn: Mục tiêu (02), Kết quả mô phỏng (04), Thói quen (05), Danh mục (06).
 
-import type { Goal, SimulationParams, UserState } from '../types/domain';
+import type { AssetCategory, Goal, SimulationParams, UserState } from '../types/domain';
 import { formatDuration, formatPct, formatVnd } from '../format';
 import { goalInsights, goalProbability, nearestMajorGoal, type GoalInsight } from './goals';
 import { monthsBetween } from './month';
@@ -210,7 +210,7 @@ export interface PortfolioAnalysis {
   slices: ReturnType<typeof allocation>;
   riskGroups: { name: string; pct: number; value: number; color: string }[];
   concentration: string | null;
-  holdings: { id: string; name: string; value: number; role: string; volatility: 'low' | 'mid' | 'high'; category: string }[];
+  holdings: { id: string; name: string; value: number; role: string; volatility: 'low' | 'mid' | 'high'; category: AssetCategory }[];
   insights: { key: string; title: string; body: string; tone: 'success' | 'danger' | 'accent' }[];
   suggestions: { key: string; title: string; body: string; tone: 'success' | 'danger' | 'accent'; to: string }[];
 }
@@ -218,7 +218,8 @@ export interface PortfolioAnalysis {
 const GROUP_COLORS = ['#F07171', '#F5A524', '#4C8DF0', '#3DBE8B', '#8B5CF6', '#94A3B8'];
 
 export function portfolioAnalysis(state: UserState): PortfolioAnalysis {
-  const total = totalValue(state.holdings) || 1;
+  const actualTotal = totalValue(state.holdings);
+  const total = actualTotal || 1;
   const groups = new Map<string, number>();
   for (const h of state.holdings) groups.set(h.riskGroup, (groups.get(h.riskGroup) ?? 0) + h.value);
   const riskGroups = [...groups]
@@ -231,11 +232,11 @@ export function portfolioAnalysis(state: UserState): PortfolioAnalysis {
   const major = nearestMajorGoal(state);
 
   return {
-    total,
+    total: actualTotal,
     slices: allocation(state.holdings),
     riskGroups,
     concentration: top && top.pct > 0.3 ? `Một phần rủi ro của bạn đang tập trung khá nhiều vào ${top.name.toLowerCase()}.` : null,
-    holdings: state.holdings.filter((h) => h.isMain).map((h) => ({ id: h.id, name: h.name, value: h.value, role: h.role, volatility: h.volatility, category: h.category })),
+    holdings: [...state.holdings].sort((a, b) => b.value - a.value).map((h) => ({ id: h.id, name: h.name, value: h.value, role: h.role, volatility: h.volatility, category: h.category })),
     insights: [
       { key: 'growth', title: `Danh mục của bạn đang thiên về ${growth >= 0.5 ? 'tăng trưởng' : 'an toàn'}`, body: `Khoảng ${formatPct(growth)} tài sản của bạn đang ở cổ phiếu và quỹ tăng trưởng, giúp có tiềm năng sinh lời cao trong dài hạn.`, tone: 'success' },
       { key: 'shock', title: 'Nếu thị trường biến động mạnh, phần cổ phiếu sẽ ảnh hưởng nhiều nhất', body: top ? `${top.name} chiếm ${formatPct(top.pct)} danh mục nên có thể biến động mạnh khi thị trường điều chỉnh.` : 'Danh mục chưa có dữ liệu.', tone: 'danger' },

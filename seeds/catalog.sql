@@ -1,5 +1,5 @@
--- Dữ liệu dùng chung cho mọi người dùng (idempotent).
--- Dữ liệu tài chính cá nhân của tài khoản demo được nạp bởi Worker khi đăng ký (shared/demo.ts).
+-- Dữ liệu danh mục dùng chung cho mọi người dùng (idempotent): kịch bản mô phỏng, câu hỏi thói quen, bài học.
+-- KHÔNG chứa dữ liệu cá nhân — tài khoản mới bắt đầu trống và tự nhập qua màn "Bắt đầu".
 
 -- Kịch bản mô phỏng phổ biến (màn 03)
 INSERT OR REPLACE INTO simulation_presets (id, slug, name, icon, params_json, order_idx) VALUES

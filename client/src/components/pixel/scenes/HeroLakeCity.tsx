@@ -5,44 +5,77 @@ import { PixelScene, type PixelLayer } from '../PixelScene';
 
 const W = 256;
 const H = 64;
+const SCALE = 3;
 const HORIZON = 44;
 
-/** Người ngồi ghế gỗ, cầm cốc cà phê, nhìn về phía hồ (bên trái). */
+/** Nhân vật cục bộ ở lưới 3x để đọc rõ dáng ngồi, tay và chiếc cốc ở kích thước banner. */
 function seatedPerson(c: PixelCanvas) {
-  const f = new PixelCanvas(W, H);
-  // Ghế
-  f.poly([[229, 33], [234, 32], [237, 48], [232, 49]], P.wood);
-  f.line(233, 32, 237, 47, P.woodLight);
-  f.line(236, 49, 238, 57, P.woodDark, 2);
-  f.rect(213, 47, 22, 2, P.wood).hline(213, 234, 49, P.woodDark);
-  f.hline(216, 231, 48, P.woodLight);
-  f.line(215, 50, 213, 57, P.woodDark, 2);
-  f.line(230, 50, 232, 57, P.woodDark, 2);
-  // Chân
-  f.poly([[218, 45], [231, 45], [231, 48], [207, 49], [207, 46]], P.pants);
-  f.hline(207, 230, 45, P.pantsShade);
-  f.rect(205, 47, 4, 10, P.pants).vline(208, 48, 56, P.pantsShade);
-  f.rect(201, 56, 7, 2, '#2B2F3A');
-  // Thân áo
-  f.poly([[219, 35], [228, 34], [231, 46], [218, 47]], P.shirtLight);
-  f.poly([[226, 35], [228, 34], [231, 46], [228, 46]], P.shirtLightShade);
-  f.vline(225, 37, 44, P.shirtLightShade).px(224, 39, P.shirtLight).px(224, 42, P.shirtLight);
-  // Tay cầm cốc
-  f.line(221, 37, 218, 43, P.shirtLight, 3);
-  f.line(217, 43, 213, 39, P.shirtLightShade, 2);
-  f.rect(207, 35, 4, 5, P.mug).vline(210, 36, 39, P.mugShade).hline(207, 209, 35, P.coffee);
-  f.px(208, 36, P.sun);
-  f.rect(211, 37, 2, 2, P.skin);
-  // Đầu
-  f.rect(222, 32, 3, 3, P.skinShade);
-  f.disc(224, 28, 4, P.hairDark);
-  f.ellipse(221.5, 30, 2.5, 3, P.skin);
-  f.px(218, 30, P.skin).px(219, 32, P.skinShade);
-  f.px(224, 30, P.skin).px(224, 31, P.skinShade);
-  f.px(220, 29, P.ink);
-  f.hline(220, 224, 26, P.hairBrown);
-  f.outline(P.outline);
-  c.draw(f);
+  const f = new PixelCanvas(120, 112);
+  // Chair back, seat and legs sit behind the body and stay visually separate.
+  f.poly([[89, 40], [102, 34], [109, 77], [97, 80]], P.woodDark);
+  f.poly([[92, 42], [99, 39], [104, 73], [98, 74]], P.wood);
+  f.line(94, 43, 101, 72, P.woodLight);
+  f.poly([[61, 76], [99, 74], [107, 81], [67, 85]], P.wood);
+  f.line(64, 78, 99, 77, P.woodLight);
+  f.line(70, 83, 67, 108, P.woodDark, 3);
+  f.line(100, 81, 105, 105, P.woodDark, 3);
+  f.px(68, 105, '#2B2F3A').px(69, 106, '#2B2F3A');
+  f.px(104, 103, '#2B2F3A').px(105, 104, '#2B2F3A');
+
+  // Bent legs and shoes establish a seated pose instead of a standing bust.
+  f.poly([[61, 62], [83, 65], [84, 75], [64, 82], [37, 78], [34, 71]], P.pants);
+  f.poly([[57, 69], [81, 71], [77, 76], [48, 79], [37, 76]], P.pantsShade);
+  f.poly([[38, 75], [49, 78], [39, 98], [28, 98], [31, 87]], P.pants);
+  f.line(39, 79, 34, 94, '#62728A', 2);
+  f.poly([[27, 96], [39, 96], [40, 102], [22, 103], [20, 100]], '#303744');
+  f.line(24, 99, 36, 99, '#596578');
+
+  // Shirt silhouette, collar and folds catch the warm light from the lake.
+  f.poly([[64, 38], [80, 39], [91, 49], [87, 72], [62, 73], [53, 57]], P.shirtLight);
+  f.poly([[78, 42], [85, 46], [86, 70], [77, 71]], P.shirtLightShade);
+  f.poly([[63, 40], [70, 43], [67, 49], [59, 45]], P.shirtLightShade);
+  f.line(70, 47, 74, 68, '#FFFFFF');
+  f.px(73, 52, P.shirtBlueShade).px(74, 57, P.shirtBlueShade);
+  f.poly([[61, 39], [70, 42], [65, 47], [59, 44]], '#FFFFFF');
+
+  // Raised arm connects continuously to the hand holding the cup near the face.
+  f.poly([[60, 43], [66, 47], [54, 57], [44, 49], [39, 42], [44, 38], [51, 46]], P.shirtLight);
+  f.poly([[51, 46], [56, 50], [46, 58], [39, 51], [37, 45], [41, 42]], P.shirtLightShade);
+  f.line(45, 48, 51, 53, '#FFFFFF', 2);
+  f.poly([[39, 37], [45, 37], [47, 42], [43, 46], [38, 43]], P.skin);
+  f.px(39, 38, P.skinShade).px(44, 42, P.skinShade);
+
+  // Ceramic mug: dark rim, visible coffee, handle and a sharp reflected edge.
+  f.poly([[25, 27], [41, 27], [39, 46], [28, 46]], P.mugShade);
+  f.rect(27, 28, 11, 15, P.mug);
+  f.rect(27, 27, 11, 3, P.coffee);
+  f.hline(28, 36, 27, '#3E2A24');
+  f.vline(37, 31, 40, P.mugShade);
+  f.line(39, 31, 44, 32, P.mugShade, 2);
+  f.vline(44, 32, 39, P.mugShade).vline(45, 33, 38, P.mugShade);
+  f.line(44, 39, 39, 40, P.mugShade, 2);
+  f.vline(29, 31, 39, '#FFFFFF');
+  f.px(32, 30, P.sun).px(34, 28, P.sun);
+
+  // Head in three-quarter profile, with hair contour, eye, nose and ear.
+  f.poly([[47, 24], [46, 16], [52, 8], [62, 5], [73, 8], [81, 15], [83, 23], [79, 30], [78, 39], [71, 43], [66, 37]], P.hairDark);
+  // Broad oval cheeks and a short, rounded chin avoid a sharp triangular profile.
+  f.ellipse(61, 26, 15, 16, P.skin);
+  f.ellipse(68, 30, 8, 9, P.skinShade);
+  f.ellipse(74, 26, 3, 4, P.skin);
+  f.ellipse(55, 29, 2.5, 2, '#F2A7A0');
+  // Short nose and a small relaxed mouth keep the side profile soft.
+  f.poly([[46, 27], [51, 27], [54, 29], [52, 31], [47, 31]], P.skin);
+  f.px(51, 23, P.ink).px(50, 22, P.hairDark);
+  f.line(51, 33, 55, 34, P.skinDark);
+  // Swept fringe, soft hair highlight and a lock resting behind the ear.
+  f.poly([[47, 23], [48, 15], [55, 10], [67, 8], [77, 13], [79, 20], [72, 18], [62, 19], [55, 25]], P.hairDark);
+  f.line(55, 12, 67, 9, P.hairBrown, 2);
+  f.px(77, 23, P.hairBrown).px(78, 28, P.hairDark);
+  f.px(78, 32, P.hairBrown).px(76, 36, P.hairBrown);
+  f.px(69, 37, P.skinShade);
+
+  c.draw(f, 196, 18);
 }
 
 /** Cây rủ lá ở góc phải trên: tán dày + các dải lá rủ 2 pixel. */
@@ -72,11 +105,11 @@ function droopingTree(c: PixelCanvas) {
 
 function build(): PixelLayer[] {
   const r = rng(2026);
-  const base = new PixelCanvas(W, H);
-  const clouds = new PixelCanvas(W, H);
-  const lit = new PixelCanvas(W, H);
-  const shimmer = new PixelCanvas(W, H);
-  const steam = new PixelCanvas(W, H);
+  const base = new PixelCanvas(W, H, SCALE);
+  const clouds = new PixelCanvas(W, H, SCALE);
+  const lit = new PixelCanvas(W, H, SCALE);
+  const shimmer = new PixelCanvas(W, H, SCALE);
+  const steam = new PixelCanvas(W, H, SCALE);
 
   // Trời + mặt trời
   bands(base, 0, 0, W, HORIZON, [P.sky0, P.sky1, P.sky2, P.sky3, P.sky4]);
@@ -125,7 +158,7 @@ function build(): PixelLayer[] {
   }
   seatedPerson(base);
   droopingTree(base);
-  steam.px(208, 33, P.steam).px(209, 31, P.steam).px(208, 29, P.steam);
+  steam.finePx(208, 26, P.steam).finePx(209, 24, P.steam).finePx(208, 22, P.steam);
 
   return [
     { paths: base.toPaths() },
@@ -140,5 +173,5 @@ let cache: PixelLayer[] | null = null;
 
 export function HeroLakeCity({ className }: { className?: string }) {
   cache ??= build();
-  return <PixelScene width={W} height={H} layers={cache} className={className} label="Người ngồi bên hồ nhìn ra thành phố buổi sáng" />;
+  return <PixelScene width={W * SCALE} height={H * SCALE} layers={cache} className={className} label="Người ngồi bên hồ nhìn ra thành phố buổi sáng" />;
 }

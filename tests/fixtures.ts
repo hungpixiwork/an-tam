@@ -1,5 +1,5 @@
 import type { UserState } from '../shared/types/domain';
-import { DEMO_GOALS, DEMO_HOLDINGS, DEMO_PROFILE, demoGoalMonth, demoSnapshots } from '../shared/demo';
+import { DEMO_GOALS, DEMO_HOLDINGS, DEMO_PROFILE, demoGoalMonth, demoSnapshots } from './demo-data';
 
 export const TODAY = '2026-09';
 
@@ -14,5 +14,6 @@ export function demoState(today = TODAY): UserState {
       targetMonth: demoGoalMonth(today, DEMO_GOALS[i]),
     })),
     snapshots: demoSnapshots(today),
+    ledger: [],
   };
 }

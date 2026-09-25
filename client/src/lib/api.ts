@@ -10,7 +10,8 @@ export class ApiError extends Error {
   }
 }
 
-type Json = Record<string, unknown> | unknown[];
+/** Thân request: object hoặc mảng, gửi dạng JSON. */
+type Json = object;
 
 async function request<T>(method: string, path: string, body?: Json): Promise<T> {
   let res: Response;

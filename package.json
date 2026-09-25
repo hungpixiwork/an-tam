@@ -11,7 +11,8 @@
     "worker:deploy": "npm run build && wrangler deploy",
     "db:migrate": "wrangler d1 migrations apply an-tam-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply an-tam-db --remote",
-    "db:seed": "wrangler d1 execute an-tam-db --local --file=./seed.sql",
+    "db:seed": "wrangler d1 execute an-tam-db --local --file=./seeds/catalog.sql",
+    "db:seed:remote": "wrangler d1 execute an-tam-db --remote --file=./seeds/catalog.sql",
     "db:reset": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate && npm run db:seed",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"

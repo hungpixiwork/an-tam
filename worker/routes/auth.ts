@@ -5,15 +5,19 @@ import type { AppEnv } from '../env';
 import { ApiError, ok, unauthorized } from '../lib/http';
 import { hashPassword, verifyPassword } from '../lib/password';
 import { createSession, destroySession, readSession } from '../lib/session';
-import { demoDataStatements, loadMe, loadUserState, syncAlerts } from '../lib/state';
+import { loadMe } from '../lib/state';
+
+export const salutationSchema = z.enum(['anh', 'chị', 'bạn']);
+export const fullNameSchema = z.string().trim().min(2, 'Vui lòng nhập họ tên').max(80);
+export const passwordSchema = z.string().min(8, 'Mật khẩu cần ít nhất 8 ký tự').max(128);
 
 const email = z.string().trim().toLowerCase().email('Email không hợp lệ').max(254);
 
 const registerSchema = z.object({
   email,
-  password: z.string().min(8, 'Mật khẩu cần ít nhất 8 ký tự').max(128),
-  fullName: z.string().trim().min(2, 'Vui lòng nhập họ tên').max(80),
-  salutation: z.enum(['anh', 'chị', 'bạn']).default('bạn'),
+  password: passwordSchema,
+  fullName: fullNameSchema,
+  salutation: salutationSchema.default('bạn'),
 });
 
 const loginSchema = z.object({ email, password: z.string().min(1).max(128) });
@@ -35,9 +39,9 @@ export const auth = new Hono<AppEnv>()
       c.env.DB.prepare('INSERT INTO users (id, email, password_hash, password_salt, full_name, salutation, avatar_seed) VALUES (?, ?, ?, ?, ?, ?, ?)')
         .bind(userId, body.email, hash, salt, body.fullName, body.salutation, avatarSeed),
       c.env.DB.prepare('INSERT INTO user_settings (user_id) VALUES (?)').bind(userId),
-      ...demoDataStatements(c.env.DB, userId),
+      // Hồ sơ tài chính trống — người dùng tự nhập ở màn "Bắt đầu"
+      c.env.DB.prepare('INSERT INTO financial_profiles (user_id) VALUES (?)').bind(userId),
     ]);
-    await syncAlerts(c.env.DB, userId, await loadUserState(c.env.DB, userId));
     await createSession(c, userId);
     return ok(c, await loadMe(c.env.DB, userId), 201);
   })

@@ -1,25 +1,51 @@
-import { AlertCircle, AlertTriangle, BarChart3, Bot, Coins, Database, Lightbulb, PieChart, Shield, TrendingUp } from 'lucide-react';
+import { useState } from 'react';
+import { AlertCircle, AlertTriangle, BarChart3, Bot, Coins, Database, Lightbulb, Pencil, PieChart, Plus, Shield, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { PortfolioAnalysis } from '@shared/engine/analysis';
 import { formatPct, formatVnd } from '@shared/format';
 import { HeroLakeCity } from '@/components/pixel';
-import { Badge, Card, CardTitle, DonutChart, ErrorState, IconTile, PageHero, PageSkeleton, TextLink, cx, type Tone } from '@/components/ui';
+import { Badge, Button, Card, CardTitle, DonutChart, EmptyState, ErrorState, IconTile, PageHero, PageSkeleton, cx, type Tone } from '@/components/ui';
 import { usePortfolio } from '@/lib/queries';
+import { HoldingFormModal } from './HoldingFormModal';
+
+type HoldingRow = PortfolioAnalysis['holdings'][number];
 
 type SuggestionTone = 'success' | 'danger' | 'accent';
 
 export default function PortfolioPage() {
   const { data, error, refetch, isPending } = usePortfolio();
+  // undefined = đóng; null = thêm mới; HoldingRow = đang sửa
+  const [editing, setEditing] = useState<HoldingRow | null | undefined>(undefined);
   if (isPending) return <PageSkeleton />;
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />;
 
+  const hero = (
+    <PageHero
+      title="Tiền của bạn đang phân bổ như thế nào?"
+      subtitle="Không cần đọc biểu đồ nến phức tạp, bạn vẫn có thể hiểu tiền mình đang ở đâu."
+      scene={(cls) => <HeroLakeCity className={cls} />}
+    />
+  );
+  const modal = editing !== undefined && <HoldingFormModal key={editing?.id ?? 'new'} holding={editing} onClose={() => setEditing(undefined)} />;
+
+  if (data.holdings.length === 0) {
+    return (
+      <div className="space-y-4">
+        {hero}
+        <EmptyState
+          icon={PieChart}
+          title="Danh mục của bạn đang trống"
+          body="Thêm tiền tiết kiệm, quỹ, cổ phiếu hay vàng bạn đang có. AI sẽ chỉ ra rủi ro đang tập trung ở đâu và mức biến động có hợp với mục tiêu không."
+          action={<Button icon={Plus} onClick={() => setEditing(null)}>Thêm tài sản đầu tiên</Button>}
+        />
+        {modal}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <PageHero
-        title="Tiền của bạn đang phân bổ như thế nào?"
-        subtitle="Không cần đọc biểu đồ nến phức tạp, bạn vẫn có thể hiểu tiền mình đang ở đâu."
-        scene={(cls) => <HeroLakeCity className={cls} />}
-      />
+      {hero}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_1fr]">
         <DonutCardSection allocation={data} />
@@ -27,11 +53,12 @@ export default function PortfolioPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.6fr_1fr]">
-        <HoldingsTableCard holdings={data.holdings} />
+        <HoldingsTableCard holdings={data.holdings} onAdd={() => setEditing(null)} onEdit={setEditing} />
         <AiExplainCard insights={data.insights} />
       </div>
 
       <SuggestionsSection suggestions={data.suggestions} />
+      {modal}
     </div>
   );
 }
@@ -41,7 +68,7 @@ export default function PortfolioPage() {
 function DonutCardSection({ allocation }: { allocation: PortfolioAnalysis }) {
   return (
     <Card>
-      <CardTitle icon={PieChart} title="Danh mục hiện tại" action={<TextLink to="/danh-muc">Chi tiết</TextLink>} />
+      <CardTitle icon={PieChart} title="Danh mục hiện tại" />
       <div className="flex flex-col items-center gap-6 sm:flex-row">
         <DonutChart
           data={allocation.slices.map((s) => ({
@@ -131,10 +158,10 @@ const VOLATILITY_LABEL: Record<'high' | 'mid' | 'low', string> = {
   low: 'Thấp',
 };
 
-function HoldingsTableCard({ holdings }: { holdings: PortfolioAnalysis['holdings'] }) {
+function HoldingsTableCard({ holdings, onAdd, onEdit }: { holdings: HoldingRow[]; onAdd: () => void; onEdit: (h: HoldingRow) => void }) {
   return (
     <Card>
-      <CardTitle icon={BarChart3} title="Các khoản chính" />
+      <CardTitle icon={BarChart3} title="Các khoản của bạn" action={<Button variant="soft" size="sm" icon={Plus} onClick={onAdd}>Thêm</Button>} />
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -143,6 +170,7 @@ function HoldingsTableCard({ holdings }: { holdings: PortfolioAnalysis['holdings
               <th className="pb-2 px-3 text-right">Giá trị</th>
               <th className="pb-2 px-3">Vai trò</th>
               <th className="pb-2 px-3">Mức biến động</th>
+              <th className="pb-2 pl-3"><span className="sr-only">Sửa</span></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -167,6 +195,11 @@ function HoldingsTableCard({ holdings }: { holdings: PortfolioAnalysis['holdings
                     <Badge tone={VOLATILITY_TONE[h.volatility]} icon={BarChart3} className="text-xs">
                       {VOLATILITY_LABEL[h.volatility]}
                     </Badge>
+                  </td>
+                  <td className="py-3 pl-3 text-right">
+                    <button type="button" onClick={() => onEdit(h)} className="rounded-lg p-2 text-ink-mute hover:bg-slate-100 hover:text-ink" aria-label={`Sửa ${h.name}`}>
+                      <Pencil className="h-4 w-4" aria-hidden />
+                    </button>
                   </td>
                 </tr>
               );

@@ -8,6 +8,7 @@ import { ok } from '../lib/http';
 /** Các trang có thể tìm tới — đồng bộ với router phía client. */
 const PAGES: SearchResult[] = [
   { type: 'page', title: 'Tổng quan', subtitle: 'Mức an tâm, tài sản, gợi ý hôm nay', to: '/' },
+  { type: 'page', title: 'Sổ thu chi', subtitle: 'Ghi thu nhập, chi tiêu hằng ngày', to: '/thu-chi' },
   { type: 'page', title: 'Mục tiêu', subtitle: 'Mua nhà, học cho con, nghỉ hưu, dự phòng', to: '/muc-tieu' },
   { type: 'page', title: 'Mô phỏng tương lai', subtitle: 'Thử kịch bản thị trường, lạm phát, thu nhập', to: '/mo-phong' },
   { type: 'page', title: 'Kiểm tra thói quen', subtitle: 'Hồ sơ phản ứng rủi ro', to: '/thoi-quen' },

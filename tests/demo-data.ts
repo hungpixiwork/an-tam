@@ -1,9 +1,9 @@
-// Bộ dữ liệu tài chính demo ("Nguyễn Văn Minh") — nạp cho mỗi tài khoản mới để dashboard có dữ liệu ngay.
+// Bộ dữ liệu mẫu "Nguyễn Văn Minh" — CHỈ dùng cho test (tái hiện số liệu mockup). Không nạp vào tài khoản thật.
 // Thu nhập 80,5tr − chi tiêu 22,5tr − để dành cho mục tiêu 40tr = dòng tiền tự do 18tr.
 // Snapshot được sinh tương đối so với tháng hiện tại nên luôn "mới".
 
-import type { FinancialProfile, Goal, Holding, Snapshot } from './types/domain';
-import { addMonths } from './engine/month';
+import type { FinancialProfile, Goal, Holding, Snapshot } from '../shared/types/domain';
+import { addMonths } from '../shared/engine/month';
 
 const M = 1_000_000;
 
@@ -58,13 +58,3 @@ export function demoSnapshots(today: string): Snapshot[] {
     cashflow: HISTORY.cashflow[i] * M,
   }));
 }
-
-/** Nhật ký "AI theo dõi" mẫu (số giờ trước thời điểm đăng ký). */
-export const DEMO_EVENTS: { type: 'alert' | 'simulation' | 'reminder' | 'analysis'; title: string; body: string; hoursAgo: number }[] = [
-  { type: 'simulation', title: 'Chạy lại mô phỏng sau khi thị trường giảm', body: 'AI đã cập nhật các kịch bản và đánh giá lại khả năng đạt mục tiêu của bạn.', hoursAgo: 14 },
-  { type: 'reminder', title: 'Nhắc bạn bổ sung quỹ dự phòng', body: 'Số dư quỹ dự phòng hiện thấp hơn mức bạn đã đặt cho 10 tháng chi tiêu.', hoursAgo: 60 },
-  { type: 'analysis', title: 'Tóm tắt ảnh hưởng của lãi suất mới đến kế hoạch hiện tại', body: 'AI đã phân tích tác động của việc tăng lãi suất 0,5% đến khoản vay mua nhà và đưa ra các phương án điều chỉnh.', hoursAgo: 84 },
-];
-
-/** Câu trả lời thói quen mẫu (khớp seed habit_scenarios). */
-export const DEMO_HABIT_ANSWERS: Record<string, string> = { hs1: 'hold', hs2: 'reduce', hs3: 'cash' };
