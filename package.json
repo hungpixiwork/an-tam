@@ -15,7 +15,13 @@
     "db:seed:remote": "wrangler d1 execute an-tam-db --remote --file=./seeds/catalog.sql",
     "db:reset": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate && npm run db:seed",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:engine": "vitest run tests/engine.test.ts",
+    "test:analysis": "vitest run tests/analysis.test.ts",
+    "test:narrate": "vitest run tests/narrate.test.ts",
+    "test:ledger": "vitest run tests/ledger.test.ts",
+    "test:format": "vitest run tests/format.test.ts",
+    "test:quick": "vitest run tests/narrate.test.ts tests/engine.test.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260924.1",
