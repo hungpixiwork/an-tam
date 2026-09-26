@@ -21,6 +21,7 @@
     "test:narrate": "vitest run tests/narrate.test.ts",
     "test:ledger": "vitest run tests/ledger.test.ts",
     "test:format": "vitest run tests/format.test.ts",
+    "test:chunk-recovery": "vitest run tests/chunk-recovery-regression.test.ts",
     "test:quick": "vitest run tests/narrate.test.ts tests/engine.test.ts"
   },
   "devDependencies": {

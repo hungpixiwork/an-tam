@@ -1,14 +1,16 @@
 import { Card, ButtonLink } from '../../components/ui/core';
 import type { OverviewData } from '../../../../shared/types/api';
+import { useLocale } from '@/app/locale';
 
 export function NbaSection({ nba }: { nba: OverviewData['nba'] }) {
+  const { t } = useLocale();
   if (!nba || nba.length === 0) return null;
 
   const [primary, ...secondaries] = nba;
 
   return (
     <div className="space-y-3">
-      <h2 className="text-lg font-bold text-ink">Hôm nay / Tuần này</h2>
+      <h2 className="text-lg font-bold text-ink">{t('home.today_week')}</h2>
       <div className="grid gap-3 md:grid-cols-2">
         <div className="col-span-1 md:col-span-2">
           <Card className="border-primary-500 bg-primary-50">

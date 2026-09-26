@@ -244,7 +244,7 @@ export const useLesson = (slug: string | null) =>
   useQuery({ queryKey: qk.lesson(slug ?? ''), queryFn: () => api.get<Lesson>(`/lessons/${slug}`), enabled: !!slug });
 
 /* ───────── 10 · Cài đặt ───────── */
-export const useSettings = () => useQuery({ queryKey: qk.settings, queryFn: () => api.get<Settings>('/settings') });
+export const useSettings = (enabled = true) => useQuery({ queryKey: qk.settings, queryFn: () => api.get<Settings>('/settings'), enabled });
 
 export function useUpdateSettings() {
   const qc = useQueryClient();

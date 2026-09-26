@@ -8,11 +8,13 @@ import { FamilyCity, HeroLakeCity, HouseCalendar } from '@/components/pixel';
 import { Badge, ButtonLink, Card, CardTitle, DeltaBadge, DonutChart, EmptyState, ErrorState, IconTile, PageHero, PageSkeleton, ProgressBar, Rich, ScoreRing, Select, TextLink, cx, type Tone } from '@/components/ui';
 import { useOverview } from '@/lib/queries';
 import { useAuth } from '@/app/auth';
+import { useLocale } from '@/app/locale';
 
 import { NbaSection } from './NbaSection';
 
 export default function OverviewPage() {
   const { me } = useAuth();
+  const { t } = useLocale();
   const [range, setRange] = useState(12);
   const { data, error, refetch, isPending } = useOverview(range);
   if (isPending) return <PageSkeleton />;
@@ -41,11 +43,11 @@ export default function OverviewPage() {
 
       {/* 3. YOUR MONEY */}
       <div className="space-y-3">
-        <h2 className="text-lg font-bold text-ink">Tài sản của bạn</h2>
+        <h2 className="text-lg font-bold text-ink">{t('home.your_assets')}</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard icon={Coins} tone="violet" label="Tổng tài sản" kpi={data.kpis.netWorth} />
-          <StatCard icon={Wallet} tone="green" label="Tiền dự phòng" kpi={data.kpis.emergency} />
-          <StatCard icon={BarChart3} tone="orange" label="Tiền đầu tư" kpi={data.kpis.invested} />
+          <StatCard icon={Coins} tone="violet" label={t('home.net_worth')} kpi={data.kpis.netWorth} />
+          <StatCard icon={Wallet} tone="green" label={t('home.emergency_fund')} kpi={data.kpis.emergency} />
+          <StatCard icon={BarChart3} tone="orange" label={t('home.invested')} kpi={data.kpis.invested} />
           <CashflowCard kpi={data.kpis.cashflow} />
         </div>
         <SetupCard setup={data.setup} />
@@ -54,10 +56,10 @@ export default function OverviewPage() {
       {/* 4. YOUR FUTURE */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-ink">Tương lai</h2>
+          <h2 className="text-lg font-bold text-ink">{t('home.future_summary')}</h2>
           <div className="flex gap-4">
-            <Link to="/muc-tieu" className="text-sm font-semibold text-accent-600 hover:text-accent-700">→ Xem mục tiêu</Link>
-            <Link to="/mo-phong" className="text-sm font-semibold text-accent-600 hover:text-accent-700">→ Chạy mô phỏng</Link>
+            <Link to="/muc-tieu" className="text-sm font-semibold text-accent-600 hover:text-accent-700">{t('home.view_goals')}</Link>
+            <Link to="/mo-phong" className="text-sm font-semibold text-accent-600 hover:text-accent-700">{t('home.run_simulation')}</Link>
           </div>
         </div>
         {!data.setup.holdings && data.kpis.netWorth.value < 10_000_000 ? (
@@ -73,7 +75,7 @@ export default function OverviewPage() {
       {/* 5. OPTIONAL DEEP DIVE */}
       <details className="group space-y-3">
         <summary className="cursor-pointer list-none flex items-center justify-between text-lg font-bold text-ink">
-          Khám phá thêm
+          {t('home.deep_dive')}
           <ChevronRight className="h-5 w-5 text-ink-soft transition-transform group-open:rotate-90" aria-hidden />
         </summary>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 pt-3">

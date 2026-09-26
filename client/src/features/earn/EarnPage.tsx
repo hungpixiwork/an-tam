@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Target, TrendingUp, Clock, Hourglass, Trash2, Plus, Info } from 'lucide-react';
-import { formatVnd } from '@shared/format';
+import { formatCurrency } from '@shared/format';
+import { useLocale } from '@/app/locale';
 import { Button, Card, CardTitle, EmptyState, PageSkeleton, ProgressBar } from '@/components/ui';
 import { FormField, TextInput, MoneyInput, Segmented } from '@/components/ui/form';
 import { PageHero } from '@/components/ui/PageHero';
@@ -15,26 +16,27 @@ import {
 import type { EarnProfile, EarnHourEntry, EarnTimeAlloc } from '@/lib/queries';
 
 export default function EarnPage() {
+  const { t } = useLocale();
   const [activeTab, setActiveTab] = useState<'plan' | 'hours' | 'time'>('plan');
   
   const TABS = [
-    { value: 'plan', label: 'Kế hoạch tăng thu nhập' },
-    { value: 'hours', label: 'Giờ giá trị' },
-    { value: 'time', label: 'Quỹ thời gian' },
+    { value: 'plan', label: t('earn.tab_plan') },
+    { value: 'hours', label: t('earn.tab_hours') },
+    { value: 'time', label: t('earn.tab_time') },
   ];
 
   return (
     <div className="space-y-4 pb-8">
       <PageHero
-        eyebrow="Tăng thu nhập"
-        title="Đầu tư vào bản thân"
-        highlight={<span className="text-primary-700">Tăng thu nhập</span>}
-        subtitle={<span>Thay vì cắt giảm chi tiêu, hãy tìm cách gia tăng thu nhập của bạn qua việc đầu tư thời gian hiệu quả.</span>}
+        eyebrow={t('earn.hero_eyebrow')}
+        title={t('earn.hero_title')}
+        highlight={<span className="text-primary-700">{t('earn.hero_highlight')}</span>}
+        subtitle={<span>{t('earn.hero_subtitle')}</span>}
         scene={(cls) => <WindingPath className={cls} />}
       />
 
       <Segmented 
-        label="Chọn mục hiển thị"
+        label={t('earn.tab_selector')}
         options={TABS} 
         value={activeTab} 
         onChange={(v) => setActiveTab(v as any)} 
@@ -48,6 +50,7 @@ export default function EarnPage() {
 }
 
 function IncomeGrowthTab() {
+  const { t, currency } = useLocale();
   const { data: profile, isPending: isProfilePending } = useEarnProfile();
   const { data: summary, isPending: isSummaryPending } = useEarnSummary();
   const saveProfile = useSaveEarnProfile();
@@ -70,22 +73,22 @@ function IncomeGrowthTab() {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr]">
       <Card>
-        <CardTitle icon={TrendingUp} title="Kế hoạch của bạn" subtitle="Xác định mục tiêu tăng thu nhập" />
+        <CardTitle icon={TrendingUp} title={t('earn.plan_card_title')} subtitle={t('earn.plan_card_subtitle')} />
         {form && (
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Thu nhập hiện tại">
+              <FormField label={t('earn.current_income')}>
                 {(id) => <MoneyInput id={id} value={form.currentIncome} onChange={(v) => setForm({ ...form, currentIncome: v })} />}
               </FormField>
-              <FormField label="Mục tiêu thu nhập">
+              <FormField label={t('earn.target_income')}>
                 {(id) => <MoneyInput id={id} value={form.targetIncome} onChange={(v) => setForm({ ...form, targetIncome: v })} />}
               </FormField>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Công việc hiện tại">
-                {(id) => <TextInput id={id} value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.target.value })} placeholder="VD: Nhân viên văn phòng" />}
+              <FormField label={t('earn.occupation')}>
+                {(id) => <TextInput id={id} value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.target.value })} placeholder={t('earn.occupation_placeholder')} />}
               </FormField>
-              <FormField label="Khoảng thời gian (tháng)">
+              <FormField label={t('earn.timeframe')}>
                 {(id) => (
                   <select 
                     id={id}
@@ -93,25 +96,25 @@ function IncomeGrowthTab() {
                     value={form.targetMonths} 
                     onChange={(e) => setForm({ ...form, targetMonths: Number(e.target.value) })}
                   >
-                    <option value={6}>6 tháng</option>
-                    <option value={12}>12 tháng</option>
-                    <option value={18}>18 tháng</option>
-                    <option value={24}>24 tháng</option>
+                    <option value={6}>{t('earn.months_n', { n: 6 })}</option>
+                    <option value={12}>{t('earn.months_n', { n: 12 })}</option>
+                    <option value={18}>{t('earn.months_n', { n: 18 })}</option>
+                    <option value={24}>{t('earn.months_n', { n: 24 })}</option>
                   </select>
                 )}
               </FormField>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Giờ/tuần đầu tư">
+              <FormField label={t('earn.hours_per_week')}>
                 {(id) => <TextInput id={id} type="number" value={form.hoursPerWeek} onChange={(e) => setForm({ ...form, hoursPerWeek: Number(e.target.value) })} />}
               </FormField>
-              <FormField label="Kỹ năng tập trung">
-                {(id) => <TextInput id={id} value={form.focusSkill} onChange={(e) => setForm({ ...form, focusSkill: e.target.value })} placeholder="VD: Lập trình, tiếng Anh..." />}
+              <FormField label={t('earn.focus_skill')}>
+                {(id) => <TextInput id={id} value={form.focusSkill} onChange={(e) => setForm({ ...form, focusSkill: e.target.value })} placeholder={t('earn.focus_skill_placeholder')} />}
               </FormField>
             </div>
             {isChanged && (
               <div className="pt-2">
-                <Button onClick={handleSave} disabled={saveProfile.isPending}>Lưu kế hoạch</Button>
+                <Button onClick={handleSave} disabled={saveProfile.isPending}>{t('earn.save_plan')}</Button>
               </div>
             )}
           </div>
@@ -121,21 +124,28 @@ function IncomeGrowthTab() {
       <div className="space-y-4">
         {summary && summary.plan && (
           <Card tone="mint">
-            <CardTitle icon={Target} tone="green" title="Tổng quan chiến lược" />
+            <CardTitle icon={Target} tone="green" title={t('earn.strategy_title')} />
             <div className="space-y-3">
               <p className="text-[15px] text-ink">
-                Mục tiêu: từ <span className="font-bold">{formatVnd(summary.plan.currentIncome)}</span> → <span className="font-bold">{formatVnd(summary.plan.targetIncome)}</span>/tháng trong {summary.plan.targetMonths} tháng tới.
+                {t('earn.plan_summary_target', {
+                  current: formatCurrency(summary.plan.currentIncome, currency),
+                  target: formatCurrency(summary.plan.targetIncome, currency),
+                  months: summary.plan.targetMonths,
+                })}
               </p>
               <p className="text-[15px] text-ink">
-                Bạn có khoảng <span className="font-bold">{summary.plan.hoursPerWeek}</span> giờ/tuần = <span className="font-bold">{summary.plan.totalAvailableHours}</span> giờ tổng cộng để rèn luyện.
+                {t('earn.plan_summary_hours', {
+                  hours: summary.plan.hoursPerWeek,
+                  total: summary.plan.totalAvailableHours,
+                })}
               </p>
               <p className="text-[15px] text-ink">
-                Tập trung: <span className="font-bold">{summary.plan.focusSkill}</span>
+                {t('earn.plan_summary_focus', { skill: summary.plan.focusSkill })}
               </p>
               
               {summary.plan.recommendations && summary.plan.recommendations.length > 0 && (
                 <div className="mt-4 rounded-xl bg-white p-3 border border-[#D7EFE2]">
-                  <p className="mb-2 text-sm font-semibold text-ink">Gợi ý hành động:</p>
+                  <p className="mb-2 text-sm font-semibold text-ink">{t('earn.recommendations_title')}</p>
                   <ul className="list-disc pl-5 text-sm text-ink-soft space-y-1">
                     {summary.plan.recommendations.map((rec, i) => (
                       <li key={i}>{rec}</li>
@@ -149,18 +159,23 @@ function IncomeGrowthTab() {
         
         {summary && summary.connection && (
           <Card tone="sky">
-            <CardTitle icon={TrendingUp} tone="blue" title="Tác động đến tài chính" />
+            <CardTitle icon={TrendingUp} tone="blue" title={t('earn.financial_impact_title')} />
             <div className="space-y-3">
               <p className="text-[15px] text-ink">
-                Nếu đạt mục tiêu, bạn có thể tăng thêm <span className="font-bold text-primary-700">{formatVnd(summary.connection.additionalMonthlyIncome)}</span>/tháng.
+                {t('earn.impact_additional_income', {
+                  amount: formatCurrency(summary.connection.additionalMonthlyIncome, currency),
+                })}
               </p>
               {summary.connection.goalAcceleration && (
                 <p className="text-[15px] text-ink">
-                  Điều này giúp bạn đạt mục tiêu <span className="font-semibold">"{summary.connection.goalAcceleration.goalTitle}"</span> sớm hơn <span className="font-bold">{summary.connection.goalAcceleration.monthsSaved}</span> tháng!
+                  {t('earn.impact_accelerate_goal', {
+                    goal: summary.connection.goalAcceleration.goalTitle,
+                    months: summary.connection.goalAcceleration.monthsSaved,
+                  })}
                 </p>
               )}
               <p className="text-xs text-ink-soft italic mt-2">
-                * Đây là kịch bản dựa trên mục tiêu bạn đặt, không phải dự đoán chắc chắn.
+                {t('earn.disclaimer')}
               </p>
             </div>
           </Card>
@@ -171,6 +186,7 @@ function IncomeGrowthTab() {
 }
 
 function ValueHoursTab() {
+  const { t } = useLocale();
   const currentWeek = "2026-W39"; // Mock current week for now
   
   const { data: activities, isPending: isActPending } = useEarnActivities();
@@ -217,17 +233,17 @@ function ValueHoursTab() {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.5fr_1fr]">
       <Card>
-        <CardTitle icon={Clock} title="Giờ giá trị tuần này" subtitle="Phân bổ thời gian cho các hoạt động tăng thu nhập" />
+        <CardTitle icon={Clock} title={t('earn.hours_card_title')} subtitle={t('earn.hours_card_subtitle')} />
         
         <div className="space-y-4">
           {(!activities || activities.length === 0) ? (
-            <EmptyState icon={Clock} title="Chưa có hoạt động" body="Thêm các hoạt động bạn dự định làm để tăng thu nhập." />
+            <EmptyState icon={Clock} title={t('earn.no_activity_title')} body={t('earn.no_activity_body')} />
           ) : (
             <div className="space-y-3">
               <div className="grid grid-cols-[1fr_80px_80px_40px] gap-2 items-end px-2 text-xs font-semibold text-ink-soft">
-                <span>Hoạt động</span>
-                <span className="text-center">Kế hoạch</span>
-                <span className="text-center">Thực tế</span>
+                <span>{t('earn.th_activity')}</span>
+                <span className="text-center">{t('earn.th_planned')}</span>
+                <span className="text-center">{t('earn.th_actual')}</span>
                 <span></span>
               </div>
               
@@ -261,18 +277,18 @@ function ValueHoursTab() {
           <div className="flex gap-2 items-center pt-4 border-t border-line">
             <div className="flex-1">
               <TextInput 
-                placeholder="Tên hoạt động mới..." 
+                placeholder={t('earn.new_activity_placeholder')} 
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddActivity()}
               />
             </div>
-            <Button onClick={handleAddActivity} disabled={createAct.isPending} variant="soft" icon={Plus}>Thêm</Button>
+            <Button onClick={handleAddActivity} disabled={createAct.isPending} variant="soft" icon={Plus}>{t('earn.add_btn')}</Button>
           </div>
           
           {isHoursChanged && (
             <div className="pt-4 flex justify-end">
-              <Button onClick={handleSaveHours} disabled={saveHours.isPending}>Lưu số giờ</Button>
+              <Button onClick={handleSaveHours} disabled={saveHours.isPending}>{t('earn.save_hours_btn')}</Button>
             </div>
           )}
         </div>
@@ -281,15 +297,18 @@ function ValueHoursTab() {
       <div className="space-y-4">
         {summary && summary.hours && (
           <Card tone="violet">
-            <CardTitle icon={Clock} tone="violet" title="Tổng kết tuần" />
+            <CardTitle icon={Clock} tone="violet" title={t('earn.week_summary_title')} />
             <div className="space-y-4">
               <p className="text-[15px] text-ink">
-                Tuần này bạn dự định đầu tư <span className="font-bold text-primary-700">{summary.hours.totalPlanned}</span> giờ vào khả năng tăng thu nhập, và đã thực hiện được <span className="font-bold text-primary-700">{summary.hours.totalActual}</span> giờ.
+                {t('earn.week_summary_desc', {
+                  planned: summary.hours.totalPlanned,
+                  actual: summary.hours.totalActual,
+                })}
               </p>
               
               <div className="space-y-2">
                 <div className="flex justify-between text-xs font-semibold text-ink-soft">
-                  <span>Tiến độ thực tế</span>
+                  <span>{t('earn.actual_progress')}</span>
                   <span>{Math.round((summary.hours.totalActual / Math.max(summary.hours.totalPlanned, 1)) * 100)}%</span>
                 </div>
                 <ProgressBar 
@@ -315,6 +334,7 @@ function ValueHoursTab() {
 }
 
 function TimeAllocationTab() {
+  const { t } = useLocale();
   const { data: allocations, isPending: isAllocPending } = useEarnTime();
   const { data: summary, isPending: isSummaryPending } = useEarnSummary();
   const saveAlloc = useSaveEarnTime();
@@ -340,6 +360,17 @@ function TimeAllocationTab() {
     setLocalAlloc(localAlloc.map(a => a.category === category ? { ...a, hours } : a));
   };
 
+  const getCatLabel = (cat: string) => {
+    switch (cat) {
+      case 'Ngủ': return t('earn.cat_sleep');
+      case 'Công việc/học chính': return t('earn.cat_work');
+      case 'Sinh hoạt & di chuyển': return t('earn.cat_living');
+      case 'Giải trí & thư giãn': return t('earn.cat_leisure');
+      case 'Phát triển bản thân (Tăng thu nhập)': return t('earn.cat_growth');
+      default: return cat;
+    }
+  };
+
   const COLORS: Record<string, string> = {
     'Ngủ': '#94a3b8',
     'Công việc/học chính': '#3b82f6',
@@ -351,7 +382,7 @@ function TimeAllocationTab() {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr]">
       <Card>
-        <CardTitle icon={Hourglass} title="Phân bổ 168 giờ" subtitle="Bạn đang dành bao nhiêu thời gian cho mỗi việc?" />
+        <CardTitle icon={Hourglass} title={t('earn.time_card_title')} subtitle={t('earn.time_card_subtitle')} />
         
         {localAlloc && (
           <div className="space-y-5">
@@ -361,12 +392,12 @@ function TimeAllocationTab() {
                   <div 
                     key={a.category} 
                     style={{ width: `${(a.hours / 168) * 100}%`, backgroundColor: COLORS[a.category] || '#ccc' }} 
-                    title={`${a.category}: ${a.hours}h`}
+                    title={`${getCatLabel(a.category)}: ${a.hours}h`}
                   />
                 ) : null
               ))}
               {unallocated > 0 && (
-                <div style={{ width: `${(unallocated / 168) * 100}%`, backgroundColor: '#e2e8f0' }} title={`Chưa phân bổ: ${unallocated}h`} />
+                <div style={{ width: `${(unallocated / 168) * 100}%`, backgroundColor: '#e2e8f0' }} title={`${t('earn.unallocated')}: ${unallocated}h`} />
               )}
             </div>
 
@@ -375,31 +406,31 @@ function TimeAllocationTab() {
                 <div key={a.category} className="grid grid-cols-[1fr_80px_40px] gap-3 items-center">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[a.category] || '#ccc' }} />
-                    <span className="text-sm font-medium text-ink">{a.category}</span>
+                    <span className="text-sm font-medium text-ink">{getCatLabel(a.category)}</span>
                   </div>
                   <TextInput 
                     type="number" 
                     value={a.hours} 
                     onChange={(e) => updateAlloc(a.category, Number(e.target.value))} 
                   />
-                  <span className="text-sm text-ink-soft text-right">giờ</span>
+                  <span className="text-sm text-ink-soft text-right">{t('earn.hours_unit')}</span>
                 </div>
               ))}
               
               <div className="grid grid-cols-[1fr_80px_40px] gap-3 items-center pt-2 border-t border-line">
                 <div className="flex items-center gap-2">
                   <span className="w-3 h-3 rounded-full bg-slate-200" />
-                  <span className="text-sm font-medium text-ink">Chưa phân bổ</span>
+                  <span className="text-sm font-medium text-ink">{t('earn.unallocated')}</span>
                 </div>
                 <div className="text-right font-medium px-3 text-ink-soft">{unallocated}</div>
-                <span className="text-sm text-ink-soft text-right">giờ</span>
+                <span className="text-sm text-ink-soft text-right">{t('earn.hours_unit')}</span>
               </div>
             </div>
 
             {isAllocChanged && (
               <div className="pt-2 flex justify-end">
                 <Button onClick={handleSaveAlloc} disabled={saveAlloc.isPending || unallocated < 0}>
-                  {unallocated < 0 ? 'Quá 168 giờ!' : 'Lưu phân bổ'}
+                  {unallocated < 0 ? t('earn.over_168_hours') : t('earn.save_alloc_btn')}
                 </Button>
               </div>
             )}
@@ -410,20 +441,20 @@ function TimeAllocationTab() {
       <div className="space-y-4">
         {summary && summary.time && (
           <Card tone="sky">
-            <CardTitle icon={Info} tone="blue" title="Góc nhìn từ AI" />
+            <CardTitle icon={Info} tone="blue" title={t('earn.ai_perspective_title')} />
             <div className="space-y-4">
               {summary.time.insight ? (
                 <p className="text-[15px] leading-relaxed text-ink">{summary.time.insight}</p>
               ) : (
                 <p className="text-[15px] leading-relaxed text-ink">
-                  Bạn đang có một quỹ thời gian tương đối cân bằng. Hãy tiếp tục duy trì!
+                  {t('earn.balanced_time_desc')}
                 </p>
               )}
               
               {unallocated > 0 && (
                 <div className="rounded-xl bg-blue-50 p-3 border border-blue-100">
                   <p className="text-[13px] text-blue-800">
-                    Bạn còn <span className="font-bold">{unallocated}</span> giờ chưa phân bổ. Đây có thể là thời gian tiềm năng để học thêm kỹ năng mới hoặc nghỉ ngơi.
+                    {t('earn.unallocated_desc', { hours: unallocated })}
                   </p>
                 </div>
               )}

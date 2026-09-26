@@ -52,14 +52,14 @@ export const ai = new Hono<AppEnv>()
     const state = await loadUserState(c.env.DB, userId);
     
     // Fetch last 7 days transactions
-    const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
-    const txsRes = await c.env.DB.prepare('SELECT id, occurred_on as date, category_id as categoryId, kind, amount, note FROM transactions WHERE user_id = ? AND occurred_on >= ?').bind(userId, since).all();
-    const txs: any[] = txsRes.results.map((r: any) => ({
+    const since = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+    const txsRes = await c.env.DB.prepare('SELECT id, occurred_on, category, kind, amount, note FROM transactions WHERE user_id = ? AND occurred_on >= ?').bind(userId, since).all<any>();
+    const txs = txsRes.results.map((r: any) => ({
       id: r.id,
-      date: r.date,
-      categoryId: r.categoryId,
-      income: r.kind === 'income' ? r.amount : 0,
-      expense: r.kind === 'expense' ? r.amount : 0,
+      occurredOn: r.occurred_on,
+      category: r.category,
+      kind: r.kind as 'income' | 'expense',
+      amount: r.amount,
       note: r.note,
     }));
 

@@ -8,8 +8,8 @@
     "directory": "./client/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    // API do Worker xử lý, không để SPA fallback nuốt mất
-    "run_worker_first": ["/api/*"]
+    // API và Assets do Worker xử lý, chặn SPA fallback nuốt nhầm assets không tồn tại
+    "run_worker_first": ["/api/*", "/assets/*"]
   },
   "d1_databases": [
     {

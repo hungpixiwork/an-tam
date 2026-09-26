@@ -3,50 +3,67 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppShell } from '@/layouts/AppShell';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { OnboardingLayout } from '@/layouts/OnboardingLayout';
+import { RouteErrorBoundary } from '@/components/ErrorBoundary';
+import { retryDynamicImport } from '@/lib/chunkRecovery';
 
-const OnboardingPage = lazy(() => import('@/features/onboarding/OnboardingPage'));
-const LedgerPage = lazy(() => import('@/features/ledger/LedgerPage'));
-const OverviewPage = lazy(() => import('@/features/overview/OverviewPage'));
-const GoalsPage = lazy(() => import('@/features/goals/GoalsPage'));
-const SimulationPage = lazy(() => import('@/features/simulation/SimulationPage'));
-const SimulationResultPage = lazy(() => import('@/features/simulation/SimulationResultPage'));
-const HabitsPage = lazy(() => import('@/features/habits/HabitsPage'));
-const PortfolioPage = lazy(() => import('@/features/portfolio/PortfolioPage'));
-const SafetyPlanPage = lazy(() => import('@/features/plan/SafetyPlanPage'));
-const AiMonitorPage = lazy(() => import('@/features/ai/AiMonitorPage'));
-const CommunityPage = lazy(() => import('@/features/community/CommunityPage'));
-const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'));
-const EarnPage = lazy(() => import('@/features/earn/EarnPage'));
-const LoginPage = lazy(() => import('@/features/auth/LoginPage'));
-const RegisterPage = lazy(() => import('@/features/auth/RegisterPage'));
-const PixelGallery = lazy(() => import('@/features/dev/PixelGallery'));
+function safeLazy<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) {
+  return lazy(() => retryDynamicImport(factory));
+}
+
+const OnboardingPage = safeLazy(() => import('@/features/onboarding/OnboardingPage'));
+const LedgerPage = safeLazy(() => import('@/features/ledger/LedgerPage'));
+const OverviewPage = safeLazy(() => import('@/features/overview/OverviewPage'));
+const GoalsPage = safeLazy(() => import('@/features/goals/GoalsPage'));
+const SimulationPage = safeLazy(() => import('@/features/simulation/SimulationPage'));
+const SimulationResultPage = safeLazy(() => import('@/features/simulation/SimulationResultPage'));
+const HabitsPage = safeLazy(() => import('@/features/habits/HabitsPage'));
+const PortfolioPage = safeLazy(() => import('@/features/portfolio/PortfolioPage'));
+const SafetyPlanPage = safeLazy(() => import('@/features/plan/SafetyPlanPage'));
+const AiMonitorPage = safeLazy(() => import('@/features/ai/AiMonitorPage'));
+const CommunityPage = safeLazy(() => import('@/features/community/CommunityPage'));
+const SettingsPage = safeLazy(() => import('@/features/settings/SettingsPage'));
+const EarnPage = safeLazy(() => import('@/features/earn/EarnPage'));
+const LoginPage = safeLazy(() => import('@/features/auth/LoginPage'));
+const RegisterPage = safeLazy(() => import('@/features/auth/RegisterPage'));
+const PixelGallery = safeLazy(() => import('@/features/dev/PixelGallery'));
 
 export const router = createBrowserRouter([
   {
-    element: <AuthLayout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
-      { path: '/dang-nhap', element: <LoginPage /> },
-      { path: '/dang-ky', element: <RegisterPage /> },
+      {
+        element: <AuthLayout />,
+        errorElement: <RouteErrorBoundary />,
+        children: [
+          { path: '/dang-nhap', element: <LoginPage /> },
+          { path: '/dang-ky', element: <RegisterPage /> },
+        ],
+      },
+      { 
+        element: <OnboardingLayout />, 
+        errorElement: <RouteErrorBoundary />,
+        children: [{ path: '/bat-dau', element: <OnboardingPage /> }] 
+      },
+      {
+        element: <AppShell />,
+        errorElement: <RouteErrorBoundary />,
+        children: [
+          { path: '/', element: <OverviewPage /> },
+          { path: '/thu-chi', element: <LedgerPage /> },
+          { path: '/tang-thu-nhap', element: <EarnPage /> },
+          { path: '/muc-tieu', element: <GoalsPage /> },
+          { path: '/mo-phong', element: <SimulationPage /> },
+          { path: '/mo-phong/ket-qua/:runId', element: <SimulationResultPage /> },
+          { path: '/thoi-quen', element: <HabitsPage /> },
+          { path: '/danh-muc', element: <PortfolioPage /> },
+          { path: '/ke-hoach', element: <SafetyPlanPage /> },
+          { path: '/ai-theo-doi', element: <AiMonitorPage /> },
+          { path: '/cong-dong', element: <CommunityPage /> },
+          { path: '/cai-dat', element: <SettingsPage /> },
+        ],
+      },
+      ...(import.meta.env.DEV ? [{ path: '/dev/pixel', element: <PixelGallery />, errorElement: <RouteErrorBoundary /> }] : []),
+      { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
-  { element: <OnboardingLayout />, children: [{ path: '/bat-dau', element: <OnboardingPage /> }] },
-  {
-    element: <AppShell />,
-    children: [
-      { path: '/', element: <OverviewPage /> },
-      { path: '/thu-chi', element: <LedgerPage /> },
-      { path: '/tang-thu-nhap', element: <EarnPage /> },
-      { path: '/muc-tieu', element: <GoalsPage /> },
-      { path: '/mo-phong', element: <SimulationPage /> },
-      { path: '/mo-phong/ket-qua/:runId', element: <SimulationResultPage /> },
-      { path: '/thoi-quen', element: <HabitsPage /> },
-      { path: '/danh-muc', element: <PortfolioPage /> },
-      { path: '/ke-hoach', element: <SafetyPlanPage /> },
-      { path: '/ai-theo-doi', element: <AiMonitorPage /> },
-      { path: '/cong-dong', element: <CommunityPage /> },
-      { path: '/cai-dat', element: <SettingsPage /> },
-    ],
-  },
-  ...(import.meta.env.DEV ? [{ path: '/dev/pixel', element: <PixelGallery /> }] : []),
-  { path: '*', element: <Navigate to="/" replace /> },
 ]);

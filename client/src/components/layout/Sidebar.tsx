@@ -5,11 +5,11 @@ import { NAV } from '@/app/nav';
 import { WindingPath } from '@/components/pixel';
 import { cx } from '@/components/ui';
 
-export function Logo({ compact = false }: { compact?: boolean }) {
+export function Logo({ compact = false, onClick }: { compact?: boolean; onClick?: () => void }) {
   const { t } = useLocale();
 
   return (
-    <Link to="/" className="flex items-center gap-3" aria-label="An Tâm AI — về trang Tổng quan">
+    <Link to="/" onClick={onClick} className="flex items-center gap-3" aria-label="An Tâm AI — về trang Tổng quan">
       <svg viewBox="0 0 32 32" className="h-10 w-10 shrink-0" aria-hidden>
         <path fill="#1FA37A" d="M15 29C7 27 3 20 5 9c7 1 12 6 10 20z" />
         <path fill="#0E6B58" d="M17 29c8-2 12-9 10-20-7 1-12 6-10 20z" />
@@ -38,16 +38,23 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   return (
     <>
       {/* Lớp phủ khi mở drawer trên màn nhỏ */}
-      <div className={cx('fixed inset-0 z-30 bg-ink/30 lg:hidden', open ? 'block' : 'hidden')} onClick={onClose} aria-hidden />
+      <div
+        className={cx(
+          'fixed inset-0 z-30 bg-ink/30 transition-opacity duration-200 lg:hidden',
+          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
+        )}
+        onClick={onClose}
+        aria-hidden
+      />
       <aside
         className={cx(
-          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-line bg-white transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:w-[76px] xl:w-64',
+          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-line bg-white transition-transform duration-200 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:w-[76px] xl:w-64',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
         aria-label="Điều hướng chính"
       >
         <div className="flex items-center justify-between px-6 pb-7 pt-6 lg:px-4 xl:px-6">
-          <span className="lg:hidden xl:block"><Logo /></span>
+          <span className="lg:hidden xl:block"><Logo onClick={onClose} /></span>
           <span className="hidden lg:block xl:hidden"><Logo compact /></span>
           <button type="button" className="rounded-lg p-2 text-ink-soft hover:bg-slate-100 lg:hidden" onClick={onClose} aria-label="Đóng menu">
             <X className="h-5 w-5" />

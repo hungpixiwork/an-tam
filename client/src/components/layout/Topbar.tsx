@@ -98,7 +98,7 @@ function NotificationBell() {
         {data.length > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-danger-500 ring-2 ring-white" />}
       </button>
       {open && (
-        <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-xl border border-line bg-white shadow-lift">
+        <div className="fixed inset-x-4 top-[74px] z-50 overflow-hidden rounded-xl border border-line bg-white shadow-lift sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-80">
           <p className="border-b border-line px-4 py-3 text-sm font-bold text-ink">{t('topbar.open_alerts')}</p>
           {data.length === 0 ? (
             <p className="px-4 py-4 text-sm text-ink-soft">{t('topbar.no_alerts')}</p>
@@ -163,7 +163,7 @@ export function Topbar({ title, onMenu }: { title: string; onMenu: () => void })
   const { t } = useLocale();
 
   return (
-    <header className="sticky top-0 z-20 flex h-[76px] items-center gap-3 border-b border-line bg-white/90 px-4 backdrop-blur md:px-8 md:gap-4">
+    <header className="sticky top-0 z-20 flex h-[76px] items-center gap-3 border-b border-line bg-white px-4 md:px-8 md:gap-4">
       <button type="button" onClick={onMenu} className="rounded-lg p-2 text-ink-soft hover:bg-slate-100 lg:hidden" aria-label="Mở menu">
         <Menu className="h-6 w-6" />
       </button>

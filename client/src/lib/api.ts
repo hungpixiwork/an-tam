@@ -27,6 +27,11 @@ async function request<T>(method: string, path: string, body?: Json): Promise<T>
   }
   const json = await res.json().catch(() => null);
   if (!res.ok || !json?.success) {
+    if (res.status === 401 && !path.startsWith('/auth/')) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:expired'));
+      }
+    }
     throw new ApiError(res.status, json?.error?.code ?? 'unknown', json?.error?.message ?? 'Đã có lỗi xảy ra, vui lòng thử lại');
   }
   return json.data as T;

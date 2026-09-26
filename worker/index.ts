@@ -29,7 +29,49 @@ app.onError((err, c) => {
   return c.json({ success: false, error: { code: 'internal', message: 'Đã có lỗi xảy ra, vui lòng thử lại' } }, 500);
 });
 
+// Chặn triệt để mọi request /assets/* không tồn tại trả về 404 text/plain, tuyệt đối không fallback về index.html
+app.all('/assets/*', async (c) => {
+  if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
+    return c.text('Method Not Allowed', 405, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    });
+  }
+
+  if (!c.env.ASSETS) {
+    return c.text('Not Found', 404, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    });
+  }
+
+  const res = await c.env.ASSETS.fetch(c.req.raw);
+  const contentType = res.headers.get('content-type') || '';
+
+  // Khi asset không tồn tại: hoặc asset binding trả về 404, hoặc bị SPA fallback ngầm trả về 200 text/html
+  if (res.status === 404 || contentType.includes('text/html')) {
+    return c.text('Not Found', 404, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    });
+  }
+
+  return res;
+});
+
 app.route('/api/auth', auth);
+
+// Phiên bản ứng dụng phục vụ chunk-load recovery
+const APP_VERSION = '1.0.0';
+const BUILD_TIME = '2026-09-26T00:00:00.000Z';
+app.get('/api/version', (c) =>
+  c.json({
+    success: true,
+    version: APP_VERSION,
+    buildTime: BUILD_TIME,
+    data: { version: APP_VERSION, buildTime: BUILD_TIME },
+  }),
+);
 
 // Mọi API còn lại yêu cầu đăng nhập
 app.use('/api/*', requireAuth);
@@ -49,7 +91,7 @@ app.route('/api/lessons', lessons);
 app.route('/api', settings);
 app.route('/api', common);
 
-app.all('/api/*', (c) => c.json({ success: false, error: { code: 'not_found', message: 'API không tồn tại' } }, 404));
+app.notFound((c) => c.json({ success: false, error: { code: 'not_found', message: 'API không tồn tại' } }, 404));
 
 export default {
   fetch: app.fetch,

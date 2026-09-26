@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Locale, Currency } from '@shared/i18n';
 import { t } from '@shared/i18n';
+import { useAuth } from '@/app/auth';
 import { useSettings, useUpdateSettings } from '@/lib/queries';
 
 interface LocaleValue {
@@ -42,7 +43,8 @@ function getInitialCurrency(loc: Locale): Currency {
 }
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const { data: settings } = useSettings();
+  const { me } = useAuth();
+  const { data: settings } = useSettings(!!me);
   const updateSettings = useUpdateSettings();
 
   const [locale, setLocalLocale] = useState<Locale>(getInitialLocale);
@@ -95,4 +97,12 @@ export function useLocale(): LocaleValue {
   const ctx = useContext(LocaleContext);
   if (!ctx) throw new Error('useLocale phải nằm trong <LocaleProvider>');
   return ctx;
+}
+
+export function useSafeLocale(): LocaleValue | null {
+  return useContext(LocaleContext);
+}
+
+export function getStoredLocale(): Locale {
+  return getInitialLocale();
 }
