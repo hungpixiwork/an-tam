@@ -95,3 +95,11 @@ export function evaluateAlerts(state: UserState, narrator: Narrator = templateNa
 
   return alerts;
 }
+
+export const ALERT_ACTIONS: Record<string, { label: string; to: string }> = {
+  goal_delay: { label: 'Xem mục tiêu', to: '/muc-tieu' },
+  volatile_share: { label: 'Xem danh mục', to: '/danh-muc' },
+  emergency_low: { label: 'Xem kế hoạch', to: '/ke-hoach' },
+  spending_over: { label: 'Xem thu chi', to: '/thu-chi' },
+  savings_declining: { label: 'Xem tổng quan', to: '/' },
+};

@@ -6,6 +6,8 @@ export type Volatility = 'low' | 'mid' | 'high';
 export type GoalKind = 'home' | 'education' | 'retirement' | 'emergency' | 'custom';
 export type Salutation = 'anh' | 'chị' | 'bạn';
 export type TransactionKind = 'income' | 'expense';
+export type SpendingTag = 'essential' | 'useful' | 'joy' | 'growth' | 'regret';
+export type TimeCategory = 'sleep' | 'work' | 'life' | 'learning' | 'side_income' | 'unallocated';
 
 export interface FinancialProfile {
   monthlyIncome: number;
@@ -59,6 +61,8 @@ export interface Transaction {
   note: string;
   /** 'YYYY-MM-DD' */
   occurredOn: string;
+  /** Intentional spending tag (optional). */
+  valueTag?: SpendingTag;
 }
 
 /** Toàn bộ dữ liệu engine cần để tính cho 1 người dùng. */
@@ -82,4 +86,33 @@ export interface SimulationParams {
   interestRateDeltaPct: number; // -3..3
   surpriseCost: number;         // VND, 0..500 triệu
   goalShiftMonths?: number;     // dời hạn mục tiêu mua nhà (âm = sớm hơn)
+}
+
+// ─── EARN layer ───
+
+export interface IncomeProfile {
+  currentIncome: number;
+  targetIncome: number;
+  targetMonths: number;
+  occupation: string;
+  hoursPerWeek: number;
+  focusSkill: string;
+}
+
+export interface ValueActivity {
+  id: string;
+  title: string;
+}
+
+export interface ValueHourEntry {
+  activityId: string;
+  activityTitle: string;
+  week: string;          // 'YYYY-Www'
+  planned: number;       // hours
+  actual: number;
+}
+
+export interface TimeAllocation {
+  category: TimeCategory;
+  hours: number;
 }

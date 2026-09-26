@@ -1,16 +1,37 @@
 import { useState } from 'react';
 import { Activity, BarChart3, Bell, CheckCircle2, Database, FileText, Lightbulb, PieChart, Search, Settings, ShieldCheck, X } from 'lucide-react';
 import { HeroLakeCity } from '@/components/pixel';
-import { Badge, ButtonLink, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, Rich, Select, TextLink, cx, type Tone } from '@/components/ui';
-import { useAi, useResolveAlert } from '@/lib/queries';
+import { Badge, ButtonLink, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, Rich, Select, cx, type Tone } from '@/components/ui';
+import { useAi, useResolveAlert, useWeeklyDigest } from '@/lib/queries';
 import type { AiAlert, AiEvent } from '@/lib/queries';
+import { formatVnd, formatPct } from '@shared/format';
+
+const ALERT_ACTIONS: Record<string, { label: string; to: string }> = {
+  goal_delay: { label: 'Xem mục tiêu', to: '/muc-tieu' },
+  volatile_share: { label: 'Xem danh mục', to: '/danh-muc' },
+  emergency_low: { label: 'Xem kế hoạch', to: '/ke-hoach' },
+  spending_over: { label: 'Xem thu chi', to: '/thu-chi' },
+  savings_declining: { label: 'Xem tổng quan', to: '/' },
+};
+
+function relativeDate(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return 'Hôm nay';
+  if (days === 1) return 'Hôm qua';
+  return `${days} ngày trước`;
+}
 
 export default function AiMonitorPage() {
   const [range, setRange] = useState<'week' | 'month'>('week');
   const { data, error, refetch, isPending } = useAi(range);
+  const digestQuery = useWeeklyDigest();
 
-  if (isPending) return <PageSkeleton />;
+  if (isPending || digestQuery.isPending) return <PageSkeleton />;
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />;
+  if (digestQuery.error) return <ErrorState error={digestQuery.error} onRetry={() => digestQuery.refetch()} />;
+
+  const digest = digestQuery.data;
 
   return (
     <div className="space-y-4">
@@ -21,6 +42,13 @@ export default function AiMonitorPage() {
         scene={(cls) => <HeroLakeCity className={cls} />}
       />
 
+      <WeeklyDigestCard digest={digest} />
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.45fr_1fr]">
+        <AlertsCard alerts={data.alerts} />
+        <SuggestionCard alerts={data.alerts} />
+      </div>
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.1fr]">
         <TimelineCard events={data.events} range={range} onRange={setRange} />
         <div className="space-y-4">
@@ -28,12 +56,47 @@ export default function AiMonitorPage() {
           <WillNotDoCard />
         </div>
       </div>
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.45fr_1fr]">
-        <AlertsCard alerts={data.alerts} />
-        <SuggestionCard alerts={data.alerts} />
-      </div>
     </div>
+  );
+}
+
+function WeeklyDigestCard({ digest }: { digest: any }) {
+  if (!digest) return null;
+  return (
+    <Card>
+      <CardTitle icon={FileText} tone="blue" title="Tuần này của bạn" action={<Badge tone="blue">{digest.weekLabel}</Badge>} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4">
+        <div>
+          <p className="text-sm text-ink-soft">Tổng thu</p>
+          <p className="font-bold text-success-600 text-lg">{formatVnd(digest.moneyIn)}</p>
+        </div>
+        <div>
+          <p className="text-sm text-ink-soft">Tổng chi</p>
+          <p className="font-bold text-danger-600 text-lg">{formatVnd(digest.moneyOut)}</p>
+        </div>
+        <div>
+          <p className="text-sm text-ink-soft">Tiết kiệm</p>
+          <p className="font-bold text-accent-600 text-lg">{formatVnd(digest.saved)}</p>
+        </div>
+        <div>
+          <p className="text-sm text-ink-soft">Giờ giá trị</p>
+          <p className="font-bold text-ink text-lg">{digest.valueHours}h</p>
+        </div>
+      </div>
+      {digest.goalProgress && (
+        <div className="py-3 border-t border-b border-[#E8EEF4]">
+          <p className="text-sm text-ink-soft mb-1">Mục tiêu: {digest.goalProgress.title}</p>
+          <div className="w-full bg-[#E8EEF4] rounded-full h-2">
+            <div className="bg-success-500 h-2 rounded-full" style={{ width: `${digest.goalProgress.pct * 100}%` }}></div>
+          </div>
+          <p className="text-xs text-right mt-1 font-semibold text-ink">{formatPct(digest.goalProgress.pct)}</p>
+        </div>
+      )}
+      <div className="mt-4 flex flex-col md:flex-row items-center gap-4 justify-between bg-sky-50 p-4 rounded-xl">
+        <p className="text-sm font-semibold text-ink flex-1">{digest.oneNotice}</p>
+        <ButtonLink to={digest.actionTo} variant="accent">{digest.oneAction}</ButtonLink>
+      </div>
+    </Card>
   );
 }
 
@@ -175,53 +238,73 @@ const ALERT_TONE: Record<AiAlert['severity'], { bg: string; border: string; icon
 
 function AlertsCard({ alerts }: { alerts: AiAlert[] }) {
   const resolveAlert = useResolveAlert();
+  
+  const openAlerts = alerts.filter(a => a.status === 'open');
+  const resolvedAlerts = alerts.filter(a => a.status === 'resolved');
+
+  const renderAlert = (alert: AiAlert) => {
+    const config = ALERT_TONE[alert.severity];
+    const baseRule = alert.ruleKey.split(':')[0];
+    const action = ALERT_ACTIONS[baseRule] || { label: 'Xem chi tiết', to: '/ai' };
+    
+    return (
+      <div key={alert.id} className={cx('rounded-xl p-4 border flex flex-col', config.bg, config.border)}>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <IconTile icon={config.icon} tone={config.pillTone} size="sm" />
+            <Badge tone={config.pillTone}>{config.pill}</Badge>
+          </div>
+          {alert.status === 'open' && (
+            <button
+              type="button"
+              onClick={() => resolveAlert.mutate(alert.id)}
+              className="text-ink-soft hover:text-ink"
+              aria-label="Đánh dấu đã xử lý"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <p className="mt-3 text-sm font-semibold text-ink">{alert.title}</p>
+        <p className="mt-1 text-xs text-ink-soft flex-1">{alert.body}</p>
+        <div className="mt-4 flex items-center justify-between">
+          <span className="text-[11px] text-ink-soft">{relativeDate(alert.createdAt)}</span>
+          {alert.status === 'open' && (
+            <ButtonLink to={action.to} variant="white" className="!px-3 !py-1.5 !text-xs">
+              {action.label}
+            </ButtonLink>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Card>
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-bold text-ink">Cảnh báo đang mở</h2>
-          <Badge tone="red">{alerts.length} cảnh báo</Badge>
-        </div>
-        {alerts.length > 0 && <TextLink to="#all-alerts">Xem tất cả</TextLink>}
+      <div className="mb-4">
+        <h2 className="text-lg font-bold text-ink">Cảnh báo đang mở {openAlerts.length > 0 && <Badge tone="red" className="ml-2">{openAlerts.length}</Badge>}</h2>
       </div>
 
-      {alerts.length === 0 ? (
+      {openAlerts.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <CheckCircle2 className="h-8 w-8 text-success-500" aria-hidden />
           <p className="text-sm text-ink-soft">Không có cảnh báo nào đang mở.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {alerts.slice(0, 3).map((alert) => {
-            const config = ALERT_TONE[alert.severity];
-            return (
-              <div key={alert.id} className={cx('rounded-xl p-4 border', config.bg, config.border)}>
-                <div className="flex items-start justify-between gap-2">
-                  <IconTile icon={config.icon} tone={alert.severity === 'danger' ? 'red' : alert.severity === 'warning' ? 'orange' : 'green'} size="sm" />
-                  <button
-                    type="button"
-                    onClick={() => resolveAlert.mutate(alert.id)}
-                    className="text-ink-soft hover:text-ink"
-                    aria-label="Đánh dấu đã xử lý"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <Badge tone={config.pillTone} className="mt-2">{config.pill}</Badge>
-                <p className="mt-2 text-sm font-semibold text-ink">{alert.title}</p>
-                <p className="mt-1 text-xs text-ink-soft">{alert.body}</p>
-                <button
-                  type="button"
-                  onClick={() => resolveAlert.mutate(alert.id)}
-                  className="mt-3 text-[13px] font-semibold text-accent-600 hover:text-accent-700"
-                >
-                  Đánh dấu đã xử lý
-                </button>
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 mb-6">
+          {openAlerts.map(renderAlert)}
         </div>
+      )}
+
+      {resolvedAlerts.length > 0 && (
+        <>
+          <div className="mb-4 mt-6">
+            <h2 className="text-md font-semibold text-ink-soft">Đã xử lý</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 opacity-60">
+            {resolvedAlerts.map(renderAlert)}
+          </div>
+        </>
       )}
     </Card>
   );
@@ -230,7 +313,8 @@ function AlertsCard({ alerts }: { alerts: AiAlert[] }) {
 /* ───────── Suggestion Card ───────── */
 
 function SuggestionCard({ alerts }: { alerts: AiAlert[] }) {
-  const firstAlert = alerts[0];
+  const openAlerts = alerts.filter(a => a.status === 'open');
+  const firstAlert = openAlerts[0];
 
   if (!firstAlert) {
     return (

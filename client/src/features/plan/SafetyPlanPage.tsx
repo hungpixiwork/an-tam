@@ -7,6 +7,7 @@ import { HeroLakeCity } from '@/components/pixel';
 import { Badge, Button, ButtonLink, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, Select, cx, type Tone } from '@/components/ui';
 import { NeedData } from '@/components/NeedData';
 import { useApplyPlan, usePlans, useToggleTask, type PlansData, type PlanTask } from '@/lib/queries';
+import { formatVnd } from '@shared/format';
 
 export default function SafetyPlanPage() {
   const { data, error, refetch, isPending } = usePlans();
@@ -31,7 +32,10 @@ export default function SafetyPlanPage() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.75fr_1fr]">
         <ComparisonCard proposal={proposal} />
-        <StepsCard steps={proposal.steps} />
+        <div className="flex flex-col gap-4">
+          <EmergencyCalculationCard info={proposal.emergencyInfo} steps={proposal.steps} />
+          <StepsCard steps={proposal.steps} />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.2fr]">
@@ -88,6 +92,35 @@ function ComparisonCard({ proposal }: { proposal: PlanProposal }) {
         <PlanColumn title="Kế hoạch hiện tại" badge="Hiện tại" metrics={proposal.current} goalTitle={goal} />
         <PlanColumn title="Kế hoạch đề xuất" badge="Được AI đề xuất" metrics={proposal.proposed} goalTitle={goal} proposed />
       </div>
+    </Card>
+  );
+}
+
+function EmergencyCalculationCard({ info, steps }: { info: PlanProposal['emergencyInfo'], steps: PlanProposal['steps'] }) {
+  const step = steps.find(s => s.key === 'emergency');
+  const monthlyExtra = step ? Math.ceil(step.amount / 8 / 1_000_000) * 1_000_000 : 0;
+  return (
+    <Card tone="sky">
+      <CardTitle icon={ShieldCheck} tone="blue" title="Nếu thu nhập dừng hôm nay" />
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] text-ink-soft">Dự phòng hiện tại</span>
+          <span className="text-[14px] font-bold text-ink">{months(info.currentMonths)} <span className="font-normal text-ink-soft">({formatVnd(info.currentAmount)})</span></span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] text-ink-soft">Mức an toàn (×{info.targetMonths})</span>
+          <span className="text-[14px] font-bold text-ink">{formatVnd(info.targetAmount)}</span>
+        </div>
+        <div className="flex items-center justify-between border-t border-line pt-3">
+          <span className="text-[14px] font-medium text-ink">Cần thêm</span>
+          <span className={cx('text-[15px] font-bold', info.gapAmount > 0 ? 'text-danger-600' : 'text-success-600')}>{formatVnd(info.gapAmount)}</span>
+        </div>
+      </div>
+      {info.gapAmount > 0 && monthlyExtra > 0 && (
+        <p className="mt-4 rounded-xl bg-white p-3 text-[13px] leading-relaxed text-ink">
+          Nếu thêm <strong>{formatVnd(monthlyExtra)}/tháng</strong>, bạn có thể đạt mốc <strong>{info.targetMonths} tháng</strong> trong <strong>8 tháng</strong>.
+        </p>
+      )}
     </Card>
   );
 }

@@ -9,6 +9,7 @@ import { addMonths, currentMonth } from '../../shared/engine/month';
 interface UserRow {
   id: string; email: string; full_name: string; salutation: Salutation;
   avatar_seed: number; member_status: string; onboarded_at: string | null;
+  life_stage: string | null;
 }
 interface HoldingRow {
   id: string; name: string; category: Holding['category']; value: number; role: string;
@@ -27,6 +28,7 @@ export const toMe = (u: UserRow): Me => ({
   avatarSeed: u.avatar_seed,
   memberStatus: u.member_status,
   onboarded: u.onboarded_at !== null,
+  lifeStage: u.life_stage ?? undefined,
 });
 
 export const loadMe = async (db: D1Database, userId: string): Promise<Me | null> => {

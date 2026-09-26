@@ -7,47 +7,81 @@ import { formatVnd } from '@shared/format';
 import { FamilyCity, HeroLakeCity, HouseCalendar } from '@/components/pixel';
 import { Badge, ButtonLink, Card, CardTitle, DeltaBadge, DonutChart, EmptyState, ErrorState, IconTile, PageHero, PageSkeleton, ProgressBar, Rich, ScoreRing, Select, TextLink, cx, type Tone } from '@/components/ui';
 import { useOverview } from '@/lib/queries';
+import { useAuth } from '@/app/auth';
+
+import { NbaSection } from './NbaSection';
 
 export default function OverviewPage() {
+  const { me } = useAuth();
   const [range, setRange] = useState(12);
   const { data, error, refetch, isPending } = useOverview(range);
   if (isPending) return <PageSkeleton />;
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />;
 
   return (
-    <div className="space-y-4">
-      <PageHero
-        eyebrow={null}
-        title={data.greeting.title}
-        highlight={<Rich text={data.greeting.headline} />}
-        subtitle={<Rich text={data.greeting.sub} />}
-        scene={(cls) => <HeroLakeCity className={cls} />}
-      />
-
-      <SetupCard setup={data.setup} />
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-[1.75fr_repeat(4,1fr)]">
-        <PeaceCard peace={data.peace} ready={data.setup.profile || data.setup.holdings} />
-        <StatCard icon={Coins} tone="violet" label="Tổng tài sản" kpi={data.kpis.netWorth} />
-        <StatCard icon={Wallet} tone="green" label="Tiền dự phòng" kpi={data.kpis.emergency} />
-        <StatCard icon={BarChart3} tone="orange" label="Tiền đầu tư" kpi={data.kpis.invested} />
-        <CashflowCard kpi={data.kpis.cashflow} />
+    <div className="space-y-6">
+      {/* 1. Greeting + Peace Score */}
+      <div>
+        <PageHero
+          eyebrow={null}
+          title={data.greeting.title}
+          highlight={<Rich text={data.greeting.headline} />}
+          subtitle={<Rich text={data.greeting.sub} />}
+          scene={(cls) => <HeroLakeCity className={cls} />}
+        />
+        <div className="mt-4">
+          <PeaceCard peace={data.peace} ready={data.setup.profile || data.setup.holdings} />
+        </div>
       </div>
 
-      {!data.setup.holdings && data.kpis.netWorth.value < 10_000_000 ? (
-        <StartingJourneyCard setup={data.setup} />
-      ) : (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[7fr_5fr]">
-          <NetWorthChart series={data.netWorthSeries} range={range} onRange={setRange} />
-          <AllocationCard allocation={data.allocation} />
-        </div>
+      {/* 2. TODAY / THIS WEEK */}
+      {data.nba && data.nba.length > 0 && (
+        <NbaSection nba={data.nba} />
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr]">
-        <AiDoingCard />
-        <TipCard tip={data.tip} />
-        <CommunityCard />
+      {/* 3. YOUR MONEY */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-bold text-ink">Tài sản của bạn</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard icon={Coins} tone="violet" label="Tổng tài sản" kpi={data.kpis.netWorth} />
+          <StatCard icon={Wallet} tone="green" label="Tiền dự phòng" kpi={data.kpis.emergency} />
+          <StatCard icon={BarChart3} tone="orange" label="Tiền đầu tư" kpi={data.kpis.invested} />
+          <CashflowCard kpi={data.kpis.cashflow} />
+        </div>
+        <SetupCard setup={data.setup} />
       </div>
+
+      {/* 4. YOUR FUTURE */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-ink">Tương lai</h2>
+          <div className="flex gap-4">
+            <Link to="/muc-tieu" className="text-sm font-semibold text-accent-600 hover:text-accent-700">→ Xem mục tiêu</Link>
+            <Link to="/mo-phong" className="text-sm font-semibold text-accent-600 hover:text-accent-700">→ Chạy mô phỏng</Link>
+          </div>
+        </div>
+        {!data.setup.holdings && data.kpis.netWorth.value < 10_000_000 ? (
+          <StartingJourneyCard setup={data.setup} lifeStage={me?.lifeStage} />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[7fr_5fr]">
+            <NetWorthChart series={data.netWorthSeries} range={range} onRange={setRange} />
+            <AllocationCard allocation={data.allocation} />
+          </div>
+        )}
+      </div>
+
+      {/* 5. OPTIONAL DEEP DIVE */}
+      <details className="group space-y-3">
+        <summary className="cursor-pointer list-none flex items-center justify-between text-lg font-bold text-ink">
+          Khám phá thêm
+          <ChevronRight className="h-5 w-5 text-ink-soft transition-transform group-open:rotate-90" aria-hidden />
+        </summary>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 pt-3">
+          <AiDoingCard />
+          <TipCard tip={data.tip} />
+          <CommunityCard />
+        </div>
+      </details>
     </div>
   );
 }
@@ -92,17 +126,51 @@ function SetupCard({ setup }: { setup: OverviewData['setup'] }) {
   );
 }
 
-function StartingJourneyCard({ setup }: { setup: OverviewData['setup'] }) {
-  const links = [
-    { to: '/thu-chi', icon: NotebookPen, title: 'Ghi thu chi', body: 'Theo dõi tiền đi đâu', done: setup.transactions, tone: 'green' as Tone },
-    { to: '/muc-tieu', icon: Target, title: 'Đặt mục tiêu', body: 'Quỹ dự phòng, tiết kiệm', done: setup.goals, tone: 'blue' as Tone },
-    { to: '/cong-dong', icon: Users, title: 'Bài học', body: 'Học quản lý tiền cơ bản', done: false, tone: 'violet' as Tone },
-  ];
+function StartingJourneyCard({ setup, lifeStage }: { setup: OverviewData['setup']; lifeStage?: string }) {
+  const configs: Record<string, { title: string; sub: string; links: any[] }> = {
+    starting: {
+      title: 'Bạn đang xây dựng nền tảng',
+      sub: 'Bắt đầu từ việc kiểm soát chi tiêu và tạo quỹ dự phòng.',
+      links: [
+        { to: '/thu-chi', icon: NotebookPen, title: 'Ghi thu chi', body: 'Theo dõi tiền đi đâu', done: setup.transactions, tone: 'green' as Tone },
+        { to: '/muc-tieu', icon: Target, title: 'Đặt mục tiêu', body: 'Quỹ dự phòng, tiết kiệm', done: setup.goals, tone: 'blue' as Tone },
+        { to: '/cong-dong', icon: Users, title: 'Bài học', body: 'Học quản lý tiền cơ bản', done: false, tone: 'violet' as Tone },
+      ],
+    },
+    building: {
+      title: 'Tăng tốc tích lũy',
+      sub: 'Tối ưu chi tiêu và bắt đầu tìm hiểu về đầu tư cơ bản.',
+      links: [
+        { to: '/muc-tieu', icon: Target, title: 'Đặt mục tiêu', body: 'Quỹ dự phòng, tiết kiệm', done: setup.goals, tone: 'blue' as Tone },
+        { to: '/ai-theo-doi', icon: Lightbulb, title: 'Tối ưu chi tiêu', body: 'Xem gợi ý từ AI', done: false, tone: 'green' as Tone },
+        { to: '/cong-dong', icon: Users, title: 'Học đầu tư', body: 'Kiến thức đầu tư cơ bản', done: false, tone: 'violet' as Tone },
+      ],
+    },
+    preparing: {
+      title: 'Chuẩn bị cho mục tiêu lớn',
+      sub: 'Lên kế hoạch chi tiết để đảm bảo đạt được mục tiêu đúng hạn.',
+      links: [
+        { to: '/muc-tieu', icon: Target, title: 'Cập nhật mục tiêu', body: 'Nhà, xe, con cái...', done: setup.goals, tone: 'blue' as Tone },
+        { to: '/mo-phong', icon: BarChart3, title: 'Chạy mô phỏng', title2: 'Xem khả năng đạt được', done: false, tone: 'orange' as Tone },
+      ],
+    },
+    investing: {
+      title: 'Tối ưu hóa tài sản',
+      sub: 'Quản lý danh mục và theo dõi mức độ rủi ro.',
+      links: [
+        { to: '/danh-muc', icon: PieChart, title: 'Quản lý danh mục', body: 'Phân bổ tài sản', done: setup.holdings, tone: 'blue' as Tone },
+        { to: '/ai-theo-doi', icon: ShieldPlus, title: 'Theo dõi rủi ro', body: 'Cảnh báo từ AI', done: false, tone: 'red' as Tone },
+      ],
+    }
+  };
+
+  const current = configs[lifeStage || 'starting'] || configs.starting;
+
   return (
     <Card tone="mint">
-      <CardTitle icon={Lightbulb} tone="green" title="Bạn đang xây dựng nền tảng" subtitle="Bắt đầu từ việc kiểm soát chi tiêu và tạo quỹ dự phòng." />
+      <CardTitle icon={Lightbulb} tone="green" title={current.title} subtitle={current.sub} />
       <div className="grid gap-3 sm:grid-cols-3">
-        {links.map((l) => (
+        {current.links.map((l) => (
           <Link key={l.to} to={l.to} className="flex items-start gap-3 rounded-xl border border-[#D7EFE2] bg-white p-3 transition-colors hover:bg-accent-50">
             <IconTile icon={l.done ? Check : l.icon} tone={l.done ? 'green' : l.tone} size="sm" />
             <div className="min-w-0">
@@ -148,9 +216,14 @@ function PeaceCard({ peace, ready }: { peace: OverviewData['peace']; ready: bool
           {peace.label}
         </Badge>
         <p className="mt-3 text-xs leading-relaxed text-ink-soft">{peace.description}</p>
-        <button type="button" onClick={() => setOpen(true)} className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent-600 hover:text-accent-700" aria-expanded={open}>
-          Xem chi tiết <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-        </button>
+        <div className="mt-3 flex items-center gap-4">
+          <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-accent-600 hover:text-accent-700" aria-expanded={open}>
+            Xem chi tiết <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+          </button>
+          <Link to="/ke-hoach" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink-soft hover:text-ink">
+            Làm gì tăng điểm? <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+          </Link>
+        </div>
       </div>
       {open && <PeaceBreakdown peace={peace} onClose={() => setOpen(false)} />}
     </Card>
@@ -181,9 +254,10 @@ function PeaceBreakdown({ peace, onClose }: { peace: OverviewData['peace']; onCl
             </li>
           ))}
         </ul>
-        <p className="mt-8 rounded-xl bg-accent-50 p-4 text-[13px] leading-relaxed text-ink-soft">
-          Điểm được tính hoàn toàn từ dữ liệu của bạn theo công thức cố định — cùng dữ liệu luôn cho cùng kết quả.
-        </p>
+        <div className="mt-8 rounded-xl bg-accent-50 p-4 text-[13px] leading-relaxed text-ink-soft">
+          <p>Điểm được tính hoàn toàn từ dữ liệu của bạn theo công thức cố định — cùng dữ liệu luôn cho cùng kết quả.</p>
+          <p className="mt-2"><strong>Lưu ý:</strong> Điểm chỉ là cách tóm tắt tình hình, không phải mục tiêu tài chính của bạn.</p>
+        </div>
       </div>
     </div>
   );

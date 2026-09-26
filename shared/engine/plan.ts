@@ -41,6 +41,14 @@ export interface PlanProposal {
   /** Xác suất đạt mục tiêu chính theo tháng nếu giữ nguyên / làm theo kế hoạch. */
   chart: { label: string; current: number; proposed: number }[];
   tasks: { title: string; tag: 'Quan trọng' | 'Nên làm' }[];
+  emergencyInfo: {
+    expense: number;
+    targetMonths: number;
+    currentMonths: number;
+    currentAmount: number;
+    targetAmount: number;
+    gapAmount: number;
+  };
 }
 
 const metrics = (state: UserState, goal: Goal | undefined): PlanMetrics => ({
@@ -138,5 +146,13 @@ export function proposePlan(state: UserState): PlanProposal {
       ...(steps.some((s) => s.key === 'rebalance') ? [{ title: 'Giảm bớt một phần quỹ tăng trưởng', tag: 'Nên làm' as const }] : []),
       { title: `Xem lại mục tiêu ${major?.title.toLowerCase() ?? 'chính'}`, tag: 'Nên làm' },
     ],
+    emergencyInfo: {
+      expense: state.profile.monthlyExpense,
+      targetMonths: state.profile.emergencyTargetMonths || 6,
+      currentMonths: emergencyMonths(state),
+      currentAmount: emergencyAmount(state),
+      targetAmount: (state.profile.monthlyExpense) * (state.profile.emergencyTargetMonths || 6),
+      gapAmount: Math.max(0, (state.profile.monthlyExpense) * (state.profile.emergencyTargetMonths || 6) - emergencyAmount(state)),
+    },
   };
 }

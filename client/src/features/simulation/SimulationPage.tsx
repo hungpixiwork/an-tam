@@ -67,8 +67,8 @@ export default function SimulationPage() {
     <NeedData
       anyOf={['holdings', 'goals']}
       icon={Target}
-      title="Chưa có gì để mô phỏng"
-      body="Mô phỏng cho thấy tài sản và mục tiêu của bạn thay đổi thế nào khi thị trường giảm, lạm phát tăng hay mất thu nhập. Hãy thêm tài sản hoặc mục tiêu trước."
+      title="Bạn sẽ làm gì nếu...?"
+      body="Thị trường giảm, lạm phát tăng hay mất thu nhập? Thêm tài sản hoặc mục tiêu trước để chạy mô phỏng và xem tác động."
     >
       <Simulator key={slug} presets={presets.data} initial={initial} />
     </NeedData>

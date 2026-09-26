@@ -111,10 +111,23 @@ function LessonCard({ lesson }: { lesson: Lesson }) {
   };
   const tone: Tone = toneMap[lesson.icon] || 'green';
 
+  const contextMap: Record<string, string> = {
+    action: 'Cần hành động',
+    watch: 'Cần chú ý',
+    stable: 'Ổn định'
+  };
+
   return (
     <>
       <Card>
-        <IconTile icon={Icon} tone={tone} size="lg" />
+        <div className="flex justify-between items-start gap-2">
+          <IconTile icon={Icon} tone={tone} size="lg" />
+          {lesson.recommendedFor && (
+            <Badge tone="blue" className="text-[10px] uppercase whitespace-nowrap">
+              Mức {contextMap[lesson.recommendedFor] || 'Gợi ý'}
+            </Badge>
+          )}
+        </div>
         <h3 className="mt-4 text-[15px] font-bold text-ink">{lesson.title}</h3>
         <p className="mt-2 text-xs text-ink-soft line-clamp-2">{lesson.excerpt}</p>
         <Button variant="soft" arrow size="sm" onClick={() => setSelectedSlug(lesson.slug)} className="mt-4">

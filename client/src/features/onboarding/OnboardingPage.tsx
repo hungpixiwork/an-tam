@@ -11,7 +11,7 @@ import { useOnboarding, type GoalInput, type OnboardingInput } from '@/lib/queri
 
 const M = 1_000_000;
 
-type Persona = 'starting' | 'building' | 'investing';
+type Persona = 'starting' | 'building' | 'preparing' | 'investing';
 
 /* ───────── Dữ liệu các bước ───────── */
 
@@ -83,6 +83,7 @@ export default function OnboardingPage() {
               priority: t.kind === 'home' || t.kind === 'emergency' ? 1 : 2,
             };
           }),
+      lifeStage: persona || undefined,
     };
   }
 
@@ -281,9 +282,10 @@ function StepTitle({ icon, title, body }: { icon: LucideIcon; title: string; bod
 
 function PersonaStep({ onSelect }: { onSelect: (p: Persona) => void }) {
   const options: { key: Persona; icon: LucideIcon; title: string; sub: string; tone: Tone }[] = [
-    { key: 'starting', icon: Sprout, title: 'Mới bắt đầu', sub: 'Chưa có tiết kiệm nhiều, muốn kiểm soát chi tiêu', tone: 'green' },
-    { key: 'building', icon: Target, title: 'Đã có tiết kiệm', sub: 'Có sổ tiết kiệm hoặc quỹ, muốn đặt mục tiêu', tone: 'blue' },
-    { key: 'investing', icon: PieChart, title: 'Có danh mục đầu tư', sub: 'Có cổ phiếu, quỹ, trái phiếu, muốn tối ưu', tone: 'violet' },
+    { key: 'starting', icon: Sprout, title: 'Tôi mới bắt đầu quản lý tài chính', sub: 'Chưa có tiết kiệm nhiều, muốn kiểm soát chi tiêu', tone: 'green' },
+    { key: 'building', icon: Target, title: 'Tôi muốn tiết kiệm và tăng thu nhập', sub: 'Có sổ tiết kiệm hoặc quỹ, muốn đặt mục tiêu', tone: 'blue' },
+    { key: 'preparing', icon: House, title: 'Tôi đang chuẩn bị cho một mục tiêu lớn', sub: 'Mua nhà, học cho con, nghỉ hưu', tone: 'orange' },
+    { key: 'investing', icon: PieChart, title: 'Tôi đã có tài sản và muốn quản lý tốt hơn', sub: 'Có cổ phiếu, quỹ, trái phiếu, muốn tối ưu', tone: 'violet' },
   ];
   return (
     <div className="space-y-4">

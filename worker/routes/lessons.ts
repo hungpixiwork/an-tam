@@ -13,6 +13,7 @@ interface LessonRow {
   icon: string;
   read_time: string;
   is_featured: number;
+  recommended_for: string;
 }
 
 const map = (l: LessonRow, withBody = false) => ({
@@ -25,6 +26,7 @@ const map = (l: LessonRow, withBody = false) => ({
   icon: l.icon,
   readTime: l.read_time,
   isFeatured: l.is_featured === 1,
+  recommendedFor: l.recommended_for,
   ...(withBody ? { bodyMd: l.body_md } : {}),
 });
 

@@ -22,6 +22,7 @@ const onboardingSchema = z.object({
   profile: profileSchema.optional(),
   holdings: z.array(holdingSchema).max(20).default([]),
   goals: z.array(goalSchema).max(10).default([]),
+  lifeStage: z.string().optional(),
 });
 
 export const onboarding = new Hono<AppEnv>().post('/', body(onboardingSchema), async (c) => {
@@ -37,7 +38,7 @@ export const onboarding = new Hono<AppEnv>().post('/', body(onboardingSchema), a
     ...(input.profile ? [upsertProfile(db, userId, input.profile, before.baseline)] : []),
     ...input.holdings.filter((h) => h.value > 0).map((h) => insertHolding(db, userId, h)),
     ...input.goals.map((g) => insertGoal(db, userId, g)),
-    db.prepare("UPDATE users SET onboarded_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?").bind(userId),
+    db.prepare("UPDATE users SET onboarded_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), life_stage = ? WHERE id = ?").bind(input.lifeStage || null, userId),
   ]);
 
   const state = await afterChange(db, userId, {

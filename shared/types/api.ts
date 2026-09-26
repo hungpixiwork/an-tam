@@ -5,6 +5,7 @@ import type { PeaceFactor, PeaceLevel } from '../engine/peace';
 import type { ProfileSource, TransactionCategory } from '../engine/ledger';
 import type { AlertSeverity } from '../engine/alerts';
 import type { MonthTotal, Salutation, Transaction } from './domain';
+import type { NextBestAction } from '../engine/nba';
 
 export interface ApiOk<T> { success: true; data: T }
 export interface ApiErr { success: false; error: { code: string; message: string } }
@@ -19,6 +20,7 @@ export interface Me {
   memberStatus: string;
   /** Đã hoàn tất màn "Bắt đầu" (nhập hoặc bỏ qua). */
   onboarded: boolean;
+  lifeStage?: string;
 }
 
 export interface Kpi {
@@ -30,6 +32,7 @@ export interface Kpi {
 }
 
 export interface OverviewData {
+  nba: NextBestAction[];
   greeting: {
     title: string;       // "Chào anh Minh,"
     headline: string;    // có thể chứa {em:...}

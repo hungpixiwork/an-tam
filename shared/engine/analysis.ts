@@ -228,6 +228,18 @@ export interface PortfolioAnalysis {
   holdings: { id: string; name: string; value: number; role: string; volatility: 'low' | 'mid' | 'high'; category: AssetCategory }[];
   insights: { key: string; title: string; body: string; tone: 'success' | 'danger' | 'accent' }[];
   suggestions: { key: string; title: string; body: string; tone: 'success' | 'danger' | 'accent'; to: string }[];
+  targetRiskyShare: number;
+  riskyShare: number;
+  majorGoalTitle: string | null;
+}
+
+/** Recommended risky share based on months to nearest major goal. Longer horizon → more risk tolerance. */
+function recommendedRiskyShare(monthsToGoal: number): number {
+  if (monthsToGoal <= 12) return 0.2;
+  if (monthsToGoal <= 36) return 0.35;
+  if (monthsToGoal <= 60) return 0.5;
+  if (monthsToGoal <= 120) return 0.6;
+  return 0.7;
 }
 
 const GROUP_COLORS = ['#F07171', '#F5A524', '#4C8DF0', '#3DBE8B', '#8B5CF6', '#94A3B8'];
@@ -248,6 +260,8 @@ export function portfolioAnalysis(state: UserState, opts?: AnalysisOpts): Portfo
   const safe = state.holdings.filter((h) => h.category === 'cash' || h.category === 'bond').reduce((sum, h) => sum + h.value, 0) / total;
   const major = nearestMajorGoal(state);
 
+  const recommended = recommendedRiskyShare(major ? monthsBetween(state.today, major.targetMonth) : 240);
+
   return {
     total: actualTotal,
     slices: allocation(state.holdings),
@@ -264,5 +278,8 @@ export function portfolioAnalysis(state: UserState, opts?: AnalysisOpts): Portfo
       { key: 'volatile', title: 'Giảm bớt phần biến động cao', body: `Tài sản biến động đang chiếm ${formatPct(stats.riskyShare)}. Cân nhắc hạ tỷ trọng nhóm tăng trưởng để tránh rủi ro quá tập trung.`, tone: 'danger', to: '/mo-phong' },
       { key: 'goals', title: 'Ưu tiên cân bằng theo mục tiêu hơn là theo cảm xúc', body: 'Phân bổ tài sản dựa trên mục tiêu cuộc sống (mua nhà, nghỉ hưu...) thay vì theo xu hướng ngắn hạn.', tone: 'accent', to: '/muc-tieu' },
     ],
+    targetRiskyShare: recommended,
+    riskyShare: stats.riskyShare,
+    majorGoalTitle: major?.title ?? null,
   };
 }

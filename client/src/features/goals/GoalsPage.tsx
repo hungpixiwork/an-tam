@@ -34,9 +34,9 @@ export default function GoalsPage() {
         {hero}
         <EmptyState
           icon={Target}
-          title="Bạn chưa đặt mục tiêu nào"
+          title="Bạn muốn tiền giúp mình đạt điều gì?"
           body="Mua nhà, quỹ học cho con, nghỉ hưu hay đơn giản là quỹ dự phòng. AI sẽ ước tính khả năng đạt đúng hạn và cảnh báo sớm khi kế hoạch lệch hướng."
-          action={<Button onClick={() => setEditing(null)}>+ Thêm mục tiêu đầu tiên</Button>}
+          action={<Button onClick={() => setEditing(null)}>Tạo mục tiêu đầu tiên</Button>}
         />
         {modal}
       </div>

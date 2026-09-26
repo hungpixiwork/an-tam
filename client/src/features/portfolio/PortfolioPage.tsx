@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { AlertCircle, AlertTriangle, BarChart3, Bot, Coins, Database, Lightbulb, Pencil, PieChart, Plus, Shield, TrendingUp } from 'lucide-react';
+import { AlertCircle, AlertTriangle, BarChart3, Bot, Coins, Database, Lightbulb, Pencil, PieChart, Plus, Shield, ShieldCheck, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { PortfolioAnalysis } from '@shared/engine/analysis';
 import { formatPct, formatVnd } from '@shared/format';
 import { HeroLakeCity } from '@/components/pixel';
-import { Badge, Button, Card, CardTitle, DonutChart, EmptyState, ErrorState, IconTile, PageHero, PageSkeleton, cx, type Tone } from '@/components/ui';
+import { Badge, Button, ButtonLink, Card, CardTitle, DonutChart, EmptyState, ErrorState, IconTile, PageHero, PageSkeleton, cx, type Tone } from '@/components/ui';
 import { usePortfolio } from '@/lib/queries';
 import { HoldingFormModal } from './HoldingFormModal';
 
@@ -34,9 +34,14 @@ export default function PortfolioPage() {
         {hero}
         <EmptyState
           icon={PieChart}
-          title="Danh mục của bạn đang trống"
-          body="Thêm tiền tiết kiệm, quỹ, cổ phiếu hay vàng bạn đang có. AI sẽ chỉ ra rủi ro đang tập trung ở đâu và mức biến động có hợp với mục tiêu không."
-          action={<Button icon={Plus} onClick={() => setEditing(null)}>Thêm tài sản đầu tiên</Button>}
+          title="Bạn chưa cần có khoản đầu tư để dùng An Tâm"
+          body="Trước tiên hãy kiểm tra vùng an toàn tài chính. Khi nào bạn bắt đầu đầu tư, An Tâm AI sẽ giúp bạn theo dõi rủi ro."
+          action={
+            <div className="flex items-center gap-3">
+              <ButtonLink to="/ke-hoach" icon={ShieldCheck}>Kiểm tra an toàn</ButtonLink>
+              <Button variant="soft" icon={Plus} onClick={() => setEditing(null)}>Thêm tài sản</Button>
+            </div>
+          }
         />
         {modal}
       </div>
@@ -57,7 +62,7 @@ export default function PortfolioPage() {
         <AiExplainCard insights={data.insights} />
       </div>
 
-      <SuggestionsSection suggestions={data.suggestions} />
+      <SuggestionsSection analysis={data} />
       {modal}
     </div>
   );
@@ -264,46 +269,74 @@ const SUGGESTION_COLORS: Record<SuggestionTone, SuggestionColor> = {
   accent: { bgTone: 'sky', textColor: '#3B82F6', icon: TrendingUp },
 };
 
-function SuggestionsSection({ suggestions }: { suggestions: PortfolioAnalysis['suggestions'] }) {
-  return (
-    <Card>
-      <CardTitle
-        icon={Lightbulb}
-        title="Nên điều chỉnh gì?"
-        subtitle="Dưới đây là một số gợi ý dựa trên danh mục hiện tại và mục tiêu của bạn."
-      />
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {suggestions.map((sugg) => {
-          const colorConfig = SUGGESTION_COLORS[sugg.tone as SuggestionTone];
-          const { bgTone, textColor, icon: Icon } = colorConfig;
-          const BG_CLASS: Record<'mint' | 'rose' | 'sky', string> = {
-            mint: 'bg-[#F1FAF5]',
-            rose: 'bg-[#FFF5F4]',
-            sky: 'bg-[#F3F8FE]',
-          };
+function SuggestionsSection({ analysis }: { analysis: PortfolioAnalysis }) {
+  const { suggestions, targetRiskyShare, riskyShare, majorGoalTitle } = analysis;
+  const diff = riskyShare - targetRiskyShare;
 
-          return (
-            <Link
-              key={sugg.key}
-              to={sugg.to}
-              className={cx(
-                'group flex flex-col gap-4 rounded-lg p-4 transition-colors hover:opacity-80',
-                BG_CLASS[bgTone],
-              )}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <p className="font-bold text-ink">{sugg.title}</p>
-                  <p className="mt-2 text-sm text-ink-soft">{sugg.body}</p>
+  return (
+    <div className="space-y-4">
+      {Math.abs(diff) > 0.1 && (
+        <Card tone={diff > 0 ? 'rose' : 'mint'}>
+          <CardTitle icon={TrendingUp} tone={diff > 0 ? 'red' : 'green'} title="Gợi ý cân bằng" />
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <div className="flex-1">
+              <p className="text-[14.5px] leading-relaxed text-ink">
+                Dựa trên mục tiêu <strong className="font-semibold text-ink">{majorGoalTitle?.toLowerCase() ?? 'gần nhất'}</strong>, 
+                tỷ trọng tài sản rủi ro (cổ phiếu, chứng chỉ quỹ) nên ở mức <strong className="font-semibold text-ink">{formatPct(targetRiskyShare)}</strong>.
+                Hiện tại bạn đang ở mức <strong className={cx('font-bold', diff > 0 ? 'text-danger-600' : 'text-success-600')}>{formatPct(riskyShare)}</strong>.
+              </p>
+              <p className="mt-2 text-[13px] text-ink-soft">
+                {diff > 0 
+                  ? 'Việc giữ quá nhiều tài sản biến động mạnh có thể khiến bạn gặp nguy hiểm nếu thị trường đi xuống ngay trước khi bạn cần tiền.'
+                  : 'Bạn có thể tăng thêm một chút tài sản biến động để tận dụng cơ hội tăng trưởng, miễn là vẫn giữ đủ quỹ dự phòng.'}
+              </p>
+            </div>
+            <div className="shrink-0">
+               <ButtonLink to="/ke-hoach" variant="soft" size="sm" arrow>Xem kế hoạch</ButtonLink>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <Card>
+        <CardTitle
+          icon={Lightbulb}
+          title="Nên điều chỉnh gì khác?"
+          subtitle="Dưới đây là một số gợi ý dựa trên danh mục hiện tại và mục tiêu của bạn."
+        />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {suggestions.map((sugg) => {
+            const colorConfig = SUGGESTION_COLORS[sugg.tone as SuggestionTone];
+            const { bgTone, textColor, icon: Icon } = colorConfig;
+            const BG_CLASS: Record<'mint' | 'rose' | 'sky', string> = {
+              mint: 'bg-[#F1FAF5]',
+              rose: 'bg-[#FFF5F4]',
+              sky: 'bg-[#F3F8FE]',
+            };
+
+            return (
+              <Link
+                key={sugg.key}
+                to={sugg.to}
+                className={cx(
+                  'group flex flex-col gap-4 rounded-lg p-4 transition-colors hover:opacity-80',
+                  BG_CLASS[bgTone],
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <p className="font-bold text-ink">{sugg.title}</p>
+                    <p className="mt-2 text-sm text-ink-soft">{sugg.body}</p>
+                  </div>
+                  <div className="shrink-0 rounded-full p-2" style={{ background: sugg.tone === 'success' ? '#DCF5E9' : sugg.tone === 'danger' ? '#F9E6E3' : '#D7E9F8' }}>
+                    <Icon className="h-5 w-5" style={{ color: textColor }} aria-hidden />
+                  </div>
                 </div>
-                <div className="shrink-0 rounded-full p-2" style={{ background: sugg.tone === 'success' ? '#DCF5E9' : sugg.tone === 'danger' ? '#F9E6E3' : '#D7E9F8' }}>
-                  <Icon className="h-5 w-5" style={{ color: textColor }} aria-hidden />
-                </div>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-    </Card>
+              </Link>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
   );
 }

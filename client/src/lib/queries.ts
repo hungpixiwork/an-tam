@@ -6,6 +6,7 @@ import type { PlanProposal } from '@shared/engine/plan';
 import type { LedgerData, Me, NotificationItem, OnboardingResult, OverviewData, ProfileData, SearchResult } from '@shared/types/api';
 import type { AssetCategory, Goal, Holding, SimulationParams, Transaction, Volatility } from '@shared/types/domain';
 import { api } from './api';
+import type { WeeklyDigest } from '@shared/engine/digest';
 
 /* ───────── Kiểu dữ liệu riêng của client ───────── */
 
@@ -26,18 +27,21 @@ export interface AiData { events: AiEvent[]; alerts: AiAlert[] }
 export interface Lesson {
   id: string; slug: string; kind: 'lesson' | 'story' | 'history'; title: string; excerpt: string;
   category: string; icon: string; readTime: string; isFeatured: boolean; bodyMd?: string;
+  recommendedFor?: string;
 }
 
 export interface Settings {
   dataEncrypted: boolean; advancedAnalysis: boolean; notifyGoalDelay: boolean;
   notifyPortfolioRisk: boolean; notifyWeeklyEmail: boolean; notifyCommunityLessons: boolean;
+  locale: 'vi' | 'en' | 'zh';
+  currency: 'VND' | 'CNY' | 'USD';
 }
 
 export type GoalInput = Omit<Goal, 'id'>;
 export interface HoldingInput { name: string; category: AssetCategory; value: number; volatility?: Volatility }
 export type TransactionInput = Omit<Transaction, 'id'>;
 export interface ProfileInput { monthlyIncome: number; monthlyExpense: number; emergencyTargetMonths: number }
-export interface OnboardingInput { profile?: ProfileInput; holdings: HoldingInput[]; goals: GoalInput[] }
+export interface OnboardingInput { profile?: ProfileInput; holdings: HoldingInput[]; goals: GoalInput[]; lifeStage?: string; }
 
 /* ───────── Khóa cache ───────── */
 
@@ -271,9 +275,73 @@ export function useDeleteAccount() {
   return useMutation({ mutationFn: () => api.del<null>('/me'), onSuccess: () => qc.clear() });
 }
 
+/* ───────── EARN · Tăng thu nhập ───────── */
+export interface EarnProfile { currentIncome: number; targetIncome: number; targetMonths: number; occupation: string; hoursPerWeek: number; focusSkill: string }
+export interface EarnActivity { id: string; title: string }
+export interface EarnHourEntry { activityId: string; activityTitle: string; week: string; planned: number; actual: number }
+export interface EarnTimeAlloc { category: string; hours: number }
+export interface EarnSummary {
+  plan: { currentIncome: number; targetIncome: number; gap: number; targetMonths: number; hoursPerWeek: number; totalAvailableHours: number; focusSkill: string; recommendations: string[] };
+  connection: { additionalMonthlyIncome: number; currentSavingsRate: number; potentialMonthlySaving: number; goalAcceleration: { goalTitle: string; monthsSaved: number } | null; disclaimer: string };
+  hours: { totalPlanned: number; totalActual: number; activities: { title: string; planned: number; actual: number }[]; insight: string };
+  time: { allocations: EarnTimeAlloc[]; unallocated: number; insight: string | null };
+}
+
+export const qk_earn = {
+  profile: ['earn-profile'] as const,
+  activities: ['earn-activities'] as const,
+  hours: (week: string) => ['earn-hours', week] as const,
+  time: ['earn-time'] as const,
+  summary: ['earn-summary'] as const,
+};
+
+export const useEarnProfile = () => useQuery({ queryKey: qk_earn.profile, queryFn: () => api.get<EarnProfile>('/earn') });
+export function useSaveEarnProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: EarnProfile) => api.put<EarnProfile>('/earn', p),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['earn-profile'] }); qc.invalidateQueries({ queryKey: ['earn-summary'] }); },
+  });
+}
+export const useEarnActivities = () => useQuery({ queryKey: qk_earn.activities, queryFn: () => api.get<EarnActivity[]>('/earn/activities') });
+export function useCreateActivity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (title: string) => api.post<{ id: string }>('/earn/activities', { title }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['earn-activities'] }); qc.invalidateQueries({ queryKey: ['earn-summary'] }); },
+  });
+}
+export function useDeleteActivity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del<null>(`/earn/activities/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['earn-activities'] }); qc.invalidateQueries({ queryKey: ['earn-hours'] }); qc.invalidateQueries({ queryKey: ['earn-summary'] }); },
+  });
+}
+export const useEarnHours = (week: string) => useQuery({ queryKey: qk_earn.hours(week), queryFn: () => api.get<EarnHourEntry[]>(`/earn/hours?week=${week}`) });
+export function useSaveEarnHours() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { week: string; entries: { activityId: string; planned: number; actual: number }[] }) => api.put<null>('/earn/hours', v),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['earn-hours'] }); qc.invalidateQueries({ queryKey: ['earn-summary'] }); },
+  });
+}
+export const useEarnTime = () => useQuery({ queryKey: qk_earn.time, queryFn: () => api.get<EarnTimeAlloc[]>('/earn/time') });
+export function useSaveEarnTime() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (allocs: EarnTimeAlloc[]) => api.put<null>('/earn/time', { allocations: allocs }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['earn-time'] }); qc.invalidateQueries({ queryKey: ['earn-summary'] }); },
+  });
+}
+export const useEarnSummary = () => useQuery({ queryKey: qk_earn.summary, queryFn: () => api.get<EarnSummary>('/earn/summary') });
+
 /* ───────── Topbar ───────── */
 export const useNotifications = () =>
   useQuery({ queryKey: qk.notifications, queryFn: () => api.get<NotificationItem[]>('/notifications'), refetchInterval: 60_000 });
 
 export const useSearch = (q: string) =>
   useQuery({ queryKey: qk.search(q), queryFn: () => api.get<SearchResult[]>(`/search?q=${encodeURIComponent(q)}`), enabled: q.trim().length > 0 });
+
+export const useWeeklyDigest = () =>
+  useQuery({ queryKey: ['digest'], queryFn: () => api.get<WeeklyDigest>('/ai/digest') });

@@ -17,6 +17,7 @@ import { onboarding } from './routes/onboarding';
 import { profile } from './routes/profile';
 import { holdings } from './routes/holdings';
 import { transactions } from './routes/transactions';
+import { earn } from './routes/earn';
 import { runMonitor } from './jobs/monitor';
 
 const app = new Hono<AppEnv>();
@@ -36,6 +37,7 @@ app.route('/api/onboarding', onboarding);
 app.route('/api/profile', profile);
 app.route('/api/holdings', holdings);
 app.route('/api/transactions', transactions);
+app.route('/api/earn', earn);
 app.route('/api/overview', overview);
 app.route('/api/goals', goals);
 app.route('/api/simulations', simulations);

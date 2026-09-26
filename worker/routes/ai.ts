@@ -27,8 +27,8 @@ export const ai = new Hono<AppEnv>()
     const [events, alerts] = await c.env.DB.batch([
       c.env.DB.prepare('SELECT id, type, title, body, created_at FROM ai_events WHERE user_id = ? AND created_at > ? ORDER BY created_at DESC LIMIT 20').bind(userId, since),
       c.env.DB.prepare(
-        `SELECT id, rule_key, severity, title, body, status, created_at FROM ai_alerts WHERE user_id = ? AND status = 'open'
-         ORDER BY CASE severity WHEN 'danger' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END, created_at DESC`,
+        `SELECT id, rule_key, severity, title, body, status, created_at FROM ai_alerts WHERE user_id = ? 
+         ORDER BY status DESC, CASE severity WHEN 'danger' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END, created_at DESC LIMIT 20`,
       ).bind(userId),
     ]);
     return ok(c, {
@@ -45,4 +45,29 @@ export const ai = new Hono<AppEnv>()
       .run();
     if (!res.meta.changes) throw notFound('Không tìm thấy cảnh báo');
     return ok(c, null);
+  })
+  .get('/digest', async (c) => {
+    const userId = c.get('userId');
+    const { loadUserState } = await import('../lib/state');
+    const state = await loadUserState(c.env.DB, userId);
+    
+    // Fetch last 7 days transactions
+    const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const txsRes = await c.env.DB.prepare('SELECT id, occurred_on as date, category_id as categoryId, kind, amount, note FROM transactions WHERE user_id = ? AND occurred_on >= ?').bind(userId, since).all();
+    const txs: any[] = txsRes.results.map((r: any) => ({
+      id: r.id,
+      date: r.date,
+      categoryId: r.categoryId,
+      income: r.kind === 'income' ? r.amount : 0,
+      expense: r.kind === 'expense' ? r.amount : 0,
+      note: r.note,
+    }));
+
+    // valueHours: For now we'll just mock it to 0 or fetch from earn_hours if possible, but simplest is 0 for MVP as not strictly requested to fetch real value
+    const valueHours = 0; 
+    
+    const { weeklyDigest } = await import('../../shared/engine/digest');
+    const digest = weeklyDigest(state, txs, valueHours);
+    return ok(c, digest);
   });
+

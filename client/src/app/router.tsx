@@ -16,6 +16,7 @@ const SafetyPlanPage = lazy(() => import('@/features/plan/SafetyPlanPage'));
 const AiMonitorPage = lazy(() => import('@/features/ai/AiMonitorPage'));
 const CommunityPage = lazy(() => import('@/features/community/CommunityPage'));
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'));
+const EarnPage = lazy(() => import('@/features/earn/EarnPage'));
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'));
 const RegisterPage = lazy(() => import('@/features/auth/RegisterPage'));
 const PixelGallery = lazy(() => import('@/features/dev/PixelGallery'));
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
     children: [
       { path: '/', element: <OverviewPage /> },
       { path: '/thu-chi', element: <LedgerPage /> },
+      { path: '/tang-thu-nhap', element: <EarnPage /> },
       { path: '/muc-tieu', element: <GoalsPage /> },
       { path: '/mo-phong', element: <SimulationPage /> },
       { path: '/mo-phong/ket-qua/:runId', element: <SimulationResultPage /> },

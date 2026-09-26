@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Bell, Bot, CheckCircle2, Database, Download, Lock, ShieldCheck, Trash2, Users, XCircle } from 'lucide-react';
+import { Bell, Bot, CheckCircle2, Database, Download, Lock, ShieldCheck, Trash2, Users, XCircle, Globe } from 'lucide-react';
 import { HeroLakeCity, WindingPath } from '@/components/pixel';
-import { Badge, Button, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, Rich, Toggle, type Tone } from '@/components/ui';
+import { Button, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, Rich, Toggle, type Tone } from '@/components/ui';
+import { Select } from '@/components/ui/core';
 import { useDeleteAccount, useSettings, useUpdateSettings, type Settings } from '@/lib/queries';
+import { useLocale } from '@/app/locale';
 import { FinanceBasicsCard, PasswordCard, ProfileCard } from './AccountCards';
 
 export default function SettingsPage() {
@@ -35,12 +37,15 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.15fr]">
-        <PrivacyCard settings={settings} />
+        <PrivacyCard />
         <DataUsedCard />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.15fr]">
-        <TransparencyCard />
+        <div className="space-y-4">
+          <LocaleCard />
+          <TransparencyCard />
+        </div>
         <NotificationsCard settings={settings} />
       </div>
 
@@ -51,8 +56,7 @@ export default function SettingsPage() {
 
 /* ───────── Privacy Card ───────── */
 
-function PrivacyCard({ settings }: { settings: Settings }) {
-  const updateSettings = useUpdateSettings();
+function PrivacyCard() {
 
   const handleDownload = () => {
     window.location.href = '/api/me/export';
@@ -67,64 +71,41 @@ function PrivacyCard({ settings }: { settings: Settings }) {
 
   return (
     <Card>
-      <CardTitle icon={ShieldCheck} tone="blue" title="Quyền riêng tư của bạn" subtitle="Bạn luôn kiểm soát dữ liệu và cách An Tâm AI sử dụng chúng." />
+      <CardTitle icon={ShieldCheck} tone="blue" title="Trung tâm dữ liệu của bạn" subtitle="Bạn luôn kiểm soát dữ liệu và cách An Tâm AI lưu trữ chúng." />
 
       <div className="space-y-4">
-        {/* Data Security */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-ink">Bảo vệ dữ liệu</p>
-            <p className="text-xs text-ink-soft mt-1">
-              Kết nối được mã hóa HTTPS. Mật khẩu được băm một chiều (PBKDF2).{' '}
-              Dữ liệu không bao giờ chia sẻ cho bên thứ ba hay dùng cho quảng cáo.
-            </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rounded-xl border border-line p-3">
+            <p className="text-sm font-semibold text-ink">Lưu trên thiết bị</p>
+            <p className="mt-1 text-[13px] text-ink-soft">Không (chỉ lưu trên server để bạn đăng nhập ở bất cứ đâu)</p>
           </div>
-          <Badge tone="green">HTTPS</Badge>
-        </div>
-
-        <div className="border-t border-line" />
-
-        {/* Advanced Analysis */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-ink">Chia sẻ dữ liệu cho phân tích nâng cao</p>
-            <p className="text-xs text-ink-soft mt-1">Giúp AI đưa ra gợi ý chính xác hơn cho bạn.</p>
+          <div className="rounded-xl border border-line p-3">
+            <p className="text-sm font-semibold text-ink">Lưu trên server</p>
+            <p className="mt-1 text-[13px] text-ink-soft">Thu chi, tài sản, mục tiêu, kết quả mô phỏng</p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Badge tone="blue">Tùy chọn</Badge>
-            <Toggle
-              checked={settings.advancedAnalysis}
-              onChange={(v) => updateSettings.mutate({ advancedAnalysis: v })}
-              label="Phân tích nâng cao"
-              disabled={updateSettings.isPending}
-            />
+          <div className="rounded-xl border border-line p-3">
+            <p className="text-sm font-semibold text-ink">Dùng để tính toán</p>
+            <p className="mt-1 text-[13px] text-ink-soft">Điểm an tâm, xác suất mục tiêu, gợi ý và cảnh báo</p>
+          </div>
+          <div className="rounded-xl border border-[#D7EFE2] bg-[#F1FAF5] p-3">
+            <p className="text-sm font-semibold text-primary-700">Gửi cho AI bên ngoài</p>
+            <p className="mt-1 text-[13px] text-primary-600 font-medium">Không (thuật toán tính toán hoàn toàn bảo mật bên trong)</p>
           </div>
         </div>
 
-        <div className="border-t border-line" />
-
-        {/* Download Data */}
-        <div className="flex items-start justify-between gap-4">
+        <div className="border-t border-line mt-4 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold text-ink">Tải xuống dữ liệu của tôi</p>
-            <p className="text-xs text-ink-soft mt-1">Nhận bản sao dữ liệu cá nhân bất cứ lúc nào.</p>
+            <p className="text-sm font-semibold text-ink">Tải xuống hoặc xóa dữ liệu</p>
+            <p className="text-xs text-ink-soft mt-1">Nhận bản sao hoặc xóa vĩnh viễn dữ liệu của bạn.</p>
           </div>
-          <Button variant="soft" icon={Download} size="sm" onClick={handleDownload} className="shrink-0">
-            Tải xuống
-          </Button>
-        </div>
-
-        <div className="border-t border-line" />
-
-        {/* Delete Account */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-ink">Xóa toàn bộ dữ liệu</p>
-            <p className="text-xs text-ink-soft mt-1">Xóa vĩnh viễn tất cả dữ liệu của bạn khỏi hệ thống.</p>
+          <div className="flex gap-2">
+            <Button variant="soft" icon={Download} size="sm" onClick={handleDownload} className="shrink-0">
+              Tải xuống
+            </Button>
+            <Button variant="danger" icon={Trash2} size="sm" onClick={handleDeleteClick} className="shrink-0">
+              Xóa tài khoản
+            </Button>
           </div>
-          <Button variant="danger" icon={Trash2} size="sm" onClick={handleDeleteClick} className="shrink-0">
-            Xóa dữ liệu
-          </Button>
         </div>
       </div>
 
@@ -329,7 +310,7 @@ function NotificationsCard({ settings }: { settings: Settings }) {
               <p className="text-xs text-ink-soft mt-1">{item.body}</p>
             </div>
             <Toggle
-              checked={settings[item.key as keyof typeof settings]}
+              checked={!!settings[item.key as keyof typeof settings]}
               onChange={(v) => updateSettings.mutate({ [item.key]: v })}
               label={item.title}
               disabled={updateSettings.isPending}
@@ -357,3 +338,50 @@ function CommitmentBanner() {
     </Card>
   );
 }
+
+/* ───────── Locale Card ───────── */
+
+function LocaleCard() {
+  const { locale, currency, setLocale, setCurrency } = useLocale();
+
+  return (
+    <Card>
+      <CardTitle icon={Globe} tone="teal" title="Ngôn ngữ & Tiền tệ" subtitle="Tuỳ chỉnh ngôn ngữ hiển thị và đơn vị tiền tệ." />
+      <div className="space-y-4 mt-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-ink">Ngôn ngữ</p>
+            <p className="text-xs text-ink-soft mt-1">Ngôn ngữ giao diện</p>
+          </div>
+          <Select
+            label="Ngôn ngữ"
+            value={locale}
+            onChange={(v) => setLocale(v as any)}
+            options={[
+              { value: 'vi', label: 'Tiếng Việt' },
+              { value: 'en', label: 'English' },
+              { value: 'zh', label: '中文' },
+            ]}
+          />
+        </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-ink">Tiền tệ</p>
+            <p className="text-xs text-ink-soft mt-1">Đơn vị tiền tệ chính</p>
+          </div>
+          <Select
+            label="Tiền tệ"
+            value={currency}
+            onChange={(v) => setCurrency(v as any)}
+            options={[
+              { value: 'VND', label: 'VND (₫)' },
+              { value: 'USD', label: 'USD ($)' },
+              { value: 'CNY', label: 'CNY (¥)' },
+            ]}
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+

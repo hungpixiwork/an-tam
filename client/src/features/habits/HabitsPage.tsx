@@ -7,7 +7,7 @@ import {
 import type { HabitOption, HabitScenario, HabitsProfile } from '@shared/engine/analysis';
 import { useMe } from '@/app/auth';
 import { HeroLakeCity, PixelAvatar } from '@/components/pixel';
-import { Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, ScoreRing, cx, type Tone } from '@/components/ui';
+import { Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, ScoreRing, ButtonLink, cx, type Tone } from '@/components/ui';
 import { useAnswerHabit, useHabits, useSetSelfScore } from '@/lib/queries';
 
 export default function HabitsPage() {
@@ -213,20 +213,27 @@ function InsightsCard({ profile }: { profile: HabitsProfile }) {
           Trả lời thêm tình huống để AI nhận xét ({profile.answered}/{profile.total}).
         </p>
       ) : (
-        <ul className="space-y-3">
-          {profile.insights.map((i) => {
-            const st = INSIGHT_STYLE[i.tone];
-            return (
-              <li key={i.title} className="flex items-start gap-4 rounded-xl border border-line p-3.5">
-                <IconTile icon={st.icon} tone={st.tone} />
-                <div>
-                  <p className="text-[15px] font-semibold text-ink">{i.title}</p>
-                  <p className="mt-0.5 text-[13px] text-ink-soft">{i.body}</p>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <ul className="space-y-3">
+            {profile.insights.map((i) => {
+              const st = INSIGHT_STYLE[i.tone];
+              return (
+                <li key={i.title} className="flex items-start gap-4 rounded-xl border border-line p-3.5">
+                  <IconTile icon={st.icon} tone={st.tone} />
+                  <div>
+                    <p className="text-[15px] font-semibold text-ink">{i.title}</p>
+                    <p className="mt-0.5 text-[13px] text-ink-soft">{i.body}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          {profile.insights.some(i => i.tone === 'warning') && (
+            <div className="mt-4 pt-2">
+              <ButtonLink to="/danh-muc" variant="soft" arrow>Xem danh mục đầu tư</ButtonLink>
+            </div>
+          )}
+        </>
       )}
     </Card>
   );

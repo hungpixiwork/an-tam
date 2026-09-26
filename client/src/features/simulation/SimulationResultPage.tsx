@@ -30,6 +30,15 @@ function Result({ report }: { report: SimulationReport }) {
   const nwDiff = after.netWorth - before.netWorth;
   const emergencyLost = Math.max(0, Math.round(before.emergencyMonths - after.emergencyMonths));
 
+  let handleStatus: { label: string; cardTone: 'mint' | 'rose' | 'cream'; titleTone: Tone; cls: string; desc: string };
+  if (after.emergencyMonths >= 6 && after.peaceScore >= 60) {
+    handleStatus = { label: 'Có thể xử lý được', cardTone: 'mint', titleTone: 'green', cls: 'bg-success-50 text-success-700', desc: 'Quỹ dự phòng và mức an tâm vẫn ở mức an toàn.' };
+  } else if (after.emergencyMonths < 3 || after.peaceScore < 40) {
+    handleStatus = { label: 'Cần hành động ngay', cardTone: 'rose', titleTone: 'red', cls: 'bg-danger-50 text-danger-700', desc: 'Tình hình tài chính sẽ rơi vào vùng nguy hiểm.' };
+  } else {
+    handleStatus = { label: 'Căng nhưng khả thi', cardTone: 'cream', titleTone: 'orange', cls: 'bg-warning-50 text-warning-700', desc: 'Bạn sẽ cần thắt chặt chi tiêu một thời gian.' };
+  }
+
   return (
     <div className="space-y-4">
       <PageHero
@@ -88,23 +97,34 @@ function Result({ report }: { report: SimulationReport }) {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.6fr_1fr]">
         <ChangeChart report={report} homeBefore={homeImpact?.probabilityBefore} homeAfter={homeImpact?.probabilityAfter} />
-        <Card tone="rose">
-          <CardTitle icon={TriangleAlert} tone="red" title="Điều đáng lo nhất" />
-          <div className="flex items-start gap-4 rounded-xl bg-[#FDE8E6] p-4">
-            <span className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-white">
-              <UserRound className="h-11 w-11 text-ink-soft" aria-hidden />
-              <span className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full bg-danger-500 text-sm font-bold text-white">!</span>
-            </span>
-            <p className="text-[15px] font-semibold leading-relaxed text-ink">
-              <Rich text={report.worry.replace(/\{em:/g, '{danger:')} />
+        <div className="flex flex-col gap-4">
+          <Card tone={handleStatus.cardTone}>
+            <CardTitle icon={ShieldCheck} tone={handleStatus.titleTone} title="Bạn có thể vượt qua không?" />
+            <div className="flex flex-col items-center justify-center p-4 text-center">
+               <span className={cx('inline-flex items-center rounded-full px-4 py-1.5 text-sm font-bold', handleStatus.cls)}>
+                 {handleStatus.label}
+               </span>
+               <p className="mt-3 text-[14px] text-ink-soft">{handleStatus.desc}</p>
+            </div>
+          </Card>
+          <Card tone="rose" className="flex-1">
+            <CardTitle icon={TriangleAlert} tone="red" title="Điều đáng lo nhất" />
+            <div className="flex items-start gap-4 rounded-xl bg-[#FDE8E6] p-4">
+              <span className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-white">
+                <UserRound className="h-11 w-11 text-ink-soft" aria-hidden />
+                <span className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full bg-danger-500 text-sm font-bold text-white">!</span>
+              </span>
+              <p className="text-[15px] font-semibold leading-relaxed text-ink">
+                <Rich text={report.worry.replace(/\{em:/g, '{danger:')} />
+              </p>
+            </div>
+            <p className="mt-4 text-sm leading-relaxed text-ink-soft">
+              Danh mục của bạn vẫn tồn tại và có khả năng phục hồi khi thị trường ổn định trở lại. Tuy nhiên, quỹ dự phòng hiện tại chỉ đủ khoảng{' '}
+              {formatDuration(after.emergencyMonths)} chi tiêu
+              {home && home.delayMonths > 0 ? `, khiến mục tiêu ${home.goalTitle.toLowerCase()} có thể bị chậm hơn ${home.delayMonths} tháng` : ''}.
             </p>
-          </div>
-          <p className="mt-4 text-sm leading-relaxed text-ink-soft">
-            Danh mục của bạn vẫn tồn tại và có khả năng phục hồi khi thị trường ổn định trở lại. Tuy nhiên, quỹ dự phòng hiện tại chỉ đủ khoảng{' '}
-            {formatDuration(after.emergencyMonths)} chi tiêu
-            {home && home.delayMonths > 0 ? `, khiến mục tiêu ${home.goalTitle.toLowerCase()} có thể bị chậm hơn ${home.delayMonths} tháng` : ''}.
-          </p>
-        </Card>
+          </Card>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.6fr_1fr]">

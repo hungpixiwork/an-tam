@@ -7,6 +7,7 @@ import { greetingName, levelKey, templateNarrator, type Narrator } from './narra
 import { emergencyAmount, freeCashflow, peaceScore, type PeaceLevel } from './peace';
 import { allocation, investedValue, totalValue } from './portfolio';
 import { DEFAULT_PARAMS, simulate } from './simulate';
+import { nextBestActions } from './nba';
 
 /** Kỳ so sánh của các KPI tài sản. */
 const COMPARE_MONTHS = 3;
@@ -101,6 +102,7 @@ export function buildOverview(
   const empty = !setup.profile && !setup.holdings;
 
   return {
+    nba: nextBestActions(state),
     greeting: {
       title: greetingName(user.fullName, user.salutation),
       headline: narrator.narrate(empty ? 'greeting.empty' : levelKey('greeting', peace.level), { s: user.salutation }),

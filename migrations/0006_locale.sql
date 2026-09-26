@@ -1,0 +1,2 @@
+ALTER TABLE user_settings ADD COLUMN locale TEXT NOT NULL DEFAULT 'vi';
+ALTER TABLE user_settings ADD COLUMN currency TEXT NOT NULL DEFAULT 'VND';

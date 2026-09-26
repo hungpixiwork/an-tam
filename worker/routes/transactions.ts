@@ -21,6 +21,7 @@ const transactionSchema = z
     category: z.string(),
     note: z.string().trim().max(120).default(''),
     occurredOn: dateString,
+    valueTag: z.enum(['essential', 'useful', 'joy', 'growth', 'regret']).optional(),
   })
   .refine((t) => categoryOf(t.category)?.kind === t.kind, { message: 'Danh mục không khớp loại thu / chi', path: ['category'] });
 
@@ -37,9 +38,10 @@ interface Row {
   category: string;
   note: string;
   occurred_on: string;
+  value_tag: string | null;
 }
 
-const toTransaction = (r: Row): Transaction => ({ id: r.id, kind: r.kind, amount: r.amount, category: r.category, note: r.note, occurredOn: r.occurred_on });
+const toTransaction = (r: Row): Transaction => ({ id: r.id, kind: r.kind, amount: r.amount, category: r.category, note: r.note, occurredOn: r.occurred_on, valueTag: (r.value_tag as any) || undefined });
 
 /** "Tháng 9/2026: thu 12 triệu · chi 4,5 triệu." cho nhật ký AI. */
 const monthLine = (month: string) => (s: LoadedState) => {
@@ -57,7 +59,7 @@ export const transactions = new Hono<AppEnv>()
     const [state, { results }] = await Promise.all([
       loadUserState(c.env.DB, userId, today),
       c.env.DB.prepare(
-        "SELECT id, kind, amount, category, note, occurred_on FROM transactions WHERE user_id = ? AND occurred_on LIKE ? ORDER BY occurred_on DESC, created_at DESC",
+        "SELECT id, kind, amount, category, note, occurred_on, value_tag FROM transactions WHERE user_id = ? AND occurred_on LIKE ? ORDER BY occurred_on DESC, created_at DESC",
       )
         .bind(userId, `${month}-%`)
         .all<Row>(),
@@ -97,8 +99,8 @@ export const transactions = new Hono<AppEnv>()
     checkDate(t.occurredOn);
     const before = await loadUserState(c.env.DB, userId);
     const id = crypto.randomUUID();
-    await c.env.DB.prepare('INSERT INTO transactions (id, user_id, kind, amount, category, note, occurred_on) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .bind(id, userId, t.kind, t.amount, t.category, t.note, t.occurredOn)
+    await c.env.DB.prepare('INSERT INTO transactions (id, user_id, kind, amount, category, note, occurred_on, value_tag) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(id, userId, t.kind, t.amount, t.category, t.note, t.occurredOn, t.valueTag ?? null)
       .run();
     await afterChange(c.env.DB, userId, { title: 'Cập nhật sổ thu chi', detail: monthLine(t.occurredOn.slice(0, 7)), before });
     return ok(c, { id }, 201);
@@ -108,8 +110,8 @@ export const transactions = new Hono<AppEnv>()
     const t = c.req.valid('json');
     checkDate(t.occurredOn);
     const before = await loadUserState(c.env.DB, userId);
-    const res = await c.env.DB.prepare('UPDATE transactions SET kind = ?, amount = ?, category = ?, note = ?, occurred_on = ? WHERE id = ? AND user_id = ?')
-      .bind(t.kind, t.amount, t.category, t.note, t.occurredOn, c.req.param('id'), userId)
+    const res = await c.env.DB.prepare('UPDATE transactions SET kind = ?, amount = ?, category = ?, note = ?, occurred_on = ?, value_tag = ? WHERE id = ? AND user_id = ?')
+      .bind(t.kind, t.amount, t.category, t.note, t.occurredOn, t.valueTag ?? null, c.req.param('id'), userId)
       .run();
     if (!res.meta.changes) throw notFound('Không tìm thấy giao dịch');
     await afterChange(c.env.DB, userId, { title: 'Cập nhật sổ thu chi', detail: monthLine(t.occurredOn.slice(0, 7)), before });

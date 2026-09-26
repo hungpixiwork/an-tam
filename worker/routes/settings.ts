@@ -16,6 +16,8 @@ const FIELDS = {
   notify_portfolio_risk: 'notifyPortfolioRisk',
   notify_weekly_email: 'notifyWeeklyEmail',
   notify_community_lessons: 'notifyCommunityLessons',
+  locale: 'locale',
+  currency: 'currency',
 } as const;
 type Column = keyof typeof FIELDS;
 type Key = (typeof FIELDS)[Column];
@@ -28,11 +30,18 @@ const settingsSchema = z.object({
   notifyPortfolioRisk: z.boolean().optional(),
   notifyWeeklyEmail: z.boolean().optional(),
   notifyCommunityLessons: z.boolean().optional(),
+  locale: z.enum(['vi', 'en', 'zh']).optional(),
+  currency: z.enum(['VND', 'CNY', 'USD']).optional(),
 });
 
-async function read(db: D1Database, userId: string): Promise<Record<Key, boolean>> {
-  const row = await db.prepare('SELECT * FROM user_settings WHERE user_id = ?').bind(userId).first<Record<string, number>>();
-  return Object.fromEntries(COLUMNS.map((col) => [FIELDS[col], (row?.[col] ?? 0) === 1])) as Record<Key, boolean>;
+async function read(db: D1Database, userId: string): Promise<Record<Key, any>> {
+  const row = await db.prepare('SELECT * FROM user_settings WHERE user_id = ?').bind(userId).first<Record<string, any>>();
+  return Object.fromEntries(COLUMNS.map((col) => {
+    const val = row?.[col];
+    if (col === 'locale') return ['locale', val ?? 'vi'];
+    if (col === 'currency') return ['currency', val ?? 'VND'];
+    return [FIELDS[col], (val ?? 0) === 1];
+  })) as Record<Key, any>;
 }
 
 /** Bảng dữ liệu cá nhân được đưa vào bản xuất. */
@@ -45,7 +54,10 @@ export const settings = new Hono<AppEnv>()
     const cols = COLUMNS.filter((col) => input[FIELDS[col]] !== undefined);
     if (cols.length) {
       await c.env.DB.prepare(`UPDATE user_settings SET ${cols.map((col) => `${col} = ?`).join(', ')} WHERE user_id = ?`)
-        .bind(...cols.map((col) => (input[FIELDS[col]] ? 1 : 0)), c.get('userId'))
+        .bind(...cols.map((col) => {
+          if (col === 'locale' || col === 'currency') return input[FIELDS[col]];
+          return input[FIELDS[col]] ? 1 : 0;
+        }), c.get('userId'))
         .run();
     }
     return ok(c, await read(c.env.DB, c.get('userId')));
