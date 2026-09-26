@@ -229,7 +229,13 @@ export function useResolveAlert() {
 }
 
 /* ───────── 09 · Cộng đồng ───────── */
-export const useLessons = () => useQuery({ queryKey: qk.lessons, queryFn: () => api.get<Lesson[]>('/lessons'), staleTime: 5 * 60_000 });
+export function useLessons(peaceLevel?: string) {
+  return useQuery({
+    queryKey: ['lessons', peaceLevel],
+    queryFn: () => api.get<Lesson[]>(`/lessons${peaceLevel ? `?peace_level=${peaceLevel}` : ''}`),
+    staleTime: 5 * 60_000
+  });
+}
 export const useLesson = (slug: string | null) =>
   useQuery({ queryKey: qk.lesson(slug ?? ''), queryFn: () => api.get<Lesson>(`/lessons/${slug}`), enabled: !!slug });
 

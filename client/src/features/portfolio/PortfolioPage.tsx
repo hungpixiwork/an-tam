@@ -169,7 +169,7 @@ function HoldingsTableCard({ holdings, onAdd, onEdit }: { holdings: HoldingRow[]
               <th className="pb-2 pl-0 pr-3">Khoản đầu tư</th>
               <th className="pb-2 px-3 text-right">Giá trị</th>
               <th className="pb-2 px-3">Vai trò</th>
-              <th className="pb-2 px-3">Mức biến động</th>
+              <th className="pb-2 px-3">Mức độ lên xuống giá</th>
               <th className="pb-2 pl-3"><span className="sr-only">Sửa</span></th>
             </tr>
           </thead>

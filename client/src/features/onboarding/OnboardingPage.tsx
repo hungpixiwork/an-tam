@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Check, Coins, GraduationCap, House, NotebookPen, Palmtree, ShieldCheck, Target, Wallet, type LucideIcon } from 'lucide-react';
+import { Bot, Check, Coins, GraduationCap, House, NotebookPen, Palmtree, PieChart, ShieldCheck, Sprout, Target, Wallet, type LucideIcon } from 'lucide-react';
 import type { OnboardingResult } from '@shared/types/api';
 import type { AssetCategory, GoalKind } from '@shared/types/domain';
 import { addMonths, currentMonth } from '@shared/engine/month';
@@ -10,7 +10,8 @@ import { Badge, Button, Card, FormAlert, FormField, IconTile, MoneyInput, ScoreR
 import { useOnboarding, type GoalInput, type OnboardingInput } from '@/lib/queries';
 
 const M = 1_000_000;
-const STEPS = ['Thu chi tháng', 'Tài sản', 'Mục tiêu'] as const;
+
+type Persona = 'starting' | 'building' | 'investing';
 
 /* ───────── Dữ liệu các bước ───────── */
 
@@ -34,6 +35,7 @@ const GOAL_TEMPLATES: GoalTemplate[] = [
 type GoalDraft = { targetAmount: number; currentAmount: number; years: number; monthlyContribution: number };
 
 export default function OnboardingPage() {
+  const [persona, setPersona] = useState<Persona | null>(null);
   const [step, setStep] = useState(0);
   const [income, setIncome] = useState(0);
   const [expense, setExpense] = useState(0);
@@ -84,13 +86,45 @@ export default function OnboardingPage() {
     };
   }
 
+  const STEPS = persona === 'starting' 
+    ? ['Thu chi tháng', 'Mục tiêu'] 
+    : ['Thu chi tháng', 'Tài sản', 'Mục tiêu'];
+
   function next(skipCurrent = false) {
     setSkipped((s) => ({ ...s, [step]: skipCurrent }));
-    if (step < STEPS.length - 1) setStep(step + 1);
-    else submit.mutate(buildInput(skipCurrent));
+    if (step === 0 && persona === 'starting') {
+      setStep(2);
+    } else if (step < 2) {
+      setStep(step + 1);
+    } else {
+      submit.mutate(buildInput(skipCurrent));
+    }
   }
 
   if (submit.data) return <ResultStep result={submit.data} />;
+
+  if (persona === null) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight text-ink sm:text-[28px]">Cho An Tâm AI biết tình hình của bạn</h1>
+          <p className="mt-1 text-sm text-ink-soft">Chỉ cần số ước lượng, bạn có thể sửa bất cứ lúc nào. Bước nào chưa muốn nhập thì cứ bỏ qua.</p>
+        </div>
+        <Card>
+          <PersonaStep onSelect={(p) => {
+            setPersona(p);
+            if (p === 'starting') {
+              const t = GOAL_TEMPLATES.find((x) => x.kind === 'emergency')!;
+              setGoals({
+                emergency: { targetAmount: 100 * M, currentAmount: 0, years: t.years, monthlyContribution: t.monthly }
+              });
+              setSkipped((s) => ({ ...s, 1: true }));
+            }
+          }} />
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -99,15 +133,18 @@ export default function OnboardingPage() {
         <p className="mt-1 text-sm text-ink-soft">Chỉ cần số ước lượng, bạn có thể sửa bất cứ lúc nào. Bước nào chưa muốn nhập thì cứ bỏ qua.</p>
       </div>
 
-      <ol className="grid grid-cols-3 gap-2" aria-label="Các bước">
-        {STEPS.map((label, i) => (
-          <li key={label} aria-current={i === step ? 'step' : undefined}>
-            <div className={cx('h-1.5 rounded-full', i <= step ? 'bg-primary-500' : 'bg-line')} />
-            <p className={cx('mt-1.5 text-xs font-semibold', i === step ? 'text-ink' : 'text-ink-mute')}>
-              {i + 1}. {label}
-            </p>
-          </li>
-        ))}
+      <ol className={cx('grid gap-2', STEPS.length === 2 ? 'grid-cols-2' : 'grid-cols-3')} aria-label="Các bước">
+        {STEPS.map((label, i) => {
+          const logicalStep = label === 'Mục tiêu' ? 2 : (label === 'Tài sản' ? 1 : 0);
+          return (
+            <li key={label} aria-current={logicalStep === step ? 'step' : undefined}>
+              <div className={cx('h-1.5 rounded-full', logicalStep <= step ? 'bg-primary-500' : 'bg-line')} />
+              <p className={cx('mt-1.5 text-xs font-semibold', logicalStep === step ? 'text-ink' : 'text-ink-mute')}>
+                {i + 1}. {label}
+              </p>
+            </li>
+          );
+        })}
       </ol>
 
       <Card>
@@ -214,7 +251,7 @@ export default function OnboardingPage() {
 
         <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-line pt-4">
           {step > 0 && (
-            <Button variant="white" onClick={() => setStep(step - 1)} disabled={submit.isPending}>
+            <Button variant="white" onClick={() => setStep(step === 2 && persona === 'starting' ? 0 : step - 1)} disabled={submit.isPending}>
               Quay lại
             </Button>
           )}
@@ -222,7 +259,7 @@ export default function OnboardingPage() {
             Bỏ qua bước này
           </Button>
           <Button onClick={() => next(false)} arrow disabled={submit.isPending}>
-            {step < STEPS.length - 1 ? 'Tiếp tục' : submit.isPending ? 'AI đang phân tích…' : 'Hoàn tất'}
+            {step < 2 ? 'Tiếp tục' : submit.isPending ? 'AI đang phân tích…' : 'Hoàn tất'}
           </Button>
         </div>
       </Card>
@@ -237,6 +274,35 @@ function StepTitle({ icon, title, body }: { icon: LucideIcon; title: string; bod
       <div>
         <h2 className="text-lg font-bold text-ink">{title}</h2>
         <p className="mt-0.5 text-sm leading-relaxed text-ink-soft">{body}</p>
+      </div>
+    </div>
+  );
+}
+
+function PersonaStep({ onSelect }: { onSelect: (p: Persona) => void }) {
+  const options: { key: Persona; icon: LucideIcon; title: string; sub: string; tone: Tone }[] = [
+    { key: 'starting', icon: Sprout, title: 'Mới bắt đầu', sub: 'Chưa có tiết kiệm nhiều, muốn kiểm soát chi tiêu', tone: 'green' },
+    { key: 'building', icon: Target, title: 'Đã có tiết kiệm', sub: 'Có sổ tiết kiệm hoặc quỹ, muốn đặt mục tiêu', tone: 'blue' },
+    { key: 'investing', icon: PieChart, title: 'Có danh mục đầu tư', sub: 'Có cổ phiếu, quỹ, trái phiếu, muốn tối ưu', tone: 'violet' },
+  ];
+  return (
+    <div className="space-y-4">
+      <p className="text-center text-sm text-ink-soft">Chọn phương án phù hợp với bạn nhất</p>
+      <div className="grid gap-3">
+        {options.map((o) => (
+          <button
+            key={o.key}
+            type="button"
+            onClick={() => onSelect(o.key)}
+            className="flex items-center gap-4 rounded-xl border border-line bg-white p-4 text-left transition-colors hover:border-accent-200 hover:bg-accent-50"
+          >
+            <IconTile icon={o.icon} tone={o.tone} size="md" />
+            <div>
+              <p className="font-semibold text-ink">{o.title}</p>
+              <p className="text-xs text-ink-soft">{o.sub}</p>
+            </div>
+          </button>
+        ))}
       </div>
     </div>
   );

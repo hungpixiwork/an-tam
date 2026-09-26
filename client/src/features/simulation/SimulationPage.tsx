@@ -36,7 +36,7 @@ const SLIDERS: SliderDef[] = [
   { key: 'marketDropPct', label: 'Thị trường giảm', hint: 'Mức thay đổi giá trị cổ phiếu và quỹ', icon: TrendingDown, tone: 'red', min: -50, max: 50, step: 5, ticks: ['-50%', '0%', '+50%'], format: (v) => `${v > 0 ? '+' : ''}${v}%` },
   { key: 'inflationPct', label: 'Lạm phát tăng', hint: 'Lạm phát trên 4% làm chi tiêu tăng', icon: Coins, tone: 'orange', min: 0, max: 10, step: 0.5, ticks: ['0%', '5%', '10%'], format: (v) => `${comma(v)}%` },
   { key: 'incomePauseMonths', label: 'Thu nhập bị gián đoạn', hint: 'Số tháng mất nguồn thu nhập chính', icon: Briefcase, tone: 'green', min: 0, max: 12, step: 1, ticks: ['0 tháng', '6 tháng', '12 tháng'], format: (v) => `${v} tháng` },
-  { key: 'interestRateDeltaPct', label: 'Lãi suất thay đổi', hint: 'Lãi suất tăng làm trái phiếu giảm giá', icon: BadgePercent, tone: 'violet', min: -3, max: 3, step: 0.5, ticks: ['-3%', '0%', '+3%'], format: (v) => `${v > 0 ? '+' : ''}${comma(v)}%` },
+  { key: 'interestRateDeltaPct', label: 'Ngân hàng thay đổi lãi suất', hint: 'Lãi suất tăng làm trái phiếu giảm giá', icon: BadgePercent, tone: 'violet', min: -3, max: 3, step: 0.5, ticks: ['-3%', '0%', '+3%'], format: (v) => `${v > 0 ? '+' : ''}${comma(v)}%` },
   { key: 'surpriseCost', label: 'Chi phí bất ngờ', hint: 'Khoản chi lớn ngoài kế hoạch', icon: Wallet, tone: 'blue', min: 0, max: 500_000_000, step: 10_000_000, ticks: ['0', '100 triệu', '500 triệu'], format: (v) => (v === 0 ? '0' : formatVnd(v)) },
 ];
 

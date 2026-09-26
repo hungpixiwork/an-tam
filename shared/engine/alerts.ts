@@ -2,7 +2,7 @@ import type { UserState } from '../types/domain';
 import { formatPct, formatVnd } from '../format';
 import { goalInsights, nearestMajorGoal } from './goals';
 import { monthsBetween } from './month';
-import { templateNarrator, type Narrator } from './narrate';
+import { templateNarrator, capitalize, type Narrator } from './narrate';
 import { emergencyAmount, recommendedRiskyShare } from './peace';
 import { portfolioStats } from './portfolio';
 
@@ -58,6 +58,39 @@ export function evaluateAlerts(state: UserState, narrator: Narrator = templateNa
       title: narrator.narrate('alert.emergency_low.title', vars),
       body: narrator.narrate('alert.emergency_low.body', vars),
     });
+  }
+
+  // Rule 4: Chi tiêu tháng vượt 110% ngân sách
+  if (state.ledger.length > 0) {
+    const latest = state.ledger.at(-1)!;
+    const budget = state.profile.monthlyExpense;
+    if (budget > 0 && latest.expense > budget * 1.1) {
+      const pct = formatPct((latest.expense - budget) / budget);
+      alerts.push({
+        ruleKey: 'spending_over',
+        severity: 'warning',
+        title: narrator.narrate('alert.spending_over.title', { pct }),
+        body: narrator.narrate('alert.spending_over.body', {
+          s_cap: capitalize(state.salutation),
+          actual: formatVnd(latest.expense),
+          budget: formatVnd(budget),
+        }),
+      });
+    }
+  }
+
+  // Rule 5: Savings rate giảm 3 tháng liên tiếp
+  if (state.ledger.length >= 3) {
+    const last3 = state.ledger.slice(-3);
+    const rates = last3.map((m) => (m.income > 0 ? (m.income - m.expense) / m.income : 0));
+    if (rates[2] < rates[1] && rates[1] < rates[0]) {
+      alerts.push({
+        ruleKey: 'savings_declining',
+        severity: 'action',
+        title: narrator.narrate('alert.savings_declining.title'),
+        body: narrator.narrate('alert.savings_declining.body'),
+      });
+    }
   }
 
   return alerts;

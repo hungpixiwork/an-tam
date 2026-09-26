@@ -6,6 +6,7 @@ export const TODAY = '2026-09';
 export function demoState(today = TODAY): UserState {
   return {
     today,
+    salutation: 'anh',
     profile: { ...DEMO_PROFILE },
     holdings: DEMO_HOLDINGS.map((h, i) => ({ ...h, id: `h${i + 1}` })),
     goals: DEMO_GOALS.map(({ targetYearOffset: _y, targetCalendarMonth: _m, ...g }, i) => ({

@@ -70,16 +70,16 @@ function PrivacyCard({ settings }: { settings: Settings }) {
       <CardTitle icon={ShieldCheck} tone="blue" title="Quyền riêng tư của bạn" subtitle="Bạn luôn kiểm soát dữ liệu và cách An Tâm AI sử dụng chúng." />
 
       <div className="space-y-4">
-        {/* Data Encrypted */}
+        {/* Data Security */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold text-ink">Dữ liệu tài sản lưu an toàn</p>
-            <p className="text-xs text-ink-soft mt-1">Mọi thông tin của bạn được mã hóa và lưu trữ an toàn.</p>
+            <p className="text-sm font-semibold text-ink">Bảo vệ dữ liệu</p>
+            <p className="text-xs text-ink-soft mt-1">
+              Kết nối được mã hóa HTTPS. Mật khẩu được băm một chiều (PBKDF2).{' '}
+              Dữ liệu không bao giờ chia sẻ cho bên thứ ba hay dùng cho quảng cáo.
+            </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Badge tone="green">Đang bật</Badge>
-            <Toggle checked disabled onChange={() => {}} label="Mã hóa dữ liệu" />
-          </div>
+          <Badge tone="green">HTTPS</Badge>
         </div>
 
         <div className="border-t border-line" />

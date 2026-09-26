@@ -30,7 +30,13 @@ const map = (l: LessonRow, withBody = false) => ({
 
 export const lessons = new Hono<AppEnv>()
   .get('/', async (c) => {
-    const { results } = await c.env.DB.prepare('SELECT * FROM lessons ORDER BY order_idx').all<LessonRow>();
+    const peaceLevel = c.req.query('peace_level');
+    let query = 'SELECT * FROM lessons ORDER BY order_idx';
+    if (peaceLevel) {
+      query = 'SELECT * FROM lessons ORDER BY (recommended_for = ?) DESC, order_idx';
+    }
+    const stmt = peaceLevel ? c.env.DB.prepare(query).bind(peaceLevel) : c.env.DB.prepare(query);
+    const { results } = await stmt.all<LessonRow>();
     return ok(c, results.map((l) => map(l)));
   })
   .get('/:slug', async (c) => {

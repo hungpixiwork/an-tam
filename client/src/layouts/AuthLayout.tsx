@@ -21,7 +21,7 @@ export function AuthLayout() {
             </Suspense>
           </div>
         </main>
-        <p className="text-xs text-ink-mute">Dữ liệu của bạn được mã hóa và không bao giờ dùng cho quảng cáo.</p>
+        <p className="text-xs text-ink-mute">Kết nối được mã hóa HTTPS. Mật khẩu được băm an toàn.</p>
       </div>
       <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#EAF4FB] to-[#DCEBF7] lg:block">
         <HeroLakeCity className="absolute inset-0 h-full w-full" />

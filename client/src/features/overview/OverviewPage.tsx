@@ -34,10 +34,14 @@ export default function OverviewPage() {
         <CashflowCard kpi={data.kpis.cashflow} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[7fr_5fr]">
-        <NetWorthChart series={data.netWorthSeries} range={range} onRange={setRange} />
-        <AllocationCard allocation={data.allocation} />
-      </div>
+      {!data.setup.holdings && data.kpis.netWorth.value < 10_000_000 ? (
+        <StartingJourneyCard setup={data.setup} />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[7fr_5fr]">
+          <NetWorthChart series={data.netWorthSeries} range={range} onRange={setRange} />
+          <AllocationCard allocation={data.allocation} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr]">
         <AiDoingCard />
@@ -84,6 +88,30 @@ function SetupCard({ setup }: { setup: OverviewData['setup'] }) {
           </li>
         ))}
       </ul>
+    </Card>
+  );
+}
+
+function StartingJourneyCard({ setup }: { setup: OverviewData['setup'] }) {
+  const links = [
+    { to: '/thu-chi', icon: NotebookPen, title: 'Ghi thu chi', body: 'Theo dõi tiền đi đâu', done: setup.transactions, tone: 'green' as Tone },
+    { to: '/muc-tieu', icon: Target, title: 'Đặt mục tiêu', body: 'Quỹ dự phòng, tiết kiệm', done: setup.goals, tone: 'blue' as Tone },
+    { to: '/cong-dong', icon: Users, title: 'Bài học', body: 'Học quản lý tiền cơ bản', done: false, tone: 'violet' as Tone },
+  ];
+  return (
+    <Card tone="mint">
+      <CardTitle icon={Lightbulb} tone="green" title="Bạn đang xây dựng nền tảng" subtitle="Bắt đầu từ việc kiểm soát chi tiêu và tạo quỹ dự phòng." />
+      <div className="grid gap-3 sm:grid-cols-3">
+        {links.map((l) => (
+          <Link key={l.to} to={l.to} className="flex items-start gap-3 rounded-xl border border-[#D7EFE2] bg-white p-3 transition-colors hover:bg-accent-50">
+            <IconTile icon={l.done ? Check : l.icon} tone={l.done ? 'green' : l.tone} size="sm" />
+            <div className="min-w-0">
+              <p className={cx('text-sm font-semibold', l.done ? 'text-ink-soft line-through' : 'text-ink')}>{l.title}</p>
+              <p className="text-xs text-ink-soft">{l.body}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
     </Card>
   );
 }

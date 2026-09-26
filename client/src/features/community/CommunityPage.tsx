@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Activity, Banknote, BarChart3, BookOpen, Bot, Building2, Clock, Heart, Sprout, Star, TrendingDown, Users, X } from 'lucide-react';
+import { Activity, Banknote, BarChart3, BookOpen, Bot, Building2, Clock, Heart, Sprout, Star, TrendingDown, Users, X, ShieldCheck } from 'lucide-react';
 import { PixelAvatar, FamilyCity, HouseCalendar } from '@/components/pixel';
 import { Badge, Button, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, Rich, ScoreRing, Skeleton, cx, type Tone } from '@/components/ui';
-import { useLesson, useLessons } from '@/lib/queries';
+import { useLesson, useLessons, useOverview } from '@/lib/queries';
 import type { Lesson } from '@/lib/queries';
 
 export default function CommunityPage() {
-  const { data: lessons, error, refetch, isPending } = useLessons();
+  const { data: overview } = useOverview();
+  const peaceLevel = overview?.peace?.level;
+  const { data: lessons, error, refetch, isPending } = useLessons(peaceLevel);
 
   if (isPending) return <PageSkeleton />;
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />;
@@ -25,6 +27,22 @@ export default function CommunityPage() {
         sceneWidth="55%"
         scene={(cls) => <FamilyCity className={cls} />}
       />
+
+      {peaceLevel === 'action' && (
+        <Card tone="rose">
+          <CardTitle icon={ShieldCheck} tone="red" title="Gợi ý cho bạn" subtitle="Dựa trên tình trạng tài chính, An Tâm AI gợi ý bài học phù hợp." />
+        </Card>
+      )}
+      {peaceLevel === 'watch' && (
+        <Card tone="cream">
+          <CardTitle icon={ShieldCheck} tone="orange" title="Gợi ý cho bạn" subtitle="Dựa trên tình trạng tài chính, An Tâm AI gợi ý bài học phù hợp." />
+        </Card>
+      )}
+      {peaceLevel === 'stable' && (
+        <Card tone="mint">
+          <CardTitle icon={ShieldCheck} tone="green" title="Gợi ý cho bạn" subtitle="Dựa trên tình trạng tài chính, An Tâm AI gợi ý bài học phù hợp." />
+        </Card>
+      )}
 
       {featured && <FeaturedCard lesson={featured} />}
 

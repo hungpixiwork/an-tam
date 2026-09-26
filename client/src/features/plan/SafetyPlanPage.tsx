@@ -50,7 +50,7 @@ export default function SafetyPlanPage() {
 
 /* ───────── So sánh ───────── */
 
-const VOLATILITY_TONE: Record<PlanMetrics['volatility'], Tone> = { Cao: 'red', 'Vừa phải': 'orange', Thấp: 'green' };
+const VOLATILITY_TONE: Record<PlanMetrics['volatility'], Tone> = { 'Dễ thay đổi': 'red', 'Vừa phải': 'orange', 'Ổn định': 'green' };
 const months = (v: number) => `${String(Math.round(v)).replace('.', ',')} tháng`;
 
 function PlanColumn({ title, badge, metrics, goalTitle, proposed }: { title: string; badge: string; metrics: PlanMetrics; goalTitle: string; proposed?: boolean }) {
@@ -58,7 +58,7 @@ function PlanColumn({ title, badge, metrics, goalTitle, proposed }: { title: str
     { icon: House, label: `Khả năng đạt mục tiêu ${goalTitle}`, value: formatPct(metrics.goalProbability) },
     { icon: ShieldCheck, label: 'Mức an tâm', value: metrics.peaceScore },
     { icon: Coins, label: 'Tiền dự phòng', value: months(metrics.emergencyMonths) },
-    { icon: Activity, label: 'Biến động', value: <Badge tone={VOLATILITY_TONE[metrics.volatility]}>{metrics.volatility}</Badge> },
+    { icon: Activity, label: 'Mức độ dao động', value: <Badge tone={VOLATILITY_TONE[metrics.volatility]}>{metrics.volatility}</Badge> },
   ];
   return (
     <div className={cx('rounded-xl border p-4', proposed ? 'border-[#CDEBDC] bg-[#F1FAF5]' : 'border-line bg-[#F8FAFC]')}>

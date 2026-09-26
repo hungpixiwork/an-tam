@@ -15,9 +15,9 @@ const EMERGENCY_MONTHS_TO_FILL = 8;
 const EXTRA_GOAL_CAP = 3_000_000;
 const CHART_MONTHS = 12;
 
-export type VolatilityLabel = 'Thấp' | 'Vừa phải' | 'Cao';
+export type VolatilityLabel = 'Ổn định' | 'Vừa phải' | 'Dễ thay đổi';
 
-export const volatilityLabel = (riskyShare: number): VolatilityLabel => (riskyShare >= 0.45 ? 'Cao' : riskyShare >= 0.3 ? 'Vừa phải' : 'Thấp');
+export const volatilityLabel = (riskyShare: number): VolatilityLabel => (riskyShare >= 0.45 ? 'Dễ thay đổi' : riskyShare >= 0.3 ? 'Vừa phải' : 'Ổn định');
 
 export interface PlanMetrics {
   goalProbability: number;

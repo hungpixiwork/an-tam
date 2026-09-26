@@ -78,6 +78,24 @@ describe('evaluateAlerts', () => {
     const keys = evaluateAlerts(demoState()).map((a) => a.ruleKey);
     expect(keys).toEqual(['volatile_share', 'emergency_low']);
   });
+
+  test('spending_over alert khi chi vượt 110%', () => {
+    const s = demoState();
+    s.ledger = [{ month: s.today, income: 30_000_000, expense: s.profile.monthlyExpense * 1.2 }];
+    const alerts = evaluateAlerts(s);
+    expect(alerts.some((a) => a.ruleKey === 'spending_over')).toBe(true);
+  });
+
+  test('savings_declining alert khi 3 tháng giảm', () => {
+    const s = demoState();
+    s.ledger = [
+      { month: '2026-06', income: 30_000_000, expense: 10_000_000 },
+      { month: '2026-07', income: 30_000_000, expense: 15_000_000 },
+      { month: '2026-08', income: 30_000_000, expense: 20_000_000 },
+    ];
+    const alerts = evaluateAlerts(s);
+    expect(alerts.some((a) => a.ruleKey === 'savings_declining')).toBe(true);
+  });
 });
 
 describe('buildOverview', () => {

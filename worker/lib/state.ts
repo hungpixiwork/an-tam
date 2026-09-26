@@ -41,7 +41,8 @@ export interface LoadedState extends UserState {
 }
 
 export async function loadUserState(db: D1Database, userId: string, today = currentMonth()): Promise<LoadedState> {
-  const [profile, holdings, goals, snapshots, ledger] = await db.batch([
+  const [user, profile, holdings, goals, snapshots, ledger] = await db.batch([
+    db.prepare('SELECT salutation FROM users WHERE id = ?').bind(userId),
     db.prepare('SELECT * FROM financial_profiles WHERE user_id = ?').bind(userId),
     db.prepare('SELECT * FROM holdings WHERE user_id = ? ORDER BY order_idx').bind(userId),
     db.prepare('SELECT * FROM goals WHERE user_id = ? ORDER BY order_idx').bind(userId),
@@ -53,6 +54,8 @@ export async function loadUserState(db: D1Database, userId: string, today = curr
        FROM transactions WHERE user_id = ? AND occurred_on >= ? GROUP BY month ORDER BY month`,
     ).bind(userId, `${addMonths(today, -11)}-01`),
   ]);
+  const u = (user.results[0] ?? {}) as Record<string, string>;
+  const salutation = (u.salutation ?? 'bạn') as Salutation;
   const p = (profile.results[0] ?? {}) as Record<string, number>;
   const baseline: FinancialProfile = {
     monthlyIncome: p.monthly_income ?? 0,
@@ -64,6 +67,7 @@ export async function loadUserState(db: D1Database, userId: string, today = curr
   const { profile: effective, ...sources } = effectiveProfile(baseline, months, today);
   return {
     today,
+    salutation,
     profile: effective,
     baseline,
     sources,

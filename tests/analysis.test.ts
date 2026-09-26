@@ -33,3 +33,21 @@ test('habitsProfile & portfolioAnalysis', () => {
   expect(p.riskGroups[0].name).toBe('Nhóm tăng trưởng công nghệ');
   console.log(JSON.stringify(p.riskGroups.map((g) => [g.name, g.pct.toFixed(2)])));
 });
+
+test('goalsSummary sử dụng narrator cho tip text', () => {
+  const s = goalsSummary(demoState(), { salutation: 'anh' });
+  if (s.tip) {
+    expect(s.tip.text).toContain('anh');
+    expect(s.tip.text).not.toContain('bạn');
+  }
+});
+
+test('habitsProfile insights dùng salutation', () => {
+  const opts = [{ key: 'hold', label: 'Giữ', risk: 7 }, { key: 'reduce', label: 'Giảm', risk: 4 }];
+  const h = habitsProfile(8, 
+    [{ id: 'a', prompt: '', context: '', icon: '', options: opts }, { id: 'b', prompt: '', context: '', icon: '', options: opts }],
+    { a: 'hold', b: 'reduce' },
+    { salutation: 'chị' }
+  );
+  expect(h.insights[0].title).toContain('Chị');
+});

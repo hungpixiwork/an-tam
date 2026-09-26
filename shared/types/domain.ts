@@ -65,6 +65,7 @@ export interface Transaction {
 export interface UserState {
   /** Tháng hiện tại 'YYYY-MM' — truyền vào để engine thuần và test được. */
   today: string;
+  salutation: Salutation;
   profile: FinancialProfile;
   holdings: Holding[];
   goals: Goal[];

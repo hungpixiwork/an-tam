@@ -44,7 +44,7 @@ test('holdingDefaults theo loại tài sản', () => {
 });
 
 describe('tài khoản trống', () => {
-  const empty: UserState = { today: TODAY, profile: ZERO, holdings: [], goals: [], snapshots: [], ledger: [] };
+  const empty: UserState = { today: TODAY, salutation: 'bạn', profile: ZERO, holdings: [], goals: [], snapshots: [], ledger: [] };
   const user = { fullName: 'Lan', salutation: 'chị' as const };
 
   test('mọi màn tính được, không NaN', () => {

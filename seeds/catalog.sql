@@ -18,24 +18,24 @@ INSERT OR REPLACE INTO habit_scenarios (id, prompt, context, icon, options_json,
  '[{"key":"cash","label":"Bạn ưu tiên tiền mặt","risk":3},{"key":"keep","label":"Bạn giữ nguyên danh mục","risk":6},{"key":"loan","label":"Bạn vay để giữ khoản đầu tư","risk":9}]', 3);
 
 -- Bài học cộng đồng (màn 09)
-INSERT OR REPLACE INTO lessons (id, slug, kind, title, excerpt, body_md, category, icon, read_time, is_featured, order_idx) VALUES
+INSERT OR REPLACE INTO lessons (id, slug, kind, title, excerpt, body_md, category, icon, read_time, is_featured, order_idx, recommended_for) VALUES
 ('l1', 'quy-du-phong-du-manh', 'lesson', 'Làm sao để có quỹ dự phòng đủ mạnh?',
  'Quỹ dự phòng giúp bạn vững vàng trước những rủi ro bất ngờ như mất việc, chi phí y tế hay biến động thu nhập. Bài học này hướng dẫn cách tính quỹ dự phòng phù hợp với từng giai đoạn cuộc sống, và cách bắt đầu ngay từ những khoản nhỏ.',
  '## Vì sao cần quỹ dự phòng?\nQuỹ dự phòng là lớp đệm đầu tiên...\n\n## Bao nhiêu là đủ?\nThông thường từ 6 đến 12 tháng chi tiêu thiết yếu...',
- 'Cơ bản', 'piggy-bank', '5 phút', 1, 1),
+ 'Cơ bản', 'piggy-bank', '5 phút', 1, 1, 'action'),
 ('l2', 'dau-tu-dai-han-la-gi', 'lesson', 'Đầu tư dài hạn là gì?',
- 'Hiểu cách đầu tư dài hạn giúp bạn xây dựng tài sản bền vững và vượt qua biến động ngắn hạn.', '', 'Kiến thức', 'sprout', '4 phút', 0, 2),
+ 'Hiểu cách đầu tư dài hạn giúp bạn xây dựng tài sản bền vững và vượt qua biến động ngắn hạn.', '', 'Kiến thức', 'sprout', '4 phút', 0, 2, 'stable'),
 ('l3', 'binh-tinh-khi-thi-truong-giam', 'lesson', 'Khi thị trường giảm, nên bình tĩnh thế nào?',
- 'Học cách duy trì tâm lý vững vàng và đưa ra quyết định sáng suốt khi thị trường biến động.', '', 'Tâm lý đầu tư', 'trending-down', '6 phút', 0, 3),
+ 'Học cách duy trì tâm lý vững vàng và đưa ra quyết định sáng suốt khi thị trường biến động.', '', 'Tâm lý đầu tư', 'trending-down', '6 phút', 0, 3, 'stable'),
 ('l4', 'mua-nha-chuan-bi-tien', 'lesson', 'Mua nhà: chuẩn bị tiền ra sao?',
- 'Tìm hiểu các bước chuẩn bị tài chính, tính toán chi phí và lựa chọn phù hợp với khả năng của bạn.', '', 'Mục tiêu lớn', 'home', '7 phút', 0, 4),
+ 'Tìm hiểu các bước chuẩn bị tài chính, tính toán chi phí và lựa chọn phù hợp với khả năng của bạn.', '', 'Mục tiêu lớn', 'home', '7 phút', 0, 4, 'watch'),
 ('l5', 'tien-du-phong-bao-nhieu-la-du', 'lesson', 'Tiền dự phòng bao nhiêu là đủ?',
- 'Biết cách xác định mức quỹ dự phòng phù hợp với thu nhập, chi tiêu và mục tiêu cuộc sống.', '', 'Quản lý vốn', 'shield-plus', '5 phút', 0, 5),
+ 'Biết cách xác định mức quỹ dự phòng phù hợp với thu nhập, chi tiêu và mục tiêu cuộc sống.', '', 'Quản lý vốn', 'shield-plus', '5 phút', 0, 5, 'action'),
 ('l6', 'cau-chuyen-anh-nam', 'story', 'Anh Nam, 38 tuổi, đã giảm rủi ro danh mục và tăng khả năng mua nhà từ 61% lên 87% sau 6 tháng.',
- 'Nhờ những bài học từ cộng đồng và công cụ của An Tâm AI, tôi hiểu rõ hơn về rủi ro, điều chỉnh danh mục phù hợp và có kế hoạch mua nhà rõ ràng hơn.', '', 'Câu chuyện', 'user', '3 phút', 0, 6),
+ 'Nhờ những bài học từ cộng đồng và công cụ của An Tâm AI, tôi hiểu rõ hơn về rủi ro, điều chỉnh danh mục phù hợp và có kế hoạch mua nhà rõ ràng hơn.', '', 'Câu chuyện', 'user', '3 phút', 0, 6, 'watch'),
 ('l7', 'khung-hoang-2008', 'history', 'Khủng hoảng 2008',
- 'Học cách nhận biết rủi ro, đa dạng hóa danh mục và giữ tâm lý bình tĩnh.', '', 'Lịch sử', 'building', '6 phút', 0, 7),
+ 'Học cách nhận biết rủi ro, đa dạng hóa danh mục và giữ tâm lý bình tĩnh.', '', 'Lịch sử', 'building', '6 phút', 0, 7, 'stable'),
 ('l8', 'lam-phat-cao', 'history', 'Giai đoạn lạm phát cao',
- 'Hiểu cách lạm phát ảnh hưởng đến sức mua và học cách bảo vệ tài sản.', '', 'Lịch sử', 'coins', '5 phút', 0, 8),
+ 'Hiểu cách lạm phát ảnh hưởng đến sức mua và học cách bảo vệ tài sản.', '', 'Lịch sử', 'coins', '5 phút', 0, 8, 'stable'),
 ('l9', 'thi-truong-giam-2020', 'history', 'Thị trường giảm mạnh 2020',
- 'Học cách ứng phó với biến động lớn và tìm cơ hội trong khủng hoảng.', '', 'Lịch sử', 'virus', '5 phút', 0, 9);
+ 'Học cách ứng phó với biến động lớn và tìm cơ hội trong khủng hoảng.', '', 'Lịch sử', 'virus', '5 phút', 0, 9, 'stable');

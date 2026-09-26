@@ -1,8 +1,8 @@
 import type { OverviewData, Kpi, SetupStatus } from '../types/api';
 import type { Salutation, Snapshot, UserState } from '../types/domain';
-import { formatMonth } from '../format';
+import { formatMonth, formatPct } from '../format';
 import { nearestMajorGoal } from './goals';
-import { addMonths } from './month';
+import { addMonths, monthsBetween } from './month';
 import { greetingName, levelKey, templateNarrator, type Narrator } from './narrate';
 import { emergencyAmount, freeCashflow, peaceScore, type PeaceLevel } from './peace';
 import { allocation, investedValue, totalValue } from './portfolio';
@@ -67,22 +67,36 @@ export function buildOverview(
     .map((s) => ({ month: s.month, total: s.total }));
   series.push({ month: state.today, total });
 
-  // Gợi ý hôm nay: thử cú sốc thị trường lên mục tiêu lớn gần nhất
+  const setup = setupStatus(state);
+  
+  // Gợi ý hôm nay: đa dạng hóa theo tình hình tài chính
   const major = nearestMajorGoal(state);
   let tip: OverviewData['tip'] = { text: narrator.narrate('tip.empty'), goalTitle: null, delayMonths: 0, presetSlug: TIP_PRESET };
-  if (major) {
-    const impact = simulate(state, TIP_SHOCK).goals.find((g) => g.goalId === major.id);
-    const delay = Math.max(0, impact?.delayMonths ?? 0);
-    const vars = { state: TIP_STATE[peace.level], goal: major.title.toLowerCase(), months: delay };
-    tip = {
-      text: narrator.narrate(delay > 0 ? 'tip.delay' : 'tip.safe', vars),
-      goalTitle: major.title,
-      delayMonths: delay,
-      presetSlug: TIP_PRESET,
-    };
+  
+  const latestLedger = state.ledger.at(-1);
+  if (latestLedger && state.profile.monthlyExpense > 0 && latestLedger.expense > state.profile.monthlyExpense * 1.1) {
+    const pct = formatPct((latestLedger.expense - state.profile.monthlyExpense) / state.profile.monthlyExpense);
+    tip = { text: narrator.narrate('tip.spending', { s: user.salutation, pct }), goalTitle: null, delayMonths: 0, presetSlug: '' };
+  } else if (major) {
+    const monthsLeft = monthsBetween(state.today, major.targetMonth);
+    if (monthsLeft > 0 && monthsLeft <= 6) {
+      const progress = major.currentAmount / major.targetAmount;
+      tip = { text: narrator.narrate('tip.goal_soon', { goal: major.title, months: monthsLeft, progress: formatPct(progress) }), goalTitle: major.title, delayMonths: 0, presetSlug: '' };
+    } else {
+      const impact = simulate(state, TIP_SHOCK).goals.find((g) => g.goalId === major.id);
+      const delay = Math.max(0, impact?.delayMonths ?? 0);
+      const vars = { state: TIP_STATE[peace.level], goal: major.title.toLowerCase(), months: delay };
+      tip = {
+        text: narrator.narrate(delay > 0 ? 'tip.delay' : 'tip.safe', vars),
+        goalTitle: major.title,
+        delayMonths: delay,
+        presetSlug: TIP_PRESET,
+      };
+    }
+  } else if (peace.level === 'stable' && setup.profile && setup.holdings) {
+    tip = { text: narrator.narrate('tip.learn', { s: user.salutation }), goalTitle: null, delayMonths: 0, presetSlug: '' };
   }
 
-  const setup = setupStatus(state);
   // Chưa có thu chi lẫn tài sản: điểm chưa có ý nghĩa, lời chào mời bắt đầu nhập
   const empty = !setup.profile && !setup.holdings;
 
