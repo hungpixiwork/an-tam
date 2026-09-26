@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/app/auth';
 import { Logo } from '@/components/layout/Sidebar';
+import { LanguageSelector } from '@/components/LanguageSelector';
 import { PageSkeleton } from '@/components/ui';
 
 /** Khung màn "Bắt đầu": chỉ cho tài khoản đã đăng nhập nhưng chưa hoàn tất. */
@@ -14,7 +15,10 @@ export function OnboardingLayout() {
   return (
     <div className="min-h-screen bg-canvas px-4 py-6 sm:px-6">
       <div className="mx-auto max-w-3xl">
-        <Logo />
+        <div className="flex items-center justify-between">
+          <Logo />
+          <LanguageSelector variant="button" />
+        </div>
         <main className="mt-6">
           <Suspense fallback={<PageSkeleton />}>
             <Outlet />

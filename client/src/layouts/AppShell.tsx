@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/app/auth';
+import { useLocale } from '@/app/locale';
 import { titleFor } from '@/app/nav';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
@@ -9,14 +10,15 @@ import { PageSkeleton } from '@/components/ui';
 /** Khung cho mọi màn cần đăng nhập: Sidebar + Topbar + nội dung. */
 export function AppShell() {
   const { me, loading } = useAuth();
+  const { t } = useLocale();
   const { pathname } = useLocation();
   const [drawer, setDrawer] = useState(false);
-  const title = titleFor(pathname);
+  const title = titleFor(pathname, t);
 
   useEffect(() => {
-    document.title = `${title} · An Tâm AI`;
+    document.title = `${title} · ${t('app.name')}`;
     window.scrollTo({ top: 0 });
-  }, [title]);
+  }, [title, t]);
 
   if (loading) return <div className="min-h-screen bg-canvas" aria-busy="true" />;
   if (!me) return <Navigate to="/dang-nhap" replace state={{ from: pathname }} />;
