@@ -30,7 +30,7 @@ cmd //c "mklink /J node_modules D:\\07-Competitions-Hackathons\\an-tam\\node_mod
 cmd //c "mklink /J client\\node_modules D:\\07-Competitions-Hackathons\\an-tam\\client\\node_modules"
 npx wrangler d1 migrations apply an-tam-db --local          # DB riêng của worktree
 npx wrangler dev --port 880N          # run_in_background
-API_PORT=880N npx --prefix client vite --port 520N --strictPort   # run_in_background
+(cd client && API_PORT=880N npx vite --port 520N --strictPort)   # run_in_background
 API=http://localhost:880N node scripts/seed-demo.mjs
 # agent-browser: luôn thêm --session pN ; mở http://localhost:520N
 ```
