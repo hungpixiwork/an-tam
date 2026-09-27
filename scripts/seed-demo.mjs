@@ -98,14 +98,29 @@ async function assets() {
 /* ───────── 4. Mục tiêu ───────── */
 const GOALS = [
   { kind: 'emergency', title: 'Quỹ dự phòng', targetAmount: 120 * M, currentAmount: 84 * M, targetMonth: addMonths(thisMonth, 6), monthlyContribution: 4 * M, priority: 1 },
-  { kind: 'education', title: 'Học tập MBA', targetAmount: 150 * M, currentAmount: 40 * M, targetMonth: addMonths(thisMonth, 48), monthlyContribution: 2 * M, priority: 2 },
-  { kind: 'custom', title: 'Du lịch Nhật Bản', targetAmount: 60 * M, currentAmount: 16 * M, targetMonth: addMonths(thisMonth, 30), monthlyContribution: 1_500 * K, priority: 3 },
-  { kind: 'custom', title: 'Mua xe ô tô', targetAmount: 600 * M, currentAmount: 120 * M, targetMonth: addMonths(thisMonth, 96), monthlyContribution: 2 * M, priority: 3 },
+  { kind: 'education', title: 'Học tập MBA', targetAmount: 150 * M, currentAmount: 40 * M, targetMonth: addMonths(thisMonth, 24), monthlyContribution: 2 * M, priority: 2 },
+  { kind: 'custom', title: 'Du lịch Nhật Bản', targetAmount: 60 * M, currentAmount: 16 * M, targetMonth: addMonths(thisMonth, 10), monthlyContribution: 1_500 * K, priority: 3 },
+  { kind: 'custom', title: 'Mua xe ô tô', targetAmount: 600 * M, currentAmount: 120 * M, targetMonth: addMonths(thisMonth, 36), monthlyContribution: 2 * M, priority: 3 },
 ];
 
 async function goals() {
   for (const g of (await get('/goals/summary')).goals) await del(`/goals/${g.id}`);
   for (const g of GOALS) await post('/goals', g);
+}
+
+/* ───────── 4b. Biểu tượng & kỳ hạn mục tiêu (trang 3) ───────── */
+const GOAL_LOOKS = {
+  'Quỹ dự phòng': { icon: 'umbrella', horizon: 'short' },
+  'Du lịch Nhật Bản': { icon: 'plane', horizon: 'short' },
+  'Học tập MBA': { icon: 'graduation-cap', horizon: 'mid' },
+  'Mua xe ô tô': { icon: 'car', horizon: 'long' },
+};
+
+async function goalLooks() {
+  for (const g of (await get('/goals/summary')).goals) {
+    const look = GOAL_LOOKS[g.title];
+    if (look) await patch(`/goals/${g.id}`, look);
+  }
 }
 
 /* ───────── 5. Sổ thu chi 6 tháng ───────── */
@@ -266,6 +281,7 @@ const steps = [
   ['Thu chi cơ bản', profile],
   ['Tài sản & nợ', assets],
   ['Mục tiêu', goals],
+  ['Biểu tượng & kỳ hạn mục tiêu', goalLooks],
   ['Sổ thu chi 6 tháng', ledger],
   ['Ngân sách & hóa đơn', billsAndBudget],
   ['Thu nhập, thời gian, kỹ năng', earn],

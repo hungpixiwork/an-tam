@@ -21,6 +21,7 @@ interface LiabilityRow {
 interface GoalRow {
   id: string; kind: Goal['kind']; title: string; target_amount: number; current_amount: number;
   target_month: string; monthly_contribution: number; priority: number;
+  icon: string | null; horizon: Goal['horizon'];
 }
 
 export const toMe = (u: UserRow): Me => ({
@@ -86,6 +87,7 @@ export async function loadUserState(db: D1Database, userId: string, today = curr
     goals: (goals.results as unknown as GoalRow[]).map((g) => ({
       id: g.id, kind: g.kind, title: g.title, targetAmount: g.target_amount, currentAmount: g.current_amount,
       targetMonth: g.target_month, monthlyContribution: g.monthly_contribution, priority: g.priority,
+      icon: g.icon ?? null, horizon: g.horizon ?? null,
     })),
     snapshots: snapshots.results as unknown as Snapshot[],
     ledger: months,

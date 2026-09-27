@@ -16,16 +16,18 @@ export const goalSchema = z.object({
   targetMonth: monthString,
   monthlyContribution: money,
   priority: z.number().int().min(1).max(3).default(2),
+  icon: z.string().trim().max(24).nullish(),
+  horizon: z.enum(['short', 'mid', 'long']).nullish(),
 });
 export type GoalInput = z.infer<typeof goalSchema>;
 
 export const insertGoal = (db: D1Database, userId: string, g: GoalInput) =>
   db
     .prepare(
-      `INSERT INTO goals (id, user_id, kind, title, target_amount, current_amount, target_month, monthly_contribution, priority, order_idx)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(order_idx), 0) + 1 FROM goals WHERE user_id = ?))`,
+      `INSERT INTO goals (id, user_id, kind, title, target_amount, current_amount, target_month, monthly_contribution, priority, icon, horizon, order_idx)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(order_idx), 0) + 1 FROM goals WHERE user_id = ?))`,
     )
-    .bind(crypto.randomUUID(), userId, g.kind, g.title, g.targetAmount, g.currentAmount, g.targetMonth, g.monthlyContribution, g.priority, userId);
+    .bind(crypto.randomUUID(), userId, g.kind, g.title, g.targetAmount, g.currentAmount, g.targetMonth, g.monthlyContribution, g.priority, g.icon ?? null, g.horizon ?? null, userId);
 
 export const goals = new Hono<AppEnv>()
   .get('/summary', async (c) => ok(c, goalsSummary(await loadUserState(c.env.DB, c.get('userId')))))
@@ -48,6 +50,8 @@ export const goals = new Hono<AppEnv>()
       target_month: g.targetMonth,
       monthly_contribution: g.monthlyContribution,
       priority: g.priority,
+      icon: g.icon,
+      horizon: g.horizon,
     };
     const entries = Object.entries(cols).filter(([, v]) => v !== undefined);
     if (entries.length === 0) return ok(c, null);

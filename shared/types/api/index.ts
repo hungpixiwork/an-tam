@@ -11,3 +11,4 @@ export * from './portfolio';
 export * from './system';
 export * from './calendar';
 export * from './lifeChoices';
+export * from './safety';
