@@ -107,7 +107,7 @@ async function loadAction(db: D1Database, userId: string, id: string): Promise<A
 }
 
 /** Hóa đơn định kỳ (bảng recurring_bills — có khi màn Sổ thu chi đã chạy migration 0010). */
-async function loadBills(db: D1Database, userId: string, today: string): Promise<BillDue[]> {
+export async function loadBills(db: D1Database, userId: string, today: string): Promise<BillDue[]> {
   try {
     const { results } = await db.prepare('SELECT name, amount, day_of_month FROM recurring_bills WHERE user_id = ?').bind(userId).all<{ name: string; amount: number; day_of_month: number }>();
     return results.flatMap((b) => {

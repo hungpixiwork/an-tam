@@ -20,3 +20,4 @@ export * from './calendar';
 export * from './safety';
 export * from './choices';
 export * from './audit';
+export * from './agent';

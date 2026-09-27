@@ -61,14 +61,6 @@ const IMPLEMENTED: [string, string][] = [
 ];
 
 const STUBS: [string, string][] = [
-  ['GET', '/api/agents'],
-  ['POST', '/api/agent/runs'],
-  ['GET', '/api/agent/runs/r1'],
-  ['GET', '/api/agent/actions?status=pending'],
-  ['POST', '/api/agent/actions/approve-batch'],
-  ['POST', '/api/agent/actions/a1/approve'],
-  ['POST', '/api/agent/actions/a1/reject'],
-  ['POST', '/api/agent/actions/a1/request-changes'],
   ['DELETE', '/api/integrations/notion'],
 ];
 
