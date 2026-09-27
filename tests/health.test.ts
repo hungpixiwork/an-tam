@@ -58,10 +58,6 @@ const IMPLEMENTED: [string, string][] = [
 ];
 
 const STUBS: [string, string][] = [
-  ['GET', '/api/life-choices/templates'],
-  ['POST', '/api/life-choices/evaluate'],
-  ['POST', '/api/life-choices/compare'],
-  ['PATCH', '/api/life-choices/c1/tasks/t1'],
   ['GET', '/api/agents'],
   ['POST', '/api/agent/runs'],
   ['GET', '/api/agent/runs/r1'],

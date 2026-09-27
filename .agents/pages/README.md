@@ -9,7 +9,7 @@ Làm tuần tự bằng skill `.claude/skills/mockup-page` — xong trang N (đ�
 | 3 | Quỹ an toàn & mục tiêu | `/quy-an-toan` | ✅ 2026-09-28 | (xem git log `feat(page-3)`) |
 | 4 | Tăng thu nhập & kỹ năng | `/tang-thu-nhap` | ✅ 2026-09-28 | (xem git log `feat(page-4)`) |
 | 5 | Lịch AI | `/lich-ai` | 📐 | |
-| 6 | Lựa chọn cuộc đời | `/lua-chon` | 📐 | |
+| 6 | Lựa chọn cuộc đời | `/lua-chon` | ✅ 2026-09-28 | (xem git log `feat(page-6)`) |
 | 7 | Danh mục & rủi ro tập trung | `/danh-muc` | ✅ 2026-09-28 | nhánh worktree |
 | 8 | AI Workspace | `/ai-workspace` | 📐 | |
 | 9 | Nhật ký AI & quyền riêng tư | `/nhat-ky-ai` | 📐 | |

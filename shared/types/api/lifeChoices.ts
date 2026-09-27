@@ -1,6 +1,8 @@
-// Lựa chọn cuộc đời (B1) — phần tối thiểu dùng ở màn Tổng quan.
+// Lựa chọn cuộc đời (B1) — Tổng quan (lựa chọn ghim) + màn Lựa chọn cuộc đời (/lua-chon).
 
 import type { LifeChoiceReadiness } from '../../engine/lifeChoice';
+
+export type LifeChoiceKind = 'study' | 'care' | 'startup' | 'switch' | 'sabbatical' | 'custom';
 
 export interface LifeChoice {
   id: string;
@@ -13,6 +15,11 @@ export interface LifeChoice {
   currentStep: number;
   pinned: boolean;
   status: 'active' | 'done' | 'archived';
+  kind: LifeChoiceKind;
+  /** Mục tiêu sau khi hoàn thành (chữ người dùng nhập). */
+  outcome: string;
+  /** Thu nhập kỳ vọng tăng bao nhiêu % sau khi hoàn thành (ước tính của người dùng). */
+  incomeUpliftPct: number;
 }
 
 export interface LifeChoiceInput {
@@ -23,8 +30,113 @@ export interface LifeChoiceInput {
   steps?: string[];
   currentStep?: number;
   pinned?: boolean;
+  kind?: LifeChoiceKind;
+  outcome?: string;
+  incomeUpliftPct?: number;
+  /** Tạo kèm phương án / điều kiện / việc cần làm từ mẫu. */
+  template?: Exclude<LifeChoiceKind, 'custom'>;
 }
 
 export interface PinnedLifeChoice extends LifeChoice {
   readiness: LifeChoiceReadiness;
+}
+
+/** Thông số một phương án — đầu vào của engine. */
+export interface LifeChoiceOptionInput {
+  title: string;
+  description?: string;
+  /** Học phí / chi phí chính (VND). */
+  cost: number;
+  otherCost: number;
+  durationMonths: number;
+  /** Số tháng không có thu nhập (≤ durationMonths). */
+  monthsWithoutIncome: number;
+  /** Thu nhập thay đổi bao nhiêu mỗi tháng trong những tháng vẫn đi làm (vd làm bán thời gian: −3,5 triệu). */
+  monthlyIncomeDelta: number;
+}
+
+export interface LifeChoiceOption extends LifeChoiceOptionInput {
+  id: string;
+  selected: boolean;
+}
+
+export interface LifeChoicePrereq {
+  id: string;
+  title: string;
+  done: boolean;
+  /** Điều kiện hệ thống tự kiểm tra (không tick tay). */
+  autoKey: string | null;
+  /** Tham số hiển thị cho điều kiện tự kiểm tra (vd số tháng hiện có). */
+  params?: Record<string, number>;
+}
+
+export type LifeChoiceTaskPriority = 'high' | 'mid' | 'low';
+
+export interface LifeChoiceTask {
+  id: string;
+  title: string;
+  detail: string;
+  priority: LifeChoiceTaskPriority;
+  done: boolean;
+}
+
+export interface TextKey {
+  key: string;
+  params?: Record<string, number | string>;
+}
+
+export type LifeChoiceVerdict = 'go' | 'conditional' | 'wait';
+
+export interface LifeChoiceEvaluation {
+  /** Điểm khả thi 0..100 = an toàn (40) + giữ mục tiêu (30) + giá trị nghề (20) + điều kiện (10). */
+  feasibility: number;
+  parts: { safety: number; goals: number; career: number; prereqs: number };
+  /** Số tháng tiền mặt + khoản đầu tư đủ trả chi tiêu, trước và sau phương án. */
+  monthsBefore: number;
+  monthsAfter: number;
+  monthsDelta: number;
+  costs: { tuition: number; living: number; other: number; total: number };
+  /** Tiền có thể dùng, phần thu nhập bù được, phần còn thiếu. */
+  funding: { liquid: number; incomeCover: number; shortfall: number };
+  /** Giá trị nghề: vốn con người thay đổi bao nhiêu % (ước tính). */
+  careerChangePct: number;
+  prereqsDone: number;
+  prereqsTotal: number;
+  opportunities: TextKey[];
+  risks: TextKey[];
+  verdict: LifeChoiceVerdict;
+  unlock: TextKey;
+}
+
+export interface LifeChoiceOptionView extends LifeChoiceOption {
+  evaluation: LifeChoiceEvaluation;
+}
+
+export interface LifeChoiceDetail extends LifeChoice {
+  monthlyIncome: number;
+  monthlyExpense: number;
+  options: LifeChoiceOptionView[];
+  prereqs: LifeChoicePrereq[];
+  tasks: LifeChoiceTask[];
+  /** Phương án điểm khả thi cao nhất. */
+  recommendedOptionId: string | null;
+}
+
+export interface LifeChoiceTemplate {
+  key: Exclude<LifeChoiceKind, 'custom'>;
+  title: string;
+  description: string;
+  icon: string;
+  cost: number;
+  incomeUpliftPct: number;
+  outcome: string;
+  steps: string[];
+  options: LifeChoiceOptionInput[];
+  prereqs: { title: string; autoKey?: string }[];
+  tasks: { title: string; detail: string; priority: LifeChoiceTaskPriority }[];
+}
+
+export interface LifeChoiceCompare {
+  options: (LifeChoiceOptionInput & { evaluation: LifeChoiceEvaluation })[];
+  recommendedIndex: number;
 }
