@@ -25,7 +25,7 @@ export const qk = {
 };
 
 /** Dữ liệu tài chính thay đổi → làm mới các màn phụ thuộc. */
-export const FINANCE_KEYS = [['overview'], ['goals'], ['portfolio'], ['plans'], ['ai'], ['notifications'], ['transactions'], ['profile'], ['holdings'], ['preview']];
+export const FINANCE_KEYS = [['overview'], ['goals'], ['portfolio'], ['plans'], ['ai'], ['notifications'], ['transactions'], ['profile'], ['holdings'], ['preview'], ['earn-dashboard']];
 
 export const useInvalidateFinance = () => {
   const qc = useQueryClient();

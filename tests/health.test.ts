@@ -54,8 +54,6 @@ const STUBS: [string, string][] = [
   ['POST', '/api/bills/b1/paid'],
   ['GET', '/api/safety'],
   ['PUT', '/api/safety/target'],
-  ['GET', '/api/skills'],
-  ['GET', '/api/human-capital'],
   ['GET', '/api/calendar?week=2026-W39'],
   ['POST', '/api/calendar/sync'],
   ['POST', '/api/calendar/auto-schedule'],

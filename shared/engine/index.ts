@@ -17,3 +17,4 @@ export * from './humanCapital';
 export * from './suggestions';
 export * from './resources';
 export * from './lifeChoice';
+export * from './earnDashboard';

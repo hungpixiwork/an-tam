@@ -7,7 +7,7 @@ Làm tuần tự bằng skill `.claude/skills/mockup-page` — xong trang N (đ�
 | 1 | Tổng quan | `/` | ✅ 2026-09-27 | `7f81da9` |
 | 2 | Sổ thu chi & dòng tiền | `/thu-chi` | 📐 | |
 | 3 | Quỹ an toàn & mục tiêu | `/quy-an-toan` | 📐 | |
-| 4 | Tăng thu nhập & kỹ năng | `/tang-thu-nhap` | 📐 | |
+| 4 | Tăng thu nhập & kỹ năng | `/tang-thu-nhap` | ✅ 2026-09-28 | (xem git log `feat(page-4)`) |
 | 5 | Lịch AI | `/lich-ai` | 📐 | |
 | 6 | Lựa chọn cuộc đời | `/lua-chon` | 📐 | |
 | 7 | Danh mục & rủi ro tập trung | `/danh-muc` | 📐 | |

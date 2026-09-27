@@ -132,7 +132,7 @@ function monthTransactions({ d, freelance, invest, expense }) {
   const month = addMonths(thisMonth, d);
   const day = (n) => `${month}-${String(n).padStart(2, '0')}`;
   const list = [{ kind: 'income', amount: 22 * M, category: 'salary', note: 'Lương tháng', occurredOn: day(5) }];
-  if (freelance) list.push({ kind: 'income', amount: freelance, category: 'business', note: 'Dự án freelance', occurredOn: day(15) });
+  if (freelance) list.push({ kind: 'income', amount: freelance, category: 'freelance', note: 'Dự án freelance', occurredOn: day(15) });
   if (invest) list.push({ kind: 'income', amount: invest, category: 'invest_income', note: 'Lãi quỹ & cổ tức', occurredOn: day(20) });
   let left = expense;
   SHARES.forEach(([category, share, note, n], i) => {
@@ -163,7 +163,7 @@ async function ledger() {
 
 /* ───────── 6. Tăng thu nhập, thời gian, kỹ năng ───────── */
 async function earn() {
-  await put('/earn', { currentIncome: 22 * M, targetIncome: 28_600 * K, targetMonths: 6, occupation: 'Chuyên viên phân tích dữ liệu', hoursPerWeek: 5, focusSkill: 'AI/No-code' });
+  await put('/earn', { currentIncome: 22 * M, targetIncome: 28_600 * K, targetMonths: 6, occupation: 'Chuyên viên phân tích dữ liệu', hoursPerWeek: 5, focusSkill: 'AI/No-code', sector: 'technology', iscoCode: '2511' });
   await put('/earn/time', {
     allocations: [
       { category: 'sleep', hours: 38 },
@@ -217,6 +217,35 @@ async function lifeChoices() {
   });
 }
 
+/* ───────── 9. Kỹ năng đang học + kế hoạch học 7 ngày (trang Tăng thu nhập) ───────── */
+const SKILLS = [
+  { name: 'Phân tích dữ liệu', tag: 'data', stage: 'foundation', monthsMin: 1, monthsMax: 3, hoursPerWeek: 4, progress: 60 },
+  { name: 'Tự động hóa với AI', tag: 'ai_automation', stage: 'practice', monthsMin: 2, monthsMax: 4, hoursPerWeek: 3, progress: 30 },
+  { name: 'Thiết kế website No-code', tag: 'nocode', stage: 'portfolio', monthsMin: 1, monthsMax: 2, hoursPerWeek: 2, progress: 20 },
+];
+// Hôm qua → 5 ngày tới (hôm nay dùng buổi "Học kỹ năng AI" của lịch hôm nay). [độ lệch ngày, tên buổi, kỹ năng, giờ bắt đầu, số giờ]
+const SESSIONS = [
+  [-1, 'Excel nâng cao', 'Phân tích dữ liệu', '20:00', 2],
+  [1, 'Thực hành Power BI', 'Phân tích dữ liệu', '20:00', 2],
+  [2, 'AI tự động hóa công việc', 'Tự động hóa với AI', '20:00', 2],
+  [3, 'Xây dựng portfolio', 'Thiết kế website No-code', '20:00', 1.5],
+  [4, 'Dự án thực tế', 'Tự động hóa với AI', '09:00', 2],
+  [5, 'Tổng kết & đánh giá', 'Phân tích dữ liệu', '10:00', 1],
+];
+
+async function skills() {
+  for (const s of await get('/skills')) await del(`/skills/${s.id}`);
+  for (const s of SKILLS) await post('/skills', s);
+  const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+  for (const [d, title, skill, from, hours] of SESSIONS) {
+    const day = new Date(Date.parse(`${today}T00:00:00Z`) + d * 86_400_000).toISOString().slice(0, 10);
+    for (const e of await get(`/calendar/events?date=${day}`)) if (e.category === 'skill') await del(`/calendar/events/${e.id}`);
+    const [h, m] = from.split(':').map(Number);
+    const { id } = await post('/calendar/events', { title, note: skill, category: 'skill', startsAt: `${day}T${from}`, endsAt: `${day}T${hhmm(h * 60 + m + hours * 60)}` });
+    if (d < 0) await patch(`/calendar/events/${id}`, { done: true });
+  }
+}
+
 /* ───────── Chạy ───────── */
 const steps = [
   ['Tài khoản', login],
@@ -227,6 +256,7 @@ const steps = [
   ['Thu nhập, thời gian, kỹ năng', earn],
   ['Lịch hôm nay', calendar],
   ['Lựa chọn cuộc đời', lifeChoices],
+  ['Kỹ năng & kế hoạch học', skills],
   ['Hiện lại đề xuất đã ẩn', () => del('/overview/suggestions/dismissals')],
 ];
 

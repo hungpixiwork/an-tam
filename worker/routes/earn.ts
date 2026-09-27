@@ -4,9 +4,14 @@ import type { AppEnv } from '../env';
 import { ApiError, ok, notFound } from '../lib/http';
 import { body, money } from '../lib/validate';
 import { loadUserState } from '../lib/state';
-import { currentMonth } from '../../shared/engine/month';
+import { addMonths, currentMonth, vnDate } from '../../shared/engine/month';
 import { incomeGrowthPlan, financialConnection, valueHoursSummary } from '../../shared/engine/earn';
 import type { IncomeProfile, ValueHourEntry } from '../../shared/types/domain';
+import type { EarnDashboard } from '../../shared/types/api';
+import { careerActions, careerBand, incomeSources, learningWeek, learningWindowEnd, learningWindowStart, rankOpportunities, roadmap } from '../../shared/engine/earnDashboard';
+import { loadHumanCapital, loadOpportunities, loadSkillEvents, loadSkills } from './skills';
+
+const SECTORS = ['technology', 'finance', 'real_estate', 'manufacturing', 'consumer', 'healthcare', 'education_public', 'other'] as const;
 
 const incomeProfileSchema = z.object({
   currentIncome: money.min(0).default(0),
@@ -15,6 +20,8 @@ const incomeProfileSchema = z.object({
   occupation: z.string().trim().max(100).default(''),
   hoursPerWeek: z.number().int().min(0).max(80).default(0),
   focusSkill: z.string().trim().max(100).default(''),
+  sector: z.enum(SECTORS).nullable().optional(),
+  iscoCode: z.string().regex(/^\d{1,4}$/, 'Mã nghề ISCO gồm 1–4 chữ số').nullable().optional(),
 });
 
 const activitySchema = z.object({
@@ -41,6 +48,41 @@ const timeAllocationSchema = z.object({
 }, { message: 'Tổng thời gian phân bổ không được vượt quá 168 giờ', path: ['allocations'] });
 
 export const earn = new Hono<AppEnv>()
+  /** Trang Tăng thu nhập & kỹ năng: nguồn thu (sổ thu chi tháng này, rỗng → tháng trước), cơ hội, lộ trình, tuần học, giá trị nghề. */
+  .get('/dashboard', async (c) => {
+    const db = c.env.DB;
+    const userId = c.get('userId');
+    const today = vnDate();
+    const incomeOf = (month: string) =>
+      db.prepare("SELECT category, SUM(amount) AS amount FROM transactions WHERE user_id = ? AND kind = 'income' AND occurred_on LIKE ? GROUP BY category")
+        .bind(userId, `${month}-%`)
+        .all<{ category: string; amount: number }>()
+        .then((r) => r.results);
+    let month = today.slice(0, 7);
+    const [skillList, opps, events, current] = await Promise.all([
+      loadSkills(db, userId), loadOpportunities(db), loadSkillEvents(db, userId, learningWindowStart(today), learningWindowEnd(today)), incomeOf(month),
+    ]);
+    let rows = current;
+    if (!rows.length) {
+      const prev = await incomeOf(addMonths(month, -1));
+      if (prev.length) [month, rows] = [addMonths(month, -1), prev];
+    }
+    const income = incomeSources(rows);
+    const week = learningWeek(today, events, skillList);
+    const hc = await loadHumanCapital(db, userId, income.total || null, week.doneHours);
+    const ranked = rankOpportunities(opps, skillList);
+    const freelance = opps.filter((o) => o.kind === 'freelance');
+    const data: EarnDashboard = {
+      month,
+      income,
+      opportunities: ranked.filter((o) => o.kind === 'freelance').slice(0, 3),
+      jobs: ranked.filter((o) => o.kind === 'job').slice(0, 3),
+      roadmap: roadmap(skillList, freelance),
+      week,
+      career: { ...hc, band: careerBand(hc.careerScore), actions: careerActions(hc, income.sources, skillList) },
+    };
+    return ok(c, data);
+  })
   .get('/', async (c) => {
     const userId = c.get('userId');
     const row = await c.env.DB.prepare('SELECT current_income, target_income, target_months, occupation, hours_per_week, focus_skill FROM income_profiles WHERE user_id = ?')
@@ -70,9 +112,11 @@ export const earn = new Hono<AppEnv>()
     const data = c.req.valid('json');
     
     await c.env.DB.prepare(`
-      INSERT INTO income_profiles (user_id, current_income, target_income, target_months, occupation, hours_per_week, focus_skill)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO income_profiles (user_id, current_income, target_income, target_months, occupation, hours_per_week, focus_skill, sector, isco_code)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET
+        sector = COALESCE(excluded.sector, income_profiles.sector),
+        isco_code = COALESCE(excluded.isco_code, income_profiles.isco_code),
         current_income = excluded.current_income,
         target_income = excluded.target_income,
         target_months = excluded.target_months,
@@ -80,7 +124,7 @@ export const earn = new Hono<AppEnv>()
         hours_per_week = excluded.hours_per_week,
         focus_skill = excluded.focus_skill
     `)
-      .bind(userId, data.currentIncome, data.targetIncome, data.targetMonths, data.occupation, data.hoursPerWeek, data.focusSkill)
+      .bind(userId, data.currentIncome, data.targetIncome, data.targetMonths, data.occupation, data.hoursPerWeek, data.focusSkill, data.sector ?? null, data.iscoCode ?? null)
       .run();
       
     return ok(c, data);

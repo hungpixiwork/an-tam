@@ -2,6 +2,7 @@ const messages: Record<string, string> = {
   // Danh mục thu chi
   "category.salary": "Lương",
   "category.bonus": "Thưởng",
+  "category.freelance": "Làm thêm",
   "category.business": "Kinh doanh",
   "category.invest_income": "Lãi đầu tư",
   "category.other_income": "Thu khác",
