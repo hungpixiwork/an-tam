@@ -153,11 +153,12 @@ export function WeekGrid({ days, events, startHour = 7, endHour = 22, categorySt
                     const Icon = ev.icon;
                     const label = ev.ariaLabel ?? `${typeof ev.title === 'string' ? ev.title : ''} ${ev.start}–${ev.end}`;
                     const compact = height < 40;
+                    const tight = height < 60;
                     const content = (
                       <>
                         <span className="flex min-w-0 items-start gap-1 font-semibold leading-tight text-ink">
                           {Icon && <Icon className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />}
-                          <span className={cx('min-w-0', compact ? 'truncate' : 'line-clamp-2')}>{ev.title}</span>
+                          <span className={cx('min-w-0', compact ? 'truncate' : tight ? 'line-clamp-1' : 'line-clamp-2')}>{ev.title}</span>
                         </span>
                         {!compact && <span className="mt-0.5 block text-[11px] text-ink-soft tabular-nums">{ev.start} – {ev.end}</span>}
                       </>

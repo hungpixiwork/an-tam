@@ -58,11 +58,6 @@ const IMPLEMENTED: [string, string][] = [
 ];
 
 const STUBS: [string, string][] = [
-  ['GET', '/api/calendar?week=2026-W39'],
-  ['POST', '/api/calendar/sync'],
-  ['POST', '/api/calendar/auto-schedule'],
-  ['GET', '/api/automation-rules'],
-  ['PUT', '/api/automation-rules/weekly_review'],
   ['GET', '/api/life-choices/templates'],
   ['POST', '/api/life-choices/evaluate'],
   ['POST', '/api/life-choices/compare'],
@@ -76,9 +71,6 @@ const STUBS: [string, string][] = [
   ['POST', '/api/agent/actions/a1/reject'],
   ['POST', '/api/agent/actions/a1/request-changes'],
   ['GET', '/api/audit?status=approved'],
-  ['GET', '/api/integrations'],
-  ['GET', '/api/integrations/google/connect'],
-  ['GET', '/api/integrations/google/callback'],
   ['POST', '/api/integrations/sepay/link'],
   ['DELETE', '/api/integrations/notion'],
 ];
