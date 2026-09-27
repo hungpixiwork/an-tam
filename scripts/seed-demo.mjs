@@ -157,7 +157,7 @@ function currentMonthTransactions() {
   return [
     { kind: 'income', amount: 22 * M, category: 'salary', note: 'Lương – Công ty TNHH ABC', occurredOn: day(5) },
     { kind: 'income', amount: 2_500 * K, category: 'invest_income', note: 'Lãi quỹ & cổ tức', occurredOn: day(20) },
-    { kind: 'income', amount: 4 * M, category: 'business', note: 'Dự án freelance', occurredOn: ago(1) },
+    { kind: 'income', amount: 3_650 * K, category: 'business', note: 'Dự án freelance', occurredOn: ago(1) }, // + 350k hoàn tiền qua SePay = 4tr
     e(4_280 * K, 'food', 'Đi chợ & siêu thị', day(3)),
     e(600 * K, 'food', 'Cà phê, trà sữa', day(8), 'regret'),
     e(600 * K, 'food', 'Cà phê, trà sữa', day(19), 'regret'),
@@ -166,7 +166,7 @@ function currentMonthTransactions() {
     e(600 * K, 'food', 'Đặt món qua ứng dụng', day(21), 'regret'),
     e(70 * K, 'food', 'Phở Bát Đàn', ago(0), 'useful'),
     e(3_160 * K, 'housing', 'Tiền nhà', day(1)),
-    e(2_400 * K, 'transport', 'Xăng xe & gửi xe', day(6)),
+    e(2_336 * K, 'transport', 'Xăng xe & gửi xe', day(6)), // + 64k Grab qua SePay
     e(120 * K, 'transport', 'Grab', ago(3), 'useful'),
     e(1_650 * K, 'shopping', 'Mua sắm đồ dùng', day(4), 'useful'),
     e(450 * K, 'shopping', 'Shopee', ago(2), 'useful'),
