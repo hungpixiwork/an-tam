@@ -48,6 +48,7 @@ agent-browser wait 1500 ; agent-browser screenshot --full ./.agents/pages/shots/
 - Tiếng Việt gửi API: dùng Node `fetch`, không curl inline.
 - Sidebar trông bị cụt ở ảnh full-page là bình thường (sticky), đừng sửa.
 - Viết file bằng tool Write/Edit, không dùng heredoc Bash (hỏng khi có dấu nháy đơn).
+- Trong worktree, Bash bị chặn `agent-browser eval`, `$var`, heredoc, `mklink` → chạy các lệnh đó bằng tool **PowerShell**. Tắt wrangler xong nhớ `Stop-Process -Name workerd` (tiến trình con còn sót).
 - Khi thay stub 501 bằng route thật: xóa path đó khỏi danh sách 501 trong `tests/health.test.ts`.
 - Bảng `transactions` chỉ lưu ngày (không giờ) — hiển thị "Hôm nay/Hôm qua/dd/mm/yyyy".
 
