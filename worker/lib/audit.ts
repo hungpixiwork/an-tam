@@ -135,6 +135,26 @@ export async function writeAudit(db: D1Database, entry: AuditEntry, opts: AuditO
   await batchWithAudit(db, [], entry, opts);
 }
 
+/** Thao tác ghi do chính người dùng làm (sổ thu chi, tài sản, mục tiêu, ngân sách). */
+export interface UserWrite {
+  agent: string;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  /** Câu mô tả — sẽ được che số / email trước khi ghi. */
+  summary: string;
+  dataLabel: string;
+}
+
+/** Ghi một dòng nhật ký cho thao tác của người dùng (actor 'user', người duyệt 'user'). */
+export async function auditUserWrite(env: { DB: D1Database; AUDIT_HASH_SALT?: string }, userId: string, w: UserWrite): Promise<void> {
+  await writeAudit(
+    env.DB,
+    { userId, actor: 'user', agent: w.agent, action: w.action, entityType: w.entityType, entityId: w.entityId ?? null, summaryMasked: maskSummary(w.summary), dataLabel: w.dataLabel, status: 'completed', approver: 'user' },
+    { salt: env.AUDIT_HASH_SALT },
+  );
+}
+
 /** Kiểm tra chuỗi hash của một user (rows theo thứ tự ghi — ORDER BY rowid). */
 export async function verifyAuditChain(rows: AuditRow[], opts: AuditOptions = {}): Promise<{ ok: boolean; brokenAt: string | null }> {
   let prev: string | null = null;

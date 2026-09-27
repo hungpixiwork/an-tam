@@ -55,6 +55,9 @@ const IMPLEMENTED: [string, string][] = [
   ['POST', '/api/bills/b1/paid'],
   ['GET', '/api/safety'],
   ['PUT', '/api/safety/target'],
+  ['GET', '/api/audit?status=approved'],
+  ['GET', '/api/audit/verify'],
+  ['POST', '/api/integrations/sepay/link'],
 ];
 
 const STUBS: [string, string][] = [
@@ -66,8 +69,6 @@ const STUBS: [string, string][] = [
   ['POST', '/api/agent/actions/a1/approve'],
   ['POST', '/api/agent/actions/a1/reject'],
   ['POST', '/api/agent/actions/a1/request-changes'],
-  ['GET', '/api/audit?status=approved'],
-  ['POST', '/api/integrations/sepay/link'],
   ['DELETE', '/api/integrations/notion'],
 ];
 
@@ -87,9 +88,10 @@ describe('Stub routes Wave 0', () => {
     }
   });
 
-  it('webhook SePay công khai (không 401)', async () => {
-    const res = await worker.fetch(req('/api/webhooks/sepay', { method: 'POST' }), envWith());
-    expect(res.status).toBe(501);
+  it('webhook SePay công khai: không cần phiên đăng nhập, tự kiểm tra khóa', async () => {
+    const env = { ...envWith(), SEPAY_WEBHOOK_KEY: 'k' };
+    const res = await worker.fetch(req('/api/webhooks/sepay', { method: 'POST', headers: { Authorization: 'Apikey k' }, body: '{}' }), env);
+    expect(res.status).toBe(400);
   });
 
   it('GET /api/portfolio cũ vẫn chạy bên cạnh /risk, /what-if', async () => {

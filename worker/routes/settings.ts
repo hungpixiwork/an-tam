@@ -5,6 +5,7 @@ import { ApiError, notFound, ok } from '../lib/http';
 import { hashPassword, verifyPassword } from '../lib/password';
 import { destroyOtherSessions, destroySession } from '../lib/session';
 import { loadMe } from '../lib/state';
+import { writeAudit } from '../lib/audit';
 import { body } from '../lib/validate';
 import { fullNameSchema, passwordSchema, salutationSchema } from './auth';
 
@@ -47,7 +48,7 @@ async function read(db: D1Database, userId: string): Promise<Record<Key, any>> {
 /** Bảng dữ liệu cá nhân được đưa vào bản xuất. */
 const EXPORT_TABLES = ['financial_profiles', 'holdings', 'goals', 'net_worth_snapshots', 'simulation_runs', 'habit_answers', 'transactions', 'safety_plans', 'ai_events', 'ai_alerts', 'user_settings',
   'liabilities', 'agent_runs', 'agent_steps', 'agent_actions', 'audit_log', 'calendar_events', 'automation_rules', 'suggestion_dismissals', 'life_choices',
-  'budgets', 'recurring_bills', 'split_bills'] as const;
+  'budgets', 'recurring_bills', 'split_bills', 'bank_accounts'] as const;
 
 export const settings = new Hono<AppEnv>()
   .get('/settings', async (c) => ok(c, await read(c.env.DB, c.get('userId'))))
@@ -97,6 +98,7 @@ export const settings = new Hono<AppEnv>()
       user: await loadMe(c.env.DB, userId),
       ...Object.fromEntries(EXPORT_TABLES.map((t, i) => [t, results[i].results])),
     };
+    await writeAudit(c.env.DB, { userId, actor: 'user', agent: 'privacy', action: 'privacy.export', entityType: 'user', summaryMasked: 'Tải về toàn bộ dữ liệu cá nhân (tệp JSON)', dataLabel: 'Toàn bộ dữ liệu của bạn', status: 'completed', approver: 'user' }, { salt: c.env.AUDIT_HASH_SALT });
     c.header('Content-Disposition', 'attachment; filename="an-tam-du-lieu-cua-toi.json"');
     return c.json(data);
   })

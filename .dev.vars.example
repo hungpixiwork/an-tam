@@ -16,5 +16,7 @@ NOTION_CLIENT_ID=
 NOTION_CLIENT_SECRET=
 
 # SePay: API key xác thực webhook + API token Bank Hub
+# Webhook: POST <APP_ORIGIN>/api/webhooks/sepay, SePay gửi header "Authorization: Apikey <SEPAY_WEBHOOK_KEY>".
+# Trên SePay chọn "Xác thực: API Key" và dán cùng giá trị. Máy local: chuỗi bất kỳ (scripts/seed-demo.mjs đọc từ .dev.vars).
 SEPAY_WEBHOOK_KEY=
 SEPAY_API_TOKEN=

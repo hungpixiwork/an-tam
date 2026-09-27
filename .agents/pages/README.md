@@ -12,6 +12,6 @@ Làm tuần tự bằng skill `.claude/skills/mockup-page` — xong trang N (đ�
 | 6 | Lựa chọn cuộc đời | `/lua-chon` | ✅ 2026-09-28 | (xem git log `feat(page-6)`) |
 | 7 | Danh mục & rủi ro tập trung | `/danh-muc` | ✅ 2026-09-28 | nhánh worktree |
 | 8 | AI Workspace | `/ai-workspace` | 📐 | |
-| 9 | Nhật ký AI & quyền riêng tư | `/nhat-ky-ai` | 📐 | |
+| 9 | Nhật ký AI & quyền riêng tư | `/nhat-ky-ai` | ✅ 2026-09-28 | nhánh worktree (`feat(page-9)`) |
 
 Ảnh các vòng đối chiếu: `shots/0N-r<k>.png`. Đặc tả + luồng dữ liệu + bảng lệch từng vòng: `0N-<slug>.md`.

@@ -78,9 +78,24 @@ export interface AutomationRule { key: AutomationRuleKey; enabled: boolean; requ
 export interface IntegrationInfo {
   provider: 'google' | 'notion' | 'sepay';
   configured: boolean;
-  status: GoogleSyncStatus;
+  /** 'pending' = ngân hàng đã liên kết, chờ xác thực bằng giao dịch đầu tiên. */
+  status: GoogleSyncStatus | 'pending';
   scopes: string[];
   lastSyncedAt: string | null;
   lastError: string | null;
   connectedAt: string | null;
+  /** Chỉ với provider 'sepay'. */
+  bank?: BankLink | null;
+}
+
+export interface BankLink {
+  id: string;
+  bankCode: string;
+  /** "•••• 6789" — không bao giờ trả số tài khoản đầy đủ. */
+  accountMasked: string;
+  status: 'pending' | 'active' | 'revoked';
+  verifiedAt: string | null;
+  lastEventAt: string | null;
+  /** Số giao dịch đã nhận qua webhook. */
+  events: number;
 }

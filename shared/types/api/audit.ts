@@ -47,4 +47,15 @@ export interface AuditLogItem {
 export interface AuditPage {
   items: AuditLogItem[];
   nextCursor: string | null;
+  /** Các tác nhân đã từng xuất hiện trong nhật ký (cho bộ lọc). */
+  agents: string[];
+}
+
+/** Kết quả kiểm tra chuỗi hash của nhật ký. */
+export interface AuditVerify {
+  ok: boolean;
+  count: number;
+  brokenAt: string | null;
+  lastAt: string | null;
+  checkedAt: string;
 }

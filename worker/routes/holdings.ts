@@ -5,6 +5,7 @@ import { holdingDefaults } from '../../shared/engine/ledger';
 import { defaultInPortfolio, totalValue } from '../../shared/engine/portfolio';
 import { formatVnd } from '../../shared/format';
 import { notFound, ok } from '../lib/http';
+import { auditUserWrite } from '../lib/audit';
 import { afterChange } from '../lib/refresh';
 import { loadUserState, type LoadedState } from '../lib/state';
 import { body, money } from '../lib/validate';
@@ -39,6 +40,10 @@ export function insertHolding(db: D1Database, userId: string, h: HoldingInput) {
 
 const b01 = (v: boolean | undefined) => (v === undefined ? undefined : v ? 1 : 0);
 
+const CATEGORY_LABEL: Record<string, string> = { cash: 'tiền mặt / tiết kiệm', fund: 'quỹ', stock: 'cổ phiếu', bond: 'trái phiếu', other: 'tài sản khác' };
+const holdingAudit = (action: 'create' | 'update' | 'delete', summary: string, id: string | null) =>
+  ({ agent: 'portfolio', action: `holding.${action}`, entityType: 'holding', entityId: id, summary, dataLabel: 'Dữ liệu tài sản (đã ẩn danh)' });
+
 const totalLine = (s: LoadedState) => `Tổng tài sản: ${formatVnd(totalValue(s.holdings))}.`;
 
 export const holdings = new Hono<AppEnv>()
@@ -49,6 +54,7 @@ export const holdings = new Hono<AppEnv>()
     const before = await loadUserState(c.env.DB, userId);
     await insertHolding(c.env.DB, userId, h).run();
     await afterChange(c.env.DB, userId, { title: 'Cập nhật tài sản', detail: totalLine, before });
+    await auditUserWrite(c.env, userId, holdingAudit('create', `Thêm tài sản loại ${CATEGORY_LABEL[h.category]}`, null));
     return ok(c, null, 201);
   })
   .patch('/:id', body(holdingSchema.partial()), async (c) => {
@@ -75,6 +81,7 @@ export const holdings = new Hono<AppEnv>()
       .run();
     if (!res.meta.changes) throw notFound('Không tìm thấy tài sản');
     await afterChange(c.env.DB, userId, { title: 'Cập nhật tài sản', detail: totalLine, before });
+    await auditUserWrite(c.env, userId, holdingAudit('update', 'Cập nhật thông tin tài sản', c.req.param('id')));
     return ok(c, null);
   })
   .delete('/:id', async (c) => {
@@ -83,5 +90,6 @@ export const holdings = new Hono<AppEnv>()
     const res = await c.env.DB.prepare('DELETE FROM holdings WHERE id = ? AND user_id = ?').bind(c.req.param('id'), userId).run();
     if (!res.meta.changes) throw notFound('Không tìm thấy tài sản');
     await afterChange(c.env.DB, userId, { title: 'Cập nhật tài sản', detail: totalLine, before });
+    await auditUserWrite(c.env, userId, holdingAudit('delete', 'Xóa một tài sản', c.req.param('id')));
     return ok(c, null);
   });
