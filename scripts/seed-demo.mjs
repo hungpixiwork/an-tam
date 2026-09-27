@@ -359,6 +359,46 @@ async function skills() {
   }
 }
 
+/* ───────── 10. Ngân hàng SePay + nhật ký AI (trang 9) ───────── */
+// Khóa webhook: biến môi trường SEPAY_WEBHOOK_KEY hoặc dòng SEPAY_WEBHOOK_KEY=… trong .dev.vars
+async function sepayKey() {
+  if (process.env.SEPAY_WEBHOOK_KEY) return process.env.SEPAY_WEBHOOK_KEY;
+  const { readFile } = await import('node:fs/promises');
+  const vars = await readFile(new URL('../.dev.vars', import.meta.url), 'utf8').catch(() => '');
+  return /^SEPAY_WEBHOOK_KEY=(.*)$/m.exec(vars)?.[1]?.trim() ?? '';
+}
+
+const DEMO_ACCOUNT = '0071000886789';
+
+async function bankAndAudit() {
+  // Liên kết tài khoản (chờ xác thực) → ngân hàng gửi 2 giao dịch qua webhook có ký khóa → nhật ký ghi lại
+  await post('/integrations/sepay/link', { bankCode: 'VCB', accountNumber: DEMO_ACCOUNT });
+  const key = await sepayKey();
+  if (!key) throw new Error('Thiếu SEPAY_WEBHOOK_KEY (.dev.vars)');
+  const yesterday = new Date(Date.parse(`${today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  const run = Date.now();
+  const events = [
+    { id: run, transactionDate: `${yesterday} 18:42:10`, content: 'GRAB thanh toan chuyen di', transferType: 'out', transferAmount: 64 * K },
+    { id: run + 1, transactionDate: `${today} 08:12:30`, content: 'Hoan tien bao hiem suc khoe', transferType: 'in', transferAmount: 350 * K },
+  ];
+  for (const e of events) {
+    const res = await fetch(`${API}/api/webhooks/sepay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Apikey ${key}` },
+      body: JSON.stringify({ gateway: 'Vietcombank', accountNumber: DEMO_ACCOUNT, code: null, accumulated: 0, subAccount: null, referenceCode: `FT${e.id}`, description: e.content, ...e }),
+    });
+    if (!res.ok) throw new Error(`POST /webhooks/sepay → ${res.status}`);
+  }
+  // Vài thao tác thật để nhật ký có đủ loại tác nhân
+  await put(`/budgets/${thisMonth}`, { limit: 31 * M });
+  const fund = (await get('/goals/summary')).goals.find((g) => g.title === 'Quỹ dự phòng');
+  if (fund) await patch(`/goals/${fund.id}`, { monthlyContribution: 4 * M });
+  const exp = await fetch(`${API}/api/me/export`, { headers: { Cookie: cookie } });
+  if (!exp.ok) throw new Error(`GET /me/export → ${exp.status}`);
+  const chain = await get('/audit/verify');
+  if (!chain.ok) throw new Error('Chuỗi hash nhật ký bị đứt');
+}
+
 /* ───────── Chạy ───────── */
 const steps = [
   ['Tài khoản', login],
@@ -373,6 +413,7 @@ const steps = [
   ['Lựa chọn cuộc đời', lifeChoices],
   ['Kỹ năng & kế hoạch học', skills],
   ['Hiện lại đề xuất đã ẩn', () => del('/overview/suggestions/dismissals')],
+  ['Ngân hàng SePay & nhật ký AI', bankAndAudit],
 ];
 
 try {

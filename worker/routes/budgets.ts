@@ -9,6 +9,7 @@ import { budgetStatus } from '../../shared/engine/budget';
 import { addMonths } from '../../shared/engine/month';
 import { formatMonth, formatVndFull } from '../../shared/format';
 import { ApiError, ok } from '../lib/http';
+import { auditUserWrite } from '../lib/audit';
 import { afterChange } from '../lib/refresh';
 import { body, money, monthString } from '../lib/validate';
 
@@ -49,5 +50,6 @@ export const budgets = new Hono<AppEnv>()
       .bind(userId, month, limit)
       .run();
     await afterChange(c.env.DB, userId, { title: 'Đặt ngân sách tháng', detail: `${formatMonth(month)}: ngân sách chi ${formatVndFull(limit)}.` });
+    await auditUserWrite(c.env, userId, { agent: 'cashflow', action: 'budget.set', entityType: 'budget', entityId: month, summary: 'Đặt ngân sách chi tiêu tháng', dataLabel: 'Thu nhập, chi tiêu (đã ẩn danh)' });
     return ok(c, await loadBudget(c.env.DB, userId, month));
   });

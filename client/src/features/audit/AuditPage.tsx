@@ -1,22 +1,27 @@
-import { Construction } from 'lucide-react';
-import { useLocale } from '@/app/locale';
-import { EmptyState, HeroBanner } from '@/components/ui';
+// Trang 9 — Nhật ký AI, kiểm toán & quyền riêng tư (mockup 9).
+// Dữ liệu: GET /api/audit (+ /verify), /api/integrations, /api/health, /api/me/export, DELETE /api/me.
+// Neo #integrations / #privacy dùng cho link ở Topbar.
 
-/** Placeholder Wave 0 — Nhật ký AI (gộp AI theo dõi) dựng ở Wave 3. Neo #integrations / #privacy dùng cho link ở Topbar. */
+import { AuditHero } from './AuditHero';
+import { AuditLogCard } from './AuditLogCard';
+import { PrivacyCard } from './PrivacyCard';
+import { IntegrationsCard } from './IntegrationsCard';
+import { SystemStatusCard } from './SystemStatusCard';
+
+const ROW = 'grid grid-cols-1 gap-3.5 xl:grid-cols-[minmax(0,978fr)_minmax(340px,420fr)]';
+
 export default function AuditPage() {
-  const { t } = useLocale();
   return (
-    <div className="space-y-4">
-      <HeroBanner
-        title={t('audit.hero.title')}
-        subtitle={t('audit.hero.subtitle')}
-        quote={t('audit.hero.quote')}
-        image="/hero-lake-city.jpg"
-        imageAlt={t('audit.hero.image_alt')}
-      />
-      <div id="integrations" className="scroll-mt-24" />
-      <div id="privacy" className="scroll-mt-24" />
-      <EmptyState icon={Construction} tone="green" title={t('common.under_construction')} body={t('common.under_construction_body')} />
+    <div className="space-y-3.5">
+      <AuditHero />
+      <div className={ROW}>
+        <AuditLogCard />
+        <PrivacyCard />
+      </div>
+      <div className={ROW}>
+        <IntegrationsCard />
+        <SystemStatusCard />
+      </div>
     </div>
   );
 }

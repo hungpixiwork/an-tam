@@ -7,6 +7,7 @@ import { categoryOf, TRANSACTION_CATEGORIES } from '../../shared/engine/ledger';
 import { addMonths, currentMonth } from '../../shared/engine/month';
 import { formatMonth, formatVnd } from '../../shared/format';
 import { ApiError, notFound, ok } from '../lib/http';
+import { auditUserWrite } from '../lib/audit';
 import { afterChange } from '../lib/refresh';
 import { loadUserState, type LoadedState } from '../lib/state';
 import { body, dateString, money, monthString } from '../lib/validate';
@@ -40,6 +41,16 @@ interface Row {
   occurred_on: string;
   value_tag: string | null;
 }
+
+/** Dòng nhật ký cho thao tác sổ thu chi — chỉ ghi loại và danh mục, không ghi số tiền / ghi chú. */
+const txAudit = (action: 'create' | 'update' | 'delete', kind: string, category: string, id: string) => ({
+  agent: 'cashflow',
+  action: `transaction.${action}`,
+  entityType: 'transaction',
+  entityId: id,
+  summary: `${{ create: 'Thêm', update: 'Sửa', delete: 'Xóa' }[action]} khoản ${kind === 'income' ? 'thu' : 'chi'}: ${categoryOf(category)?.label ?? category}`,
+  dataLabel: 'Dữ liệu giao dịch (đã ẩn danh)',
+});
 
 const toTransaction = (r: Row): Transaction => ({ id: r.id, kind: r.kind, amount: r.amount, category: r.category, note: r.note, occurredOn: r.occurred_on, valueTag: (r.value_tag as any) || undefined });
 
@@ -103,6 +114,7 @@ export const transactions = new Hono<AppEnv>()
       .bind(id, userId, t.kind, t.amount, t.category, t.note, t.occurredOn, t.valueTag ?? null)
       .run();
     await afterChange(c.env.DB, userId, { title: 'Cập nhật sổ thu chi', detail: monthLine(t.occurredOn.slice(0, 7)), before });
+    await auditUserWrite(c.env, userId, txAudit('create', t.kind, t.category, id));
     return ok(c, { id }, 201);
   })
   .patch('/:id', body(transactionSchema), async (c) => {
@@ -115,16 +127,18 @@ export const transactions = new Hono<AppEnv>()
       .run();
     if (!res.meta.changes) throw notFound('Không tìm thấy giao dịch');
     await afterChange(c.env.DB, userId, { title: 'Cập nhật sổ thu chi', detail: monthLine(t.occurredOn.slice(0, 7)), before });
+    await auditUserWrite(c.env, userId, txAudit('update', t.kind, t.category, c.req.param('id')));
     return ok(c, null);
   })
   .delete('/:id', async (c) => {
     const userId = c.get('userId');
-    const row = await c.env.DB.prepare('SELECT occurred_on FROM transactions WHERE id = ? AND user_id = ?')
+    const row = await c.env.DB.prepare('SELECT occurred_on, kind, category FROM transactions WHERE id = ? AND user_id = ?')
       .bind(c.req.param('id'), userId)
-      .first<{ occurred_on: string }>();
+      .first<{ occurred_on: string; kind: string; category: string }>();
     if (!row) throw notFound('Không tìm thấy giao dịch');
     const before = await loadUserState(c.env.DB, userId);
     await c.env.DB.prepare('DELETE FROM transactions WHERE id = ? AND user_id = ?').bind(c.req.param('id'), userId).run();
     await afterChange(c.env.DB, userId, { title: 'Cập nhật sổ thu chi', detail: monthLine(row.occurred_on.slice(0, 7)), before });
+    await auditUserWrite(c.env, userId, txAudit('delete', row.kind, row.category, c.req.param('id')));
     return ok(c, null);
   });
