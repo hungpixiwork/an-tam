@@ -23,11 +23,31 @@ Tham chiếu:
 
 ## Quy trình
 
-### Bước 0 — Môi trường
-- Worker: `npm run worker:dev` (cổng 8787), client: `npm run dev` (cổng 5173). Kiểm tra `curl -s localhost:8787/api/health` trước; chỉ khởi động nếu chưa chạy (chạy nền).
-- Migration local: `npm run db:migrate`.
-- Dữ liệu demo: `node scripts/seed-demo.mjs` (tạo/cập nhật tài khoản `hung.demo@antam.vn` / `demo12345` qua API thật; chạy lại nhiều lần không bị trùng).
-- Trình duyệt: dùng `agent-browser` (giữ phiên, không đóng/mở lại). Đăng nhập tài khoản demo, đặt `localStorage.antam_locale='vi'`.
+### Bước 0 — Môi trường (làm nhanh, đừng dò lại)
+Chạy đúng khối này, không tự tìm hiểu lại cách khởi động:
+```bash
+curl -s localhost:8787/api/health | head -c 60; curl -s -o /dev/null -w " vite:%{http_code}\n" localhost:5173
+# Nếu worker down: npm run worker:dev (run_in_background) ; nếu vite down: npm run dev (run_in_background)
+npm run db:migrate        # sau khi thêm migration
+node scripts/seed-demo.mjs   # in 1 dòng tóm tắt số liệu cuối — dùng để so với mockup
+```
+Đăng nhập + chụp (agent-browser giữ phiên; thường đã đăng nhập sẵn):
+```bash
+agent-browser set viewport 1672 941
+agent-browser open http://localhost:5173/dang-nhap   # chỉ khi bị đẩy về trang đăng nhập
+agent-browser snapshot -i -c                          # lấy ref ô Email/Mật khẩu/nút
+agent-browser fill @eX hung.demo@antam.vn ; agent-browser fill @eY demo12345 ; agent-browser click @eZ
+agent-browser eval "localStorage.setItem('antam_locale','vi'); location.href='<route>'; 1"
+agent-browser wait 1500 ; agent-browser screenshot --full .agents/pages/shots/0N-r<k>.png
+```
+- Tiếng Việt trong JSON gửi API: dùng Node `fetch` (UTF-8). Không dùng curl inline trên Git Bash (hỏng dấu).
+- Ảnh chụp cả trang: sidebar `sticky h-screen` trông như bị cụt ở ~941px — đó là giới hạn của ảnh full-page, **không phải lỗi**, đừng sửa.
+
+### Đã có sẵn từ các trang trước — dùng lại, không viết lại
+- **Seed** `scripts/seed-demo.mjs`: có sẵn `get/post/put/patch/del`, `M`/`K` (triệu/nghìn), `thisMonth`, `today`, `addMonths`, sổ thu chi 6 tháng, tài sản + nợ, mục tiêu, lịch hôm nay, lựa chọn cuộc đời. Trang mới: **thêm 1 hàm** (xóa dữ liệu cũ của phần đó rồi ghi lại) và thêm vào mảng `steps`; mở rộng dòng tóm tắt cuối nếu cần.
+- **Backend đã có**: `calendar_events` + `automation_rules` (migration 0013, route `worker/routes/calendar.ts` có CRUD events), `life_choices` + options/prereqs/tasks (0014, `worker/routes/lifeChoices.ts` CRUD), `/api/liabilities`, `suggestion_dismissals`. Engine: `suggestions.ts`, `resources.ts`, `lifeChoice.ts`, `peace.ts` (`peaceScoreAsOf`), `overview.ts` (`netWorthBreakdown`, `monthCashflow`), `shared/data/peer-benchmarks.ts`. Mở rộng các file này thay vì tạo song song.
+- **Số migration**: 0010 (sổ thu chi/ngân sách/hóa đơn), 0011 (kỹ năng/cơ hội), 0012 (tích hợp) còn trống cho đúng domain; domain khác dùng 0015 trở đi.
+- **Mẫu trang**: `client/src/features/overview/` (tách mỗi hàng/khối 1 file: `KpiRow`, `SuggestionsCard`, `TodayCalendarCard`, `BottomRow`) — làm theo cách tách này. UI kit có thêm `MiniBars`, `TONE_HEX`.
 
 ### Bước 1 — Đọc mockup & viết đặc tả trang
 - `Read` ảnh mockup của trang N (đường dẫn trong pages.md). Xem kỹ từng khối.
@@ -43,7 +63,9 @@ Cho mỗi khối: `khối → hook (client/src/lib/queries/<domain>.ts) → endp
 Thứ tự: migration (nếu cần, số tiếp theo, mỗi domain 1 file) → engine thuần → route (file route đã được mount sẵn trong `worker/index.ts`; thay stub 501) → types `shared/types/api/<domain>.ts` → hooks → component trang (`client/src/features/<feature>/`) → i18n namespace. Trang cũ bị gộp (xem pages.md) thì chuyển phần còn dùng vào trang mới và xóa file cũ khi không còn ai import.
 
 ### Bước 4 — Dữ liệu demo qua API thật
-Bổ sung vào `scripts/seed-demo.mjs` (Node ≥18, dùng `fetch` + cookie `at_session`): gọi đúng các endpoint ghi của trang này để tạo dữ liệu khớp số liệu mockup (xem pages.md). Script phải idempotent (xóa/ghi đè dữ liệu cũ của tài khoản demo trước khi ghi). Chạy lại script.
+Bổ sung vào `scripts/seed-demo.mjs`: gọi đúng các endpoint ghi của trang này. Script phải idempotent. Chạy lại script.
+- **Chỉnh đầu vào seed để số tính ra gần mockup** (vd điểm, %, số tháng). Tuyệt đối không ép số trong UI/engine cho khớp. Nếu số tính ra khác mockup nhưng hợp lý với nhân vật (vd điểm 60 "Khá" vì quỹ mới 4,2 tháng), giữ và ghi lý do.
+- Không phá dữ liệu mà trang trước đã seed (chỉ xóa phần của domain mình).
 
 ### Bước 5 — Vòng đối chiếu hình (tối thiểu 3 vòng, tối đa 6)
 Mỗi vòng `k`:
@@ -51,7 +73,9 @@ Mỗi vòng `k`:
 2. `agent-browser screenshot --full .agents/pages/shots/0N-r<k>.png`.
 3. `Read` ảnh chụp **và** ảnh mockup, so từng khối theo thứ tự trên → dưới, trái → phải. Ghi bảng vào file đặc tả, mục "Vòng k":
    | Khối | Mockup | Hiện tại | Lệch (bố cục / khoảng cách / cỡ chữ / màu / icon / chữ / số liệu) | Sửa |
-4. Sửa hết các dòng lệch, rồi sang vòng tiếp.
+4. Sửa hết các dòng lệch **gộp trong 1 lượt** (không chụp lại sau từng sửa nhỏ), rồi sang vòng tiếp.
+- Giữa các vòng chỉ chạy `npm run typecheck` (nhanh); để test + build cho bước 7.
+- Ưu tiên theo thứ tự: bố cục/chia cột → đủ khối & chữ → số liệu → khoảng cách/cỡ chữ → màu/icon.
 - Sau vòng cuối: kiểm tra tràn ngang ở 1440, 1024, 390 bằng `agent-browser set viewport <w> <h>` + `eval "document.documentElement.scrollWidth > innerWidth"`, và chữ không bị cắt/nút không xuống dòng xấu.
 
 ### Bước 6 — Kiểm tra tính năng thật
@@ -60,7 +84,9 @@ Bằng `agent-browser`, làm ít nhất 1 hành động chính của trang như 
 ### Bước 7 — Cổng chất lượng & commit
 - `npm run typecheck && npm test && npm run build` phải xanh; `npm --prefix client run lint` không lỗi mới.
 - Commit: `feat(page-N): <tên trang> khớp mockup + dữ liệu thật` với trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Không stage file ngoài phạm vi (không đụng `.docx`, `package.json` trừ khi thật cần).
-- Cập nhật trạng thái trang trong `.agents/pages/README.md` (✅ + ngày + commit).
+- Cập nhật trạng thái trang trong `.agents/pages/README.md` (✅ + ngày + commit) **trong cùng commit**.
+- Chỉ commit ảnh vòng cuối; xóa các ảnh `0N-r1..r(k-1).png` sau khi xong.
+- File đặc tả `.agents/pages/0N-*.md` giữ gọn (≤120 dòng): lưới, khối, luồng dữ liệu, bảng lệch từng vòng.
 
 ## Tiêu chí chín (tất cả phải đạt mới qua trang)
 - [ ] Đủ mọi khối trong mockup, đúng thứ tự và chia cột ở 1672px; ảnh vòng cuối gần như trùng mockup về bố cục.
