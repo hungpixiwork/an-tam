@@ -268,15 +268,25 @@ async function calendar() {
 /* ───────── 8. Lựa chọn cuộc đời ───────── */
 async function lifeChoices() {
   for (const c of await get('/life-choices')) await del(`/life-choices/${c.id}`);
-  await post('/life-choices', {
-    title: 'Học thạc sĩ Quản trị Kinh doanh (MBA)',
-    description: 'Mở rộng cơ hội nghề nghiệp, tăng thu nhập dài hạn.',
+  // Tạo từ mẫu "study": 2 phương án (nghỉ hẳn 12 tháng / vừa học vừa làm 24 tháng), 6 điều kiện, 5 việc cần làm
+  const { id } = await post('/life-choices', {
+    template: 'study',
+    title: 'Nghỉ việc 12 tháng để học thạc sĩ',
+    description:
+      'Bạn đang cân nhắc tạm dừng công việc hiện tại trong 12 tháng để theo chương trình thạc sĩ, nhằm nâng cao chuyên môn và mở rộng cơ hội nghề nghiệp trong tương lai.',
     icon: 'graduation-cap',
     cost: 300 * M,
+    incomeUpliftPct: 30,
     steps: ['Tìm hiểu', 'Chuẩn bị tài chính', 'Ứng tuyển', 'Bắt đầu học'],
     currentStep: 2,
     pinned: true,
   });
+  // Điều kiện đã xong: 4 điều kiện tick tay (+ "quỹ ≥ 12 tháng" tự kiểm tra) → 5/6; còn thiếu nguồn thu nhập phụ
+  const detail = await get(`/life-choices/${id}`);
+  for (const p of detail.prereqs) if (!p.autoKey && !p.title.startsWith('Có nguồn thu nhập phụ')) await patch(`/life-choices/${id}/prereqs/${p.id}`, { done: true });
+  // Việc cần làm: số tiền cụ thể theo tình huống
+  const [first] = detail.tasks;
+  if (first) await patch(`/life-choices/${id}/tasks/${first.id}`, { detail: 'Bổ sung thêm 4 tháng chi phí sinh hoạt (~80.000.000đ) trong 6 tháng tới.' });
 }
 
 /* ───────── 9. Kỹ năng đang học + kế hoạch học 7 ngày (trang Tăng thu nhập) ───────── */
