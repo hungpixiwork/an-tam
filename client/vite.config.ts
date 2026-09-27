@@ -76,7 +76,7 @@ export default defineConfig({
     // Cho phép import code dùng chung ở ../shared
     fs: { allow: ['..'] },
     // API chạy bằng `wrangler dev` ở cổng 8787
-    proxy: { '/api': 'http://localhost:8787' },
+    proxy: { '/api': `http://localhost:${process.env.API_PORT ?? 8787}` },
   },
   build: {
     manifest: true,
