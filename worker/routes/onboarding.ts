@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { AppEnv } from '../env';
 import type { OnboardingResult } from '../../shared/types/api';
 import { evaluateAlerts } from '../../shared/engine/alerts';
+import { allocateSavings, targetPortfolio } from '../../shared/engine/allocation';
 import { setupStatus } from '../../shared/engine/overview';
 import { peaceScore } from '../../shared/engine/peace';
 import { totalValue } from '../../shared/engine/portfolio';
@@ -47,10 +48,18 @@ export const onboarding = new Hono<AppEnv>().post('/', body(onboardingSchema), a
       `AI đã đọc ${s.holdings.length} khoản tài sản (${formatVnd(totalValue(s.holdings))}) và ${s.goals.length} mục tiêu, sẽ theo dõi mỗi ngày.`,
   });
   const peace = peaceScore(state);
+  const plan = allocateSavings(state);
+  const top = [...plan.items].filter((i) => i.kind !== 'debt').sort((a, b) => Number(a.kind === 'emergency') - Number(b.kind === 'emergency') || (state.goals.find((g) => g.id === b.goalId)?.targetAmount ?? 0) - (state.goals.find((g) => g.id === a.goalId)?.targetAmount ?? 0))[0];
   return ok<OnboardingResult>(c, {
     me: { ...me, onboarded: true },
     peace: { score: peace.score, label: peace.label, level: peace.level },
     alerts: evaluateAlerts(state).map((a) => ({ severity: a.severity, title: a.title })),
     setup: setupStatus(state),
+    allocation: {
+      capacity: plan.capacity,
+      savings: plan.items.filter((i) => i.required > 0 || i.suggested > 0).slice(0, 3),
+      mix: targetPortfolio(state).target,
+      topGoal: top ? { title: top.title, probability: top.probabilityAfter ?? 0 } : null,
+    },
   });
 });

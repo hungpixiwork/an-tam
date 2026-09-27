@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ArrowRight, CalendarDays, MoreVertical, Plus } from 'lucide-react';
-import type { SafetyData, SafetyGoalItem } from '@shared/types/api';
+import type { SafetyData, SafetyGoalItem, SavingsItem, SavingsPlan } from '@shared/types/api';
 import type { Goal, GoalHorizon } from '@shared/types/domain';
 import { formatVndFull } from '@shared/format';
 import { Badge, Button, ProgressBar, TONE_EXT, Tabs, cx, type ExtTone } from '@/components/ui';
@@ -53,7 +53,16 @@ function GoalMenu({ goal, onEdit }: { goal: Goal; onEdit: () => void }) {
   );
 }
 
-function GoalCardView({ item, onEdit }: { item: SafetyGoalItem; onEdit: () => void }) {
+/** Một dòng nhỏ dưới thanh tiến độ: số nên để mỗi tháng theo kế hoạch chia tiền để dành. */
+function PlanLine({ plan }: { plan: SavingsItem }) {
+  const { t } = useLocale();
+  const cls = 'mt-1 truncate text-[12px] font-semibold leading-[14px]';
+  if (plan.status === 'thieu') return <p className={cx(cls, 'text-amber-600')}>{t('safety.alloc.line_short', { amount: formatVndFull(plan.required - plan.suggested) })}</p>;
+  if (plan.status === 'du_du') return <p className={cx(cls, 'text-success-700')}>{t('safety.alloc.line_done')}</p>;
+  return <p className={cx(cls, 'text-success-700')}>{t('safety.alloc.line_ok', { amount: formatVndFull(plan.suggested) })}</p>;
+}
+
+function GoalCardView({ item, plan, onEdit }: { item: SafetyGoalItem; plan?: SavingsItem; onEdit: () => void }) {
   const { t } = useLocale();
   const { goal } = item;
   const look = goalLook(goal);
@@ -78,14 +87,15 @@ function GoalCardView({ item, onEdit }: { item: SafetyGoalItem; onEdit: () => vo
           )}
         </div>
       </div>
-      <div className="mt-3 flex items-baseline justify-between gap-2">
+      <div className={cx('flex items-baseline justify-between gap-2', plan ? 'mt-2' : 'mt-3')}>
         <p className="truncate text-[13px] text-ink-soft tabular-nums">
           <span className="text-[15px] font-extrabold text-ink">{formatVndFull(goal.currentAmount)}</span> / {formatVndFull(goal.targetAmount)}
         </p>
         <span className="text-[13px] font-bold tabular-nums" style={{ color: look.hex }}>{pct}%</span>
       </div>
       <ProgressBar value={item.progress} color={look.hex} className="mt-2" label={goal.title} />
-      <div className="mt-3 flex items-center justify-between border-t border-line pt-2.5 text-[12.5px]">
+      {plan && <PlanLine plan={plan} />}
+      <div className={cx('flex items-center justify-between border-t border-line text-[12.5px]', plan ? 'mt-2 pt-2' : 'mt-3 pt-2.5')}>
         <span className="inline-flex items-center gap-1.5 text-ink-soft">
           <CalendarDays className="h-4 w-4" aria-hidden />
           {item.monthsLeft > 0 ? t('safety.goals.left', { n: item.monthsLeft }) : t('safety.goals.due')}
@@ -99,7 +109,7 @@ function GoalCardView({ item, onEdit }: { item: SafetyGoalItem; onEdit: () => vo
   );
 }
 
-export function GoalsSection({ data, onEdit, onAdd }: { data: SafetyData; onEdit: (goal: Goal) => void; onAdd: () => void }) {
+export function GoalsSection({ data, plan, onEdit, onAdd, onPlan }: { data: SafetyData; plan?: SavingsPlan; onEdit: (goal: Goal) => void; onAdd: () => void; onPlan: () => void }) {
   const { t } = useLocale();
   const [filter, setFilter] = useState<Filter>('all');
   const items = data.goals.filter((g) => filter === 'all' || g.horizon === filter);
@@ -115,6 +125,12 @@ export function GoalsSection({ data, onEdit, onAdd }: { data: SafetyData; onEdit
             className="border-b-0"
             items={(['all', 'short', 'mid', 'long'] as const).map((k) => ({ key: k, label: t(`safety.goals.tab.${k}`), count: data.counts[k] }))}
           />
+          {plan && (
+            <button type="button" onClick={onPlan} className="inline-flex items-center gap-1 whitespace-nowrap text-[13px] font-semibold text-accent-600 hover:text-accent-700 hover:underline">
+              {t('safety.alloc.open')}
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          )}
           <Button variant="soft" size="sm" icon={Plus} onClick={onAdd}>
             {t('safety.goals.add')}
           </Button>
@@ -125,7 +141,7 @@ export function GoalsSection({ data, onEdit, onAdd }: { data: SafetyData; onEdit
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {items.map((item) => (
-            <GoalCardView key={item.goal.id} item={item} onEdit={() => onEdit(item.goal)} />
+            <GoalCardView key={item.goal.id} item={item} plan={plan?.items.find((p) => p.goalId === item.goal.id)} onEdit={() => onEdit(item.goal)} />
           ))}
         </div>
       )}

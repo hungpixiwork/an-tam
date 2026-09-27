@@ -39,7 +39,8 @@ export const goals = new Hono<AppEnv>()
     await afterChange(c.env.DB, userId, { title: 'Thêm mục tiêu', detail: `Mục tiêu "${g.title}" ${formatVnd(g.targetAmount)}.`, before });
     return ok(c, null, 201);
   })
-  .patch('/:id', body(goalSchema.partial()), async (c) => {
+  // partial() vẫn giữ .default(2) của priority → sửa mục tiêu sẽ reset mức ưu tiên; ghi đè thành optional
+  .patch('/:id', body(goalSchema.partial().extend({ priority: z.number().int().min(1).max(3).optional() })), async (c) => {
     const g = c.req.valid('json');
     const userId = c.get('userId');
     const cols: Record<string, unknown> = {
