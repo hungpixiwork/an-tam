@@ -52,7 +52,7 @@ Mỗi cam kết đi kèm **bằng chứng trong mã nguồn** (✅) hoặc **đ�
 
 ## 📂 HỆ THỐNG TÀI LIỆU QUẢN TRỊ DỰ ÁN (SSOT DIRECTORY)
 
-Tài liệu hiện hành được quản lý tập trung trong thư mục `.agents/` (thư mục `docs/` là tài liệu giai đoạn trước, chỉ để tham khảo):
+Tài liệu hiện hành được quản lý tập trung trong thư mục `.agents/`:
 
 - ⚖️ [Báo cáo thẩm định tiền nộp bài](.agents/judge-review.md): Đối chiếu Claim ↔ Evidence, 5 phần phản biện của Ban Giám Khảo và Top 5 câu hỏi Q&A.
 - 📋 [BA & Product Specs (SSOT)](.agents/specs/ba.md): Đặc tả nghiệp vụ, mô hình toán, data model và API contract khớp mã nguồn.
