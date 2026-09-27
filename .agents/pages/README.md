@@ -4,7 +4,7 @@ Làm tuần tự bằng skill `.claude/skills/mockup-page` — xong trang N (đ�
 
 | N | Trang | Route | Trạng thái | Commit |
 |---|-------|-------|-----------|--------|
-| 1 | Tổng quan | `/` | ⏳ đang làm | |
+| 1 | Tổng quan | `/` | ✅ 2026-09-27 | `7f81da9` |
 | 2 | Sổ thu chi & dòng tiền | `/thu-chi` | 📐 | |
 | 3 | Quỹ an toàn & mục tiêu | `/quy-an-toan` | 📐 | |
 | 4 | Tăng thu nhập & kỹ năng | `/tang-thu-nhap` | 📐 | |
