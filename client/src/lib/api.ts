@@ -13,13 +13,13 @@ export class ApiError extends Error {
 /** Thân request: object hoặc mảng, gửi dạng JSON. */
 type Json = object;
 
-async function request<T>(method: string, path: string, body?: Json): Promise<T> {
+async function request<T>(method: string, path: string, body?: Json, extraHeaders?: Record<string, string>): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
       method,
       credentials: 'same-origin',
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...extraHeaders },
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
@@ -39,7 +39,7 @@ async function request<T>(method: string, path: string, body?: Json): Promise<T>
 
 export const api = {
   get: <T>(path: string) => request<T>('GET', path),
-  post: <T>(path: string, body?: Json) => request<T>('POST', path, body),
+  post: <T>(path: string, body?: Json, headers?: Record<string, string>) => request<T>('POST', path, body, headers),
   put: <T>(path: string, body?: Json) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: Json) => request<T>('PATCH', path, body),
   del: <T>(path: string) => request<T>('DELETE', path),

@@ -190,17 +190,68 @@ async function earn() {
   }
 }
 
-/* ───────── 7. Lịch hôm nay ───────── */
-const EVENTS = [
-  { title: 'Xem lại chi tiêu tuần qua', note: 'Cùng An Tâm AI', category: 'finance', from: '08:00', to: '08:30' },
-  { title: 'Học kỹ năng AI (45 phút)', note: 'Khóa học GenAI cho công việc', category: 'skill', from: '09:00', to: '09:45' },
-  { title: 'Gọi lại khách freelance', note: 'Trao đổi dự án thiết kế website', category: 'work', from: '14:00', to: '14:30' },
-  { title: 'Cập nhật mục tiêu tiết kiệm', note: 'Rà soát tiến độ cùng AI', category: 'personal', from: '20:00', to: '20:30' },
+/* ───────── 7. Lịch AI: cả tuần này + quy tắc tự động + đề xuất AI ───────── */
+// [thứ (0 = Thứ Hai), tiêu đề, loại, từ, đến, ghi chú]
+const WEEK = [
+  [0, 'Thiền buổi sáng', 'rest', '07:30', '08:00', '10 phút hít thở'],
+  [0, 'Xem thu chi tuần trước', 'finance', '09:00', '10:00', 'Cùng An Tâm AI'],
+  [0, 'Làm việc dự án freelance', 'work', '10:30', '12:00', ''],
+  [0, 'Học kỹ năng Marketing', 'skill', '13:00', '14:00', ''],
+  [0, 'Họp khách hàng', 'work', '15:00', '17:00', 'Dự án thiết kế website'],
+  [0, 'Tập thể dục', 'rest', '20:00', '21:00', ''],
+  [1, 'Đóng hóa đơn Internet', 'personal', '08:00', '09:00', ''],
+  [1, 'Làm việc dự án thiết kế website', 'work', '10:00', '12:00', ''],
+  [1, 'Cập nhật sổ thu chi', 'finance', '14:00', '15:00', ''],
+  [1, 'Học tiếng Anh', 'skill', '19:00', '20:30', ''],
+  [2, 'Học kỹ năng Data/AI', 'skill', '08:00', '09:00', ''],
+  [2, 'Làm việc', 'work', '10:00', '11:00', ''],
+  [2, 'Follow-up khách freelance', 'work', '13:30', '15:00', ''],
+  [2, 'Lên kế hoạch tuần', 'work', '19:00', '20:00', ''],
+  [3, 'Thiền buổi sáng', 'rest', '07:30', '08:00', ''],
+  [3, 'Xem dòng tiền', 'finance', '09:00', '10:00', ''],
+  [3, 'Học kỹ năng Productivity', 'skill', '11:00', '12:00', ''],
+  [3, 'Làm việc dự án freelance', 'work', '14:00', '16:00', ''],
+  [3, 'Chạy bộ', 'rest', '19:00', '20:00', ''],
+  [4, 'Làm việc', 'work', '10:00', '12:00', ''],
+  [4, 'Review mục tiêu', 'finance', '14:00', '15:00', ''],
+  [4, 'Học kỹ năng UI/UX', 'skill', '19:30', '21:00', ''],
+  [5, 'Thời gian gia đình', 'rest', '09:00', '11:00', ''],
+  [5, 'Đọc sách', 'skill', '14:00', '16:00', ''],
+  [5, 'Xem phim', 'rest', '20:00', '21:30', ''],
+  [6, 'Tổng kết chi tiêu', 'finance', '09:00', '10:00', 'Cùng An Tâm AI'],
+  [6, 'Lên kế hoạch tuần mới', 'personal', '10:30', '12:00', ''],
+  [6, 'Chuẩn bị tài liệu', 'work', '15:00', '16:30', ''],
+  [6, 'Nghỉ ngơi', 'rest', '20:00', '21:00', ''],
 ];
+const addDays = (day, n) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+const monday = addDays(today, -((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7));
+
+/** POST có Idempotency-Key (duyệt / từ chối đề xuất). */
+async function postIdem(path) {
+  const res = await fetch(`${API}/api${path}`, { method: 'POST', headers: { Cookie: cookie, 'Idempotency-Key': `seed-${crypto.randomUUID()}` } });
+  if (!res.ok) throw new Error(`POST ${path} → ${res.status}`);
+}
 
 async function calendar() {
-  for (const e of await get(`/calendar/events?date=${today}`)) await del(`/calendar/events/${e.id}`);
-  for (const e of EVENTS) await post('/calendar/events', { title: e.title, note: e.note, category: e.category, startsAt: `${today}T${e.from}`, endsAt: `${today}T${e.to}` });
+  // Xóa lịch tuần này + tuần sau, bỏ các đề xuất cũ đang chờ
+  for (const w of [monday, addDays(monday, 7)]) {
+    const week = await get(`/calendar?week=${w}`);
+    for (const e of week.events.filter((x) => x.source !== 'google')) await del(`/calendar/events/${e.id}`);
+  }
+  for (const p of (await get(`/calendar?week=${monday}`)).proposals) await postIdem(`/calendar/proposals/${p.id}/reject`);
+
+  for (const [d, title, category, from, to, note] of WEEK) {
+    const day = addDays(monday, d);
+    await post('/calendar/events', { title, note, category, startsAt: `${day}T${from}`, endsAt: `${day}T${to}` });
+  }
+  // Hạn đóng thẻ tín dụng: 3 ngày tới (để AI kịp nhắc trước 2 ngày) — trùng Thứ Sáu tuần này nếu còn kịp
+  const friday = addDays(monday, 4);
+  const due = friday >= addDays(today, 3) ? friday : addDays(today, 3);
+  await post('/calendar/events', { title: 'Đóng phí thẻ tín dụng', note: 'Sao kê tháng này', category: 'personal', startsAt: `${due}T08:00`, endsAt: `${due}T09:00` });
+
+  // 4 quy tắc tự động bật → AI tự xếp lịch (qua engine thật) → 2 đề xuất chờ duyệt
+  for (const key of ['weekly_review', 'bill_reminder', 'skill_block', 'freelance_followup']) await put(`/automation-rules/${key}`, { enabled: true });
+  await post(`/calendar/auto-schedule?week=${monday}`);
 }
 
 /* ───────── 8. Lựa chọn cuộc đời ───────── */
@@ -225,7 +276,7 @@ const steps = [
   ['Mục tiêu', goals],
   ['Sổ thu chi 6 tháng', ledger],
   ['Thu nhập, thời gian, kỹ năng', earn],
-  ['Lịch hôm nay', calendar],
+  ['Lịch AI cả tuần', calendar],
   ['Lựa chọn cuộc đời', lifeChoices],
   ['Hiện lại đề xuất đã ẩn', () => del('/overview/suggestions/dismissals')],
 ];
