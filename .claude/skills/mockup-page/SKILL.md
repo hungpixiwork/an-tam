@@ -8,6 +8,7 @@ description: Build one An Tâm AI page to match its mockup (1..9) end-to-end —
 Mục tiêu thời gian: **≤15 phút/trang**. Đầu vào: số trang `N`. Tham chiếu: [pages.md](pages.md) (bố cục + dữ liệu + số demo từng trang), kế hoạch `C:\Users\ppnh1\.claude\plans\pure-skipping-fountain.md` (tên bảng/API — chỉ đọc phần "Backend chi tiết").
 
 ## Luật
+Đọc trước: `.claude/skills/an-tam-conventions/SKILL.md` (từ cấm, commit, bẫy Windows). Tóm tắt:
 1. **Tính năng thật**: không hardcode số trong UI. Số đi API → engine → D1. Demo seed chỉ qua API thật.
 2. **Tiếng Việt dễ hiểu**: không "Runway" (→ "Số tháng an toàn"), không HHI/KPI/cashflow. Đủ vi/en/zh.
 3. **Ít test**: giữ test cũ xanh; chỉ thêm 1–2 test ngắn cho logic tiền/phê duyệt.
@@ -16,7 +17,7 @@ Mục tiêu thời gian: **≤15 phút/trang**. Đầu vào: số trang `N`. Tha
 
 ## Đã có sẵn — dùng lại
 - UI kit `client/src/components/ui`: `KpiCard, SectionCard, StackedBar, Gauge, Stepper, Timeline, Tabs, ListRow, ApprovalBar, HeroBanner, QuoteCard, WeekGrid, ProgressRing, MiniBars, DonutChart, ScoreRing, Badge, Button, Modal, MoneyInput, Segmented, Toggle, TONE_HEX`.
-- Mẫu trang: `client/src/features/overview/` — mỗi hàng/khối 1 file, trang chỉ ghép.
+- Mẫu trang: `client/src/features/overview/` và `features/ledger/` — mỗi hàng/khối 1 file, trang chỉ ghép.
 - Seed `scripts/seed-demo.mjs`: có `get/post/put/patch/del`, `M`/`K`, `thisMonth`, `today`, `addMonths`; mỗi phần = 1 hàm (xóa dữ liệu cũ của phần đó rồi ghi) + 1 dòng trong mảng `steps`.
 - Backend: `calendar_events`/`automation_rules` (0013, `worker/routes/calendar.ts`), `life_choices`+options/prereqs/tasks (0014, `worker/routes/lifeChoices.ts`), `/api/liabilities`, engine `suggestions.ts, resources.ts, lifeChoice.ts, peace.ts, overview.ts, concentration.ts, humanCapital.ts`. Route stub của mọi domain đã được mount trong `worker/index.ts` → chỉ sửa file route của mình.
 - Migration: 0010 sổ thu chi, 0011 kỹ năng/cơ hội, 0012 tích hợp; domain khác dùng 0015+ (trang N dùng `00(14+N)` nếu cần, tránh trùng khi chạy song song).
@@ -48,8 +49,7 @@ agent-browser wait 1500 ; agent-browser screenshot --full ./.agents/pages/shots/
 - Tiếng Việt gửi API: dùng Node `fetch`, không curl inline.
 - Sidebar trông bị cụt ở ảnh full-page là bình thường (sticky), đừng sửa.
 - Viết file bằng tool Write/Edit, không dùng heredoc Bash (hỏng khi có dấu nháy đơn).
-- Trong worktree, Bash bị chặn `agent-browser eval`, `$var`, heredoc, `mklink` → chạy các lệnh đó bằng tool **PowerShell**. Tắt wrangler xong nhớ `Stop-Process -Name workerd` (tiến trình con còn sót).
-- Khi thay stub 501 bằng route thật: xóa path đó khỏi danh sách 501 trong `tests/health.test.ts`.
+- Trong worktree, Bash bị chặn `agent-browser eval`, `$var`, heredoc, `mklink` → chạy các lệnh đó bằng tool **PowerShell**. Tắt worker của mình theo cổng (skill `dev-env` §2, thay 8787 bằng 880N) — đừng giết mọi `workerd`.
 - Bảng `transactions` chỉ lưu ngày (không giờ) — hiển thị "Hôm nay/Hôm qua/dd/mm/yyyy".
 
 ## Quy trình
@@ -57,7 +57,7 @@ agent-browser wait 1500 ; agent-browser screenshot --full ./.agents/pages/shots/
 2. **Code**: migration → engine → route → `shared/types/api/<domain>.ts` → hooks `client/src/lib/queries/<domain>.ts` → khối UI → i18n ns. Trang cũ bị gộp: chuyển phần dùng được, xóa file khi không còn import.
 3. **Seed**: thêm hàm vào `scripts/seed-demo.mjs`; chỉnh đầu vào để số tính ra gần mockup (không ép số). Chạy seed.
 4. **Đối chiếu — tối đa 3 vòng**: chụp full → Read ảnh chụp + mockup → liệt kê lệch theo thứ tự ưu tiên (bố cục/cột → thiếu khối/chữ → số liệu → khoảng cách/cỡ chữ → màu/icon) → sửa **tất cả trong 1 lượt** → vòng sau. Vòng 2 không còn lệch quan trọng thì dừng. Giữa các vòng chỉ `npx tsc -p tsconfig.json --noEmit` hoặc `npm run typecheck`.
-5. **Kiểm tra nhanh (1 lượt)**: overflow bằng 1 lệnh cho 1440/1024/390 (`set viewport` + `eval "document.documentElement.scrollWidth>innerWidth"`); làm 1 hành động chính trên trình duyệt và xác nhận số đổi; tài khoản rỗng: chỉ gọi API (đăng ký mới → GET dashboard không lỗi).
+5. **Kiểm tra nhanh (1 lượt)**: `node scripts/dev/smoke.mjs --base http://localhost:<vite> [--session pN] --routes <route> --widths 1672,1440,1024,390` (báo lỗi, tràn ngang kèm phần tử, từ cấm); làm 1 hành động chính trên trình duyệt và xác nhận số đổi; tài khoản rỗng: chỉ gọi API (đăng ký mới → GET dashboard không lỗi).
 6. **Cổng + commit**: `npm run typecheck && npm test && npm run build`. Commit `feat(page-N): <tên> khớp mockup + dữ liệu thật` + trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Stage chỉ file của mình + ảnh vòng cuối + `.agents/pages/0N-*.md` + dòng N trong `.agents/pages/README.md`. Không stage `.docx`, `package.json`/lock, `client/public/version.json`, `scripts/export_docx.py`, `.agents/*.md` ngoài `.agents/pages/`. Xóa ảnh vòng trước. Chế độ song song: dừng worker/vite của mình trước khi kết thúc.
 
 ## Tiêu chí xong

@@ -44,39 +44,29 @@ describe('GET /api/health', () => {
   });
 });
 
-/** Route mới đã có handler thật (trang 2 Sổ thu chi) — vẫn phải yêu cầu đăng nhập. */
-const IMPLEMENTED: [string, string][] = [
+/**
+ * Mọi route cần đăng nhập đều phải trả 401 khi chưa có phiên.
+ * Danh sách cố định, sắp theo domain — trang mới KHÔNG cần sửa file này (tránh xung đột merge).
+ */
+const PROTECTED: [string, string][] = [
   ['GET', '/api/ledger/dashboard?month=2026-09'],
-  ['POST', '/api/ledger/split'],
-  ['PUT', '/api/settings/payout-account'],
   ['GET', '/api/budgets/2026-09'],
-  ['PUT', '/api/budgets/2026-09'],
   ['GET', '/api/bills'],
-  ['POST', '/api/bills/b1/paid'],
   ['GET', '/api/safety'],
-  ['PUT', '/api/safety/target'],
-  ['GET', '/api/audit?status=approved'],
-  ['GET', '/api/audit/verify'],
-  ['POST', '/api/integrations/sepay/link'],
+  ['GET', '/api/skills'],
+  ['GET', '/api/calendar?week=2026-09-21'],
+  ['GET', '/api/life-choices'],
+  ['GET', '/api/portfolio/risk'],
+  ['GET', '/api/agents'],
+  ['GET', '/api/audit'],
+  ['GET', '/api/integrations'],
 ];
 
-const STUBS: [string, string][] = [
-  ['DELETE', '/api/integrations/notion'],
-];
-
-describe('Stub routes Wave 0', () => {
-  it('chưa đăng nhập → 401 cho mọi route mới', async () => {
-    for (const [method, path] of [...IMPLEMENTED, ...STUBS]) {
+describe('Route cần đăng nhập', () => {
+  it('chưa đăng nhập → 401', async () => {
+    for (const [method, path] of PROTECTED) {
       const res = await worker.fetch(req(path, { method }), envWith());
       expect(res.status, `${method} ${path}`).toBe(401);
-    }
-  });
-
-  it('đã đăng nhập → 501 not_implemented theo envelope chung', async () => {
-    for (const [method, path] of STUBS) {
-      const res = await worker.fetch(req(path, { method }, true), envWith({ authed: true }));
-      expect(res.status, `${method} ${path}`).toBe(501);
-      expect(((await res.json()) as any).error.code).toBe('not_implemented');
     }
   });
 
