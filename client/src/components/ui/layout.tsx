@@ -1,4 +1,4 @@
-import { useId, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, MoreHorizontal, Quote, type LucideIcon } from 'lucide-react';
 import { IconTile, TONE_EXT, cx, type ExtTone } from './core';
@@ -218,5 +218,60 @@ export function QuoteCard({ text, className }: { text: ReactNode; className?: st
       <Quote className="h-6 w-6 shrink-0 rotate-180 fill-accent-600 text-accent-600" aria-hidden />
       <blockquote className="whitespace-pre-line text-[14px] font-medium leading-relaxed text-ink">{text}</blockquote>
     </figure>
+  );
+}
+
+/* ───────── Menu ⋯ ───────── */
+
+export interface MenuItem { label: ReactNode; onSelect: () => void; disabled?: boolean }
+
+/** Nút "⋯" mở danh sách thao tác nhỏ (Ẩn hôm nay, Đánh dấu xong…). Đóng khi bấm ra ngoài hoặc Esc. */
+export function MenuButton({ items, label, className }: { items: MenuItem[]; label: string; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: globalThis.MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: globalThis.KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  return (
+    <div ref={ref} className={cx('relative shrink-0', className)}>
+      <button
+        type="button"
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="rounded-lg p-1 text-ink-soft hover:bg-black/5 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-600"
+      >
+        <MoreHorizontal className="h-5 w-5" aria-hidden />
+      </button>
+      {open && (
+        <ul role="menu" className="absolute right-0 top-full z-30 mt-1 min-w-[168px] rounded-xl border border-line bg-white p-1 shadow-lift">
+          {items.map((it, i) => (
+            <li key={i} role="none">
+              <button
+                type="button"
+                role="menuitem"
+                disabled={it.disabled}
+                onClick={() => {
+                  setOpen(false);
+                  it.onSelect();
+                }}
+                className="w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-[13px] font-medium text-ink hover:bg-slate-50 disabled:opacity-50"
+              >
+                {it.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

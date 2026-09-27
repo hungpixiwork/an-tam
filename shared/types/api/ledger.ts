@@ -13,7 +13,7 @@ export interface ProfileUsage {
 }
 
 export interface ProfileData {
-  baseline: { monthlyIncome: number; monthlyExpense: number; emergencyTargetMonths: number };
+  baseline: { monthlyIncome: number; monthlyExpense: number; emergencyTargetMonths: number; birthYear?: number | null };
   used: ProfileUsage;
 }
 

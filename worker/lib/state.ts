@@ -1,7 +1,7 @@
 // Đọc / ghi dữ liệu người dùng từ D1 và chuyển sang kiểu miền của engine.
 
 import type { Me } from '../../shared/types/api';
-import type { FinancialProfile, Goal, Holding, MonthTotal, Salutation, Snapshot, UserState } from '../../shared/types/domain';
+import type { FinancialProfile, Goal, Holding, Liability, MonthTotal, Salutation, Snapshot, UserState } from '../../shared/types/domain';
 import { evaluateAlerts, type AlertCandidate } from '../../shared/engine/alerts';
 import { effectiveProfile, type EffectiveProfile } from '../../shared/engine/ledger';
 import { addMonths, currentMonth } from '../../shared/engine/month';
@@ -14,6 +14,9 @@ interface UserRow {
 interface HoldingRow {
   id: string; name: string; category: Holding['category']; value: number; role: string;
   volatility: Holding['volatility']; risk_group: string; is_main: number;
+}
+interface LiabilityRow {
+  id: string; name: string; kind: Liability['kind']; balance: number; monthly_payment: number; rate_bp: number;
 }
 interface GoalRow {
   id: string; kind: Goal['kind']; title: string; target_amount: number; current_amount: number;
@@ -43,18 +46,19 @@ export interface LoadedState extends UserState {
 }
 
 export async function loadUserState(db: D1Database, userId: string, today = currentMonth()): Promise<LoadedState> {
-  const [user, profile, holdings, goals, snapshots, ledger] = await db.batch([
+  const [user, profile, holdings, goals, snapshots, ledger, liabilities] = await db.batch([
     db.prepare('SELECT salutation FROM users WHERE id = ?').bind(userId),
     db.prepare('SELECT * FROM financial_profiles WHERE user_id = ?').bind(userId),
     db.prepare('SELECT * FROM holdings WHERE user_id = ? ORDER BY order_idx').bind(userId),
     db.prepare('SELECT * FROM goals WHERE user_id = ? ORDER BY order_idx').bind(userId),
-    db.prepare('SELECT month, total, emergency, invested, cashflow FROM net_worth_snapshots WHERE user_id = ? ORDER BY month').bind(userId),
+    db.prepare('SELECT month, total, emergency, invested, cashflow, cash, other, debt FROM net_worth_snapshots WHERE user_id = ? ORDER BY month').bind(userId),
     db.prepare(
       `SELECT substr(occurred_on, 1, 7) AS month,
               SUM(CASE WHEN kind = 'income' THEN amount ELSE 0 END) AS income,
               SUM(CASE WHEN kind = 'expense' THEN amount ELSE 0 END) AS expense
        FROM transactions WHERE user_id = ? AND occurred_on >= ? GROUP BY month ORDER BY month`,
     ).bind(userId, `${addMonths(today, -11)}-01`),
+    db.prepare('SELECT id, name, kind, balance, monthly_payment, rate_bp FROM liabilities WHERE user_id = ? ORDER BY order_idx, created_at').bind(userId),
   ]);
   const u = (user.results[0] ?? {}) as Record<string, string>;
   const salutation = (u.salutation ?? 'bạn') as Salutation;
@@ -64,6 +68,8 @@ export async function loadUserState(db: D1Database, userId: string, today = curr
     monthlyExpense: p.monthly_expense ?? 0,
     emergencyTargetMonths: p.emergency_target_months ?? 6,
     riskSelfScore: p.risk_self_score ?? 5,
+    birthYear: p.birth_year ?? null,
+    retirementAge: p.retirement_age ?? 60,
   };
   const months = ledger.results as unknown as MonthTotal[];
   const { profile: effective, ...sources } = effectiveProfile(baseline, months, today);
@@ -83,6 +89,9 @@ export async function loadUserState(db: D1Database, userId: string, today = curr
     })),
     snapshots: snapshots.results as unknown as Snapshot[],
     ledger: months,
+    liabilities: (liabilities.results as unknown as LiabilityRow[]).map((l) => ({
+      id: l.id, name: l.name, kind: l.kind, balance: l.balance, monthlyPayment: l.monthly_payment, rateBp: l.rate_bp,
+    })),
   };
 }
 

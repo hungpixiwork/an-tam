@@ -46,7 +46,7 @@ async function read(db: D1Database, userId: string): Promise<Record<Key, any>> {
 
 /** Bảng dữ liệu cá nhân được đưa vào bản xuất. */
 const EXPORT_TABLES = ['financial_profiles', 'holdings', 'goals', 'net_worth_snapshots', 'simulation_runs', 'habit_answers', 'transactions', 'safety_plans', 'ai_events', 'ai_alerts', 'user_settings',
-  'liabilities', 'agent_runs', 'agent_steps', 'agent_actions', 'audit_log'] as const;
+  'liabilities', 'agent_runs', 'agent_steps', 'agent_actions', 'audit_log', 'calendar_events', 'automation_rules', 'suggestion_dismissals', 'life_choices'] as const;
 
 export const settings = new Hono<AppEnv>()
   .get('/settings', async (c) => ok(c, await read(c.env.DB, c.get('userId'))))

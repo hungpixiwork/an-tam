@@ -78,6 +78,45 @@ export function StackedBar({ segments, showLegend = true, formatValue = (v) => v
   );
 }
 
+/* ───────── Cột mini ───────── */
+
+export interface MiniBarsProps {
+  /** Giá trị từng cột (null = không có dữ liệu → cột xám thấp). */
+  values: (number | null)[];
+  /** Màu cột dương / âm. */
+  positive?: string;
+  negative?: string;
+  height?: number;
+  barWidth?: number;
+  ariaLabel: string;
+  className?: string;
+}
+
+/** Biểu đồ cột mini (mockup Tổng quan "Dòng tiền tháng này"): cột xanh khi ≥ 0, đỏ khi âm, chung đường 0. */
+export function MiniBars({ values, positive = TONE_HEX.green, negative = TONE_HEX.red, height = 52, barWidth = 6, ariaLabel, className }: MiniBarsProps) {
+  const nums = values.map((v) => v ?? 0);
+  const max = Math.max(0, ...nums);
+  const min = Math.min(0, ...nums);
+  const span = max - min || 1;
+  const zero = (max / span) * height;
+  return (
+    <div role="img" aria-label={ariaLabel} className={cx('relative flex shrink-0 items-stretch gap-[3px]', className)} style={{ height }}>
+      {values.map((v, i) => {
+        const h = v === null ? 2 : Math.max(3, (Math.abs(v) / span) * height);
+        const up = (v ?? 0) >= 0;
+        return (
+          <div key={i} className="relative" style={{ width: barWidth }}>
+            <span
+              className="absolute left-0 w-full rounded-[2px]"
+              style={{ height: h, background: v === null ? '#CBD5E1' : up ? positive : negative, ...(up ? { bottom: height - zero } : { top: zero }) }}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ───────── Đồng hồ nửa vòng ───────── */
 
 export interface GaugeThreshold { at: number; tone: ExtTone }

@@ -6,8 +6,11 @@ const migrations = await readMigrations();
 const sqlOf = (prefix: string) => migrations.find((m) => m.name.startsWith(prefix))?.sql ?? '';
 
 describe('migrations — kiểm tra nội dung', () => {
-  it('đánh số liên tục 0001..0009', () => {
-    expect(migrations.map((m) => m.name.slice(0, 4))).toEqual(['0001', '0002', '0003', '0004', '0005', '0006', '0007', '0008', '0009']);
+  it('đánh số tăng dần, không trùng (0010–0012 để dành cho sổ thu chi / kỹ năng / tích hợp)', () => {
+    const nums = migrations.map((m) => Number(m.name.slice(0, 4)));
+    expect(nums.slice(0, 9)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(nums).toEqual([...nums].sort((a, b) => a - b));
+    expect(new Set(nums).size).toBe(nums.length);
   });
 
   it('0008 có trigger chặn UPDATE / DELETE và chuỗi hash, audit_log không FK', () => {

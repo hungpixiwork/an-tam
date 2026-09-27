@@ -31,6 +31,13 @@ export function formatVnd(amount: number, opts: VndOptions = {}): string {
   return prefix + body;
 }
 
+/** Số tiền đầy đủ kiểu mockup: 7500000 → "7.500.000đ" (sign → "+7.500.000đ"). */
+export function formatVndFull(amount: number, opts: { sign?: boolean } = {}): string {
+  const abs = Math.round(Math.abs(amount));
+  const prefix = amount < 0 && abs > 0 ? '-' : opts.sign && amount > 0 ? '+' : '';
+  return `${prefix}${String(abs).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}đ`;
+}
+
 /** 0.061 → "6%"; digits cho phép "1,5%". */
 export function formatPct(fraction: number, digits = 0, sign = false): string {
   const v = fraction * 100;

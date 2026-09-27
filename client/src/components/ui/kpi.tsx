@@ -21,6 +21,10 @@ export interface KpiCardProps {
   progress?: { value: number; tone?: ExtTone; color?: string; label?: string };
   /** Dòng chú thích nhỏ cuối thẻ. */
   footnote?: ReactNode;
+  /** Phần phụ bên phải hàng tiêu đề (ví dụ biểu đồ cột mini). */
+  aside?: ReactNode;
+  /** Ghi đè cỡ chữ giá trị (mặc định 26px). */
+  valueClassName?: string;
   /** Tooltip của icon (i) cạnh nhãn. */
   info?: string;
   children?: ReactNode;
@@ -28,7 +32,7 @@ export interface KpiCardProps {
 }
 
 /** Thẻ chỉ số: icon tile + nhãn + giá trị lớn + delta/badge + progress + chú thích (mockup Tổng quan, Sổ thu chi, Danh mục). */
-export function KpiCard({ icon, tone = 'green', label, value, unit, delta, badge, progress, footnote, info, children, className }: KpiCardProps) {
+export function KpiCard({ icon, tone = 'green', label, value, unit, delta, badge, progress, footnote, aside, valueClassName, info, children, className }: KpiCardProps) {
   return (
     <section className={cx('flex min-w-0 flex-col rounded-2xl border border-line bg-white p-5 shadow-card', className)}>
       <div className="flex items-start gap-4">
@@ -43,12 +47,13 @@ export function KpiCard({ icon, tone = 'green', label, value, unit, delta, badge
             )}
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-            <p className="text-[26px] font-extrabold leading-none tracking-tight text-ink tabular-nums">
+            <p className={cx('whitespace-nowrap font-extrabold leading-none tracking-tight text-ink tabular-nums', valueClassName ?? 'text-[26px]')}>
               {value}
               {unit && <span className="ml-1 text-[15px] font-semibold text-ink-soft">{unit}</span>}
             </p>
             {delta && <DeltaBadge value={delta.value} goodWhenUp={delta.goodWhenUp} className="h-6 text-xs" />}
             {badge}
+            {aside && <div className="ml-auto shrink-0">{aside}</div>}
           </div>
         </div>
       </div>
@@ -96,7 +101,7 @@ export function ProgressRing({ value, label, icon: Icon, tone = 'green', size = 
       </ScoreRing>
       {valueLabel !== null && <p className="mt-2 text-[17px] font-bold text-ink tabular-nums">{valueLabel ?? `${pct}%`}</p>}
       {status && (
-        <Badge size="sm" tone={status.tone ?? tone} className="mt-1.5">
+        <Badge size="sm" tone={status.tone ?? tone} className="mt-1.5 !h-auto min-h-6 max-w-full !whitespace-normal py-0.5 text-center leading-tight">
           {status.label}
         </Badge>
       )}

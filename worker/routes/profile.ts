@@ -13,19 +13,24 @@ export const profileSchema = z.object({
   monthlyIncome: money,
   monthlyExpense: money,
   emergencyTargetMonths: z.number().int().min(1, 'Ít nhất 1 tháng').max(24, 'Tối đa 24 tháng'),
+  /** Năm sinh — để so sánh tỷ lệ tiết kiệm với người cùng độ tuổi (tùy chọn). */
+  birthYear: z.number().int().min(1900).max(2100).nullable().optional(),
 });
 
 export const upsertProfile = (db: D1Database, userId: string, p: Partial<z.infer<typeof profileSchema>>, base: LoadedState['baseline']) =>
   db
     .prepare(
-      `INSERT INTO financial_profiles (user_id, monthly_income, monthly_expense, emergency_target_months) VALUES (?, ?, ?, ?)
+      `INSERT INTO financial_profiles (user_id, monthly_income, monthly_expense, emergency_target_months, birth_year) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT (user_id) DO UPDATE SET monthly_income = excluded.monthly_income, monthly_expense = excluded.monthly_expense,
-         emergency_target_months = excluded.emergency_target_months`,
+         emergency_target_months = excluded.emergency_target_months, birth_year = excluded.birth_year`,
     )
-    .bind(userId, p.monthlyIncome ?? base.monthlyIncome, p.monthlyExpense ?? base.monthlyExpense, p.emergencyTargetMonths ?? base.emergencyTargetMonths);
+    .bind(
+      userId, p.monthlyIncome ?? base.monthlyIncome, p.monthlyExpense ?? base.monthlyExpense, p.emergencyTargetMonths ?? base.emergencyTargetMonths,
+      p.birthYear !== undefined ? p.birthYear : (base.birthYear ?? null),
+    );
 
 const toData = (s: LoadedState): ProfileData => ({
-  baseline: { monthlyIncome: s.baseline.monthlyIncome, monthlyExpense: s.baseline.monthlyExpense, emergencyTargetMonths: s.baseline.emergencyTargetMonths },
+  baseline: { monthlyIncome: s.baseline.monthlyIncome, monthlyExpense: s.baseline.monthlyExpense, emergencyTargetMonths: s.baseline.emergencyTargetMonths, birthYear: s.baseline.birthYear ?? null },
   used: { income: s.profile.monthlyIncome, expense: s.profile.monthlyExpense, ...s.sources },
 });
 

@@ -14,3 +14,6 @@ export * from './spending';
 export * from './nba';
 export * from './concentration';
 export * from './humanCapital';
+export * from './suggestions';
+export * from './resources';
+export * from './lifeChoice';

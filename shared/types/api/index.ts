@@ -9,3 +9,5 @@ export * from './agent';
 export * from './earn';
 export * from './portfolio';
 export * from './system';
+export * from './calendar';
+export * from './lifeChoices';

@@ -15,10 +15,15 @@ const COALESCE_MINUTES = 30;
  */
 export const snapshotStatement = (db: D1Database, userId: string, state: UserState): D1PreparedStatement =>
   db.prepare(
-    `INSERT INTO net_worth_snapshots (user_id, month, total, emergency, invested, cashflow) VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO net_worth_snapshots (user_id, month, total, emergency, invested, cashflow, cash, other, debt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (user_id, month) DO UPDATE SET total = excluded.total, emergency = excluded.emergency,
-       invested = excluded.invested, cashflow = excluded.cashflow`,
-  ).bind(userId, state.today, totalValue(state.holdings), emergencyAmount(state), investedValue(state.holdings), freeCashflow(state));
+       invested = excluded.invested, cashflow = excluded.cashflow, cash = excluded.cash, other = excluded.other, debt = excluded.debt`,
+  ).bind(
+    userId, state.today, totalValue(state.holdings), emergencyAmount(state), investedValue(state.holdings), freeCashflow(state),
+    sumCategory(state, 'cash'), sumCategory(state, 'other'), (state.liabilities ?? []).reduce((s, l) => s + l.balance, 0),
+  );
+
+const sumCategory = (state: UserState, category: string) => state.holdings.filter((h) => h.category === category).reduce((s, h) => s + h.value, 0);
 
 export interface Change {
   /** Tiêu đề nhật ký, cũng là khóa gộp: "Cập nhật sổ thu chi", "Thêm tài sản"... */

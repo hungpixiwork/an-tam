@@ -1,4 +1,6 @@
-import type { UserState } from '../types/domain';
+import type { FinancialProfile, UserState } from '../types/domain';
+import { effectiveProfile } from './ledger';
+import { addMonths } from './month';
 import { goalProbability, nearestMajorGoal } from './goals';
 import { monthsBetween } from './month';
 import { portfolioStats } from './portfolio';
@@ -103,4 +105,25 @@ export function peaceScore(state: UserState): PeaceResult {
       { key: 'cashflow', label: 'Dòng tiền', score: cashflow, max: WEIGHTS.cashflow, detail: `Để dành được ${pct(savingsRate)} thu nhập` },
     ],
   };
+}
+
+/**
+ * Điểm an tâm ước tính của `monthsBack` tháng trước — để so "tăng / giảm N điểm so với tháng trước".
+ * Dựng lại trạng thái lúc đó: thu / chi lấy trung bình sổ thu chi tính đến tháng đó (hoặc số nền),
+ * mỗi mục tiêu bớt đi phần đã góp trong các tháng sau. Tài sản giữ nguyên (không có lịch sử từng khoản).
+ * Trả về null khi không có dữ liệu thu chi của giai đoạn đó để so sánh.
+ */
+export function peaceScoreAsOf(state: UserState, baseline: FinancialProfile, monthsBack = 1): number | null {
+  const month = addMonths(state.today, -monthsBack);
+  const ledger = state.ledger.filter((m) => m.month <= month);
+  if (!ledger.length) return null;
+  const { profile } = effectiveProfile(baseline, ledger, month);
+  const past: UserState = {
+    ...state,
+    today: month,
+    profile,
+    ledger,
+    goals: state.goals.map((g) => ({ ...g, currentAmount: Math.max(0, g.currentAmount - g.monthlyContribution * monthsBack) })),
+  };
+  return peaceScore(past).score;
 }

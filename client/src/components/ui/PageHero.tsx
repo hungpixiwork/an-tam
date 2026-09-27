@@ -16,6 +16,8 @@ export interface HeroBannerProps {
   description?: ReactNode;
   /** Trích dẫn trong thẻ trắng phía phải. */
   quote?: ReactNode;
+  /** Ghi đè vị trí / bề rộng thẻ trích dẫn. */
+  quoteClassName?: string;
   /** Ảnh minh họa bên phải (ví dụ "/hero-lake-city.jpg"). */
   image?: string;
   /** Alt của ảnh; truyền "" nếu ảnh chỉ để trang trí. */
@@ -39,7 +41,7 @@ const MASK = '[mask-image:linear-gradient(to_right,transparent,black_28%)]';
  * (mép trái ảnh mờ dần vào nền để chữ luôn đọc rõ), thẻ trích dẫn nổi trên ảnh.
  */
 export function HeroBanner({
-  eyebrow, title, highlight, subtitle, description, quote, image, imageAlt = '', imagePosition = 'center',
+  eyebrow, title, highlight, subtitle, description, quote, quoteClassName, image, imageAlt = '', imagePosition = 'center',
   scene, visualWidth = '58%', headingLevel = 'h2', children, className,
 }: HeroBannerProps) {
   const H = headingLevel;
@@ -64,7 +66,7 @@ export function HeroBanner({
           {description && <p className="mt-2 max-w-[620px] text-[14px] leading-relaxed text-ink-soft">{text(description)}</p>}
           {children && <div className="mt-4 flex flex-wrap items-center gap-2.5">{children}</div>}
         </div>
-        {quote && <QuoteCard text={text(quote)} className="hidden w-[300px] shrink-0 lg:flex xl:mr-[14%]" />}
+        {quote && <QuoteCard text={text(quote)} className={cx('hidden shrink-0 lg:flex', quoteClassName ?? 'w-[300px] xl:mr-[14%]')} />}
       </div>
     </section>
   );

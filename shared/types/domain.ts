@@ -101,6 +101,8 @@ export interface UserState {
   snapshots: Snapshot[];
   /** Tổng sổ thu chi theo tháng (tối đa 12 tháng gần nhất), tăng dần. */
   ledger: MonthTotal[];
+  /** Khoản nợ (tùy chọn — engine cũ không cần). */
+  liabilities?: Liability[];
 }
 
 export interface SimulationParams {

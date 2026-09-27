@@ -1,10 +1,14 @@
-import type { OverviewData, Kpi, SetupStatus } from '../types/api';
-import type { Salutation, Snapshot, UserState } from '../types/domain';
+import type { CalendarEvent, LifeChoice, OverviewData, Kpi, SetupStatus } from '../types/api';
+import type { FinancialProfile, IncomeProfile, Salutation, Snapshot, TimeAllocation, Transaction, UserState } from '../types/domain';
+import { peerBenchmark } from '../data/peer-benchmarks';
+import { lifeChoiceReadiness } from './lifeChoice';
+import { resourceRings } from './resources';
+import { todaySuggestions, type SuggestionGroup } from './suggestions';
 import { formatMonth, formatPct } from '../format';
 import { nearestMajorGoal } from './goals';
 import { addMonths, monthsBetween } from './month';
 import { greetingName, levelKey, templateNarrator, type Narrator } from './narrate';
-import { emergencyAmount, freeCashflow, peaceScore, type PeaceLevel } from './peace';
+import { emergencyAmount, emergencyMonths, freeCashflow, peaceScore, peaceScoreAsOf, type PeaceLevel } from './peace';
 import { allocation, investedValue, totalValue } from './portfolio';
 import { DEFAULT_PARAMS, simulate } from './simulate';
 import { nextBestActions } from './nba';
@@ -42,11 +46,73 @@ export interface OverviewUser {
   salutation: Salutation;
 }
 
+/** Dữ liệu ngoài UserState mà màn Tổng quan cần (đều tùy chọn — thiếu thì khối tương ứng hiện trạng thái rỗng). */
+export interface OverviewExtras {
+  /** Số nền người dùng tự nhập — để ước tính điểm tháng trước. */
+  baseline?: FinancialProfile;
+  birthYear?: number | null;
+  /** Giao dịch tháng này + tháng trước. */
+  recent?: Transaction[];
+  income?: IncomeProfile | null;
+  dismissed?: SuggestionGroup[];
+  allocations?: TimeAllocation[];
+  /** Tổng giờ thực tế từng tuần gần nhất (hoạt động giá trị). */
+  weeklyActualHours?: number[];
+  todayDate?: string;
+  events?: CalendarEvent[];
+  lifeChoice?: LifeChoice | null;
+}
+
+/** Kỳ so sánh tài sản ròng ở khối "Tài sản hiện tại". */
+export const NET_WORTH_COMPARE_MONTHS = 3;
+
+/**
+ * Tách tài sản ròng: tiền mặt / đầu tư (quỹ, cổ phiếu, trái phiếu) / tài sản khác / nợ.
+ * So sánh 3 tháng trước: dùng snapshot tháng đó nếu có; nếu không, lùi lại bằng phần để dành
+ * thực tế trong sổ thu chi của 3 tháng gần nhất (tài sản ròng trước ≈ hiện tại − số đã để dành).
+ */
+export function netWorthBreakdown(state: UserState): OverviewData['netWorthBreakdown'] {
+  const sum = (pred: (c: string) => boolean) => state.holdings.filter((h) => pred(h.category)).reduce((s, h) => s + h.value, 0);
+  const cash = sum((c) => c === 'cash');
+  const invested = sum((c) => c === 'fund' || c === 'stock' || c === 'bond');
+  const other = sum((c) => c === 'other');
+  const debt = (state.liabilities ?? []).reduce((s, l) => s + l.balance, 0);
+  const net = cash + invested + other - debt;
+
+  let previous: number | null = null;
+  const snap = snapshotAt(state.snapshots, addMonths(state.today, -NET_WORTH_COMPARE_MONTHS));
+  if (snap && snap.total > 0) previous = snap.total - (snap.debt ?? 0);
+  else {
+    const from = addMonths(state.today, -(NET_WORTH_COMPARE_MONTHS - 1));
+    const months = state.ledger.filter((m) => m.month >= from && m.month <= state.today);
+    if (months.length) previous = net - months.reduce((s, m) => s + m.income - m.expense, 0);
+  }
+  const deltaPct = previous !== null && previous > 0 && net > 0 ? (net - previous) / previous : null;
+  return { net, cash, invested, other, debt, deltaPct, compareMonths: NET_WORTH_COMPARE_MONTHS };
+}
+
+/** Dòng tiền tháng này + chuỗi 6 tháng (tháng không ghi sổ = null). */
+export function monthCashflow(state: UserState): OverviewData['cashflow6m'] {
+  const current = state.ledger.find((m) => m.month === state.today);
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const month = addMonths(state.today, i - 5);
+    const m = state.ledger.find((x) => x.month === month);
+    return { month, net: m && (m.income > 0 || m.expense > 0) ? m.income - m.expense : null };
+  });
+  if (current && (current.income > 0 || current.expense > 0)) {
+    return { month: state.today, income: current.income, expense: current.expense, net: current.income - current.expense, source: 'ledger', months };
+  }
+  const { monthlyIncome: income, monthlyExpense: expense } = state.profile;
+  if (income > 0 || expense > 0) return { month: state.today, income, expense, net: income - expense, source: 'estimate', months };
+  return { month: state.today, income: 0, expense: 0, net: 0, source: 'none', months };
+}
+
 export function buildOverview(
   state: UserState,
   user: OverviewUser,
-  opts: { range?: number; openAlerts?: number; narrator?: Narrator } = {},
+  opts: { range?: number; openAlerts?: number; narrator?: Narrator; extras?: OverviewExtras } = {},
 ): OverviewData {
+  const extras = opts.extras ?? {};
   const narrator = opts.narrator ?? templateNarrator;
   const range = opts.range ?? 12;
   const peace = peaceScore(state);
@@ -101,7 +167,36 @@ export function buildOverview(
   // Chưa có thu chi lẫn tài sản: điểm chưa có ý nghĩa, lời chào mời bắt đầu nhập
   const empty = !setup.profile && !setup.holdings;
 
+  const ready = setup.profile || setup.holdings;
+  const pastScore = extras.baseline ? peaceScoreAsOf(state, extras.baseline, 1) : null;
+  const cashflow6m = monthCashflow(state);
+  const rate = cashflow6m.income > 0 ? cashflow6m.net / cashflow6m.income : null;
+  const age = extras.birthYear ? Number(state.today.slice(0, 4)) - extras.birthYear : null;
+  const peer = peerBenchmark(age);
+  const choice = extras.lifeChoice ?? null;
+
   return {
+    ready,
+    peaceDelta: ready && pastScore !== null ? peace.score - pastScore : null,
+    safeMonths: {
+      months: Math.round(emergencyMonths(state) * 10) / 10,
+      targetMonths: state.profile.emergencyTargetMonths || 6,
+      amount: emergency,
+      ready: state.profile.monthlyExpense > 0,
+    },
+    cashflow6m,
+    savingsRateVsPeers: { rate, peerRate: peer?.savingsRate ?? null, ageGroup: peer?.label ?? null },
+    todaySuggestions: todaySuggestions(state, { recent: extras.recent, income: extras.income, dismissed: extras.dismissed }),
+    todayDate: extras.todayDate ?? `${state.today}-01`,
+    todayEvents: extras.events ?? [],
+    netWorthBreakdown: netWorthBreakdown(state),
+    resourceRings: resourceRings({
+      peaceScore: ready ? peace.score : null,
+      allocations: extras.allocations ?? [],
+      weeklyActualHours: extras.weeklyActualHours ?? [],
+      targetHoursPerWeek: extras.income?.hoursPerWeek ?? 0,
+    }),
+    pinnedLifeChoice: choice ? { ...choice, readiness: lifeChoiceReadiness(state) } : null,
     nba: nextBestActions(state),
     greeting: {
       title: greetingName(user.fullName, user.salutation),
