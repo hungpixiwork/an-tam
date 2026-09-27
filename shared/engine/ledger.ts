@@ -14,6 +14,7 @@ export interface TransactionCategory {
 export const TRANSACTION_CATEGORIES: TransactionCategory[] = [
   { key: 'salary', kind: 'income', label: 'Lương', icon: 'briefcase' },
   { key: 'bonus', kind: 'income', label: 'Thưởng', icon: 'gift' },
+  { key: 'freelance', kind: 'income', label: 'Làm thêm', icon: 'laptop' },
   { key: 'business', kind: 'income', label: 'Kinh doanh', icon: 'store' },
   { key: 'invest_income', kind: 'income', label: 'Lãi đầu tư', icon: 'trending-up' },
   { key: 'other_income', kind: 'income', label: 'Thu khác', icon: 'plus-circle' },

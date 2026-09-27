@@ -58,8 +58,6 @@ const IMPLEMENTED: [string, string][] = [
 ];
 
 const STUBS: [string, string][] = [
-  ['GET', '/api/skills'],
-  ['GET', '/api/human-capital'],
   ['GET', '/api/calendar?week=2026-W39'],
   ['POST', '/api/calendar/sync'],
   ['POST', '/api/calendar/auto-schedule'],

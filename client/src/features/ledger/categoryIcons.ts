@@ -1,10 +1,11 @@
-import { Baby, Briefcase, Car, CirclePlus, Ellipsis, Gift, HeartPulse, House, PartyPopper, ShoppingBag, Store, TrendingUp, Utensils, type LucideIcon } from 'lucide-react';
+import { Baby, Briefcase, Car, CirclePlus, Ellipsis, Gift, HeartPulse, House, Laptop, PartyPopper, ShoppingBag, Store, TrendingUp, Utensils, type LucideIcon } from 'lucide-react';
 import type { ExtTone } from '@/components/ui';
 
 /** Tên icon trong TRANSACTION_CATEGORIES (shared/engine/ledger.ts) → component lucide. */
 const ICONS: Record<string, LucideIcon> = {
   briefcase: Briefcase,
   gift: Gift,
+  laptop: Laptop,
   store: Store,
   'trending-up': TrendingUp,
   'plus-circle': CirclePlus,

@@ -6,6 +6,7 @@
 
 import type { Sector } from '../types/domain';
 import type { ExposureLevel, HumanCapitalInput, HumanCapitalResult } from '../types/api';
+import { DEFAULT_ILO_LEVEL, iloGroupFor } from '../data/ilo-exposure';
 
 /** Lãi suất không rủi ro VND / năm (ƯỚC TÍNH, khớp giả định tiền mặt ở portfolio.ts). */
 export const RISK_FREE = 0.045;
@@ -25,13 +26,9 @@ export const SECTOR_GROWTH: Record<Sector, number> = {
 /** Ngưỡng giờ học / tuần để tính là "đang nâng kỹ năng": g +1 điểm %, π giảm một mức. */
 export const SKILL_HOURS_THRESHOLD = 3;
 
-/** Mức phơi nhiễm ILO (0..4) theo nhóm nghề ISCO-08 cấp 1 — tạm thời cho tới khi có bảng chi tiết. */
-const ISCO_MAJOR_LEVEL: Record<string, number> = { '0': 0, '1': 1, '2': 2, '3': 2, '4': 4, '5': 1, '6': 0, '7': 0, '8': 1, '9': 1 };
-const DEFAULT_LEVEL = 2;
-
-export function exposureLevelFor(iscoCode?: string): number {
-  const major = iscoCode?.trim()[0];
-  return major !== undefined && major in ISCO_MAJOR_LEVEL ? ISCO_MAJOR_LEVEL[major] : DEFAULT_LEVEL;
+/** Mức AI tác động (ILO 0..4) theo nhóm nghề ISCO-08 cấp 1 — bảng shared/data/ilo-exposure.ts. */
+export function exposureLevelFor(iscoCode?: string | null): number {
+  return iloGroupFor(iscoCode)?.level ?? DEFAULT_ILO_LEVEL;
 }
 
 const levelLabel = (level: number): ExposureLevel => (level <= 1 ? 'low' : level === 2 ? 'medium' : 'high');
@@ -65,9 +62,9 @@ export function humanCapital(input: HumanCapitalInput): HumanCapitalResult {
 
   const explain = [
     `Còn khoảng ${years} năm đi làm; thu nhập giả định tăng ${(g * 100).toFixed(1)}%/năm.`,
-    `Mức phơi nhiễm AI ${baseLevel}/4 (ILO) → mức bất định ${(EXPOSURE_PI[baseLevel] * 100).toFixed(0)}%/năm. Phơi nhiễm không có nghĩa là mất việc.`,
+    `Mức AI có thể làm thay một phần công việc: ${baseLevel}/4 (theo ILO). Điều này không có nghĩa là sẽ mất việc.`,
   ];
-  if (upskilling) explain.push(`Học kỹ năng ≥ ${SKILL_HOURS_THRESHOLD} giờ/tuần: mức bất định giảm một bậc (ước tính).`);
+  if (upskilling) explain.push(`Học kỹ năng ≥ ${SKILL_HOURS_THRESHOLD} giờ/tuần giúp giảm rủi ro nghề nghiệp một bậc (ước tính).`);
   explain.push('Đây là ước tính, không phải lời hứa tăng lương.');
 
   return { hc, exposureLevel: levelLabel(baseLevel), exposurePct: baseLevel * 25, careerScore, explain, g, pi, years };

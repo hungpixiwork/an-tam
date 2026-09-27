@@ -2,6 +2,7 @@ const messages: Record<string, string> = {
   // 收支分类 (Transaction Categories)
   "category.salary": "工资薪金",
   "category.bonus": "奖金分红",
+  "category.freelance": "兼职副业",
   "category.business": "商业经营",
   "category.invest_income": "投资收益",
   "category.other_income": "其他收入",

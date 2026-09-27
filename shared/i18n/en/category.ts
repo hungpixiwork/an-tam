@@ -2,6 +2,7 @@ const messages: Record<string, string> = {
   // Transaction Categories
   "category.salary": "Salary",
   "category.bonus": "Bonus",
+  "category.freelance": "Side work",
   "category.business": "Business",
   "category.invest_income": "Investment Returns",
   "category.other_income": "Other Income",
