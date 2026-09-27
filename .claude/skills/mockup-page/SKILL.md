@@ -40,10 +40,13 @@ agent-browser [--session pN] set viewport 1672 941
 agent-browser [--session pN] open http://localhost:<vite>/dang-nhap ; agent-browser snapshot -i -c
 # fill email hung.demo@antam.vn / mật khẩu demo12345, click Đăng nhập
 agent-browser eval "localStorage.setItem('antam_locale','vi'); location.href='<route>'; 1"
-agent-browser wait 1500 ; agent-browser screenshot --full .agents/pages/shots/0N-r<k>.png
+agent-browser wait 1500 ; agent-browser screenshot --full ./.agents/pages/shots/0N-r<k>.png   # BẮT BUỘC có './' — '.agents/...' bị hiểu là CSS selector
 ```
 - Tiếng Việt gửi API: dùng Node `fetch`, không curl inline.
 - Sidebar trông bị cụt ở ảnh full-page là bình thường (sticky), đừng sửa.
+- Viết file bằng tool Write/Edit, không dùng heredoc Bash (hỏng khi có dấu nháy đơn).
+- Khi thay stub 501 bằng route thật: xóa path đó khỏi danh sách 501 trong `tests/health.test.ts`.
+- Bảng `transactions` chỉ lưu ngày (không giờ) — hiển thị "Hôm nay/Hôm qua/dd/mm/yyyy".
 
 ## Quy trình
 1. **Đọc mockup** (Read ảnh) + mục trang N trong pages.md. Ghi `.agents/pages/0N-<slug>.md` ngắn: lưới 12 cột từng hàng + luồng dữ liệu `khối → hook → endpoint → engine → bảng` + hành động người dùng → khối nào đổi. (≤40 dòng)
