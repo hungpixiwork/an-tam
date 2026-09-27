@@ -28,7 +28,7 @@ body {
   cursor: pointer;
 }
 .range-slider:focus-visible {
-  outline: 2px solid #2f7bea;
+  outline: 2px solid #2563eb;
   outline-offset: 4px;
 }
 .range-slider::-webkit-slider-thumb {
@@ -36,7 +36,7 @@ body {
   width: 18px;
   height: 18px;
   border-radius: 9999px;
-  background: #2f7bea;
+  background: #2563eb;
   border: 3px solid #fff;
   box-shadow: 0 1px 4px rgba(15, 42, 68, 0.35);
 }
@@ -44,7 +44,15 @@ body {
   width: 14px;
   height: 14px;
   border-radius: 9999px;
-  background: #2f7bea;
+  background: #2563eb;
   border: 3px solid #fff;
   box-shadow: 0 1px 4px rgba(15, 42, 68, 0.35);
+}
+
+/* Ẩn thanh cuộn nhưng vẫn cuộn được (tabs, lưới lịch trên màn nhỏ) */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

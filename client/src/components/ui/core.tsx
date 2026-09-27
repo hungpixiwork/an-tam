@@ -20,6 +20,22 @@ export const TONE: Record<Tone, { soft: string; text: string; solid: string; rin
   gray:   { soft: 'bg-slate-100',  text: 'text-ink-soft',    solid: 'bg-slate-400',   ring: 'ring-slate-100' },
 };
 
+/** Tone mở rộng cho badge/icon pastel của mockup (hồng, vàng hổ phách, xanh trời). */
+export type ExtTone = Tone | 'rose' | 'amber' | 'sky';
+
+export const TONE_EXT: Record<ExtTone, { soft: string; text: string; solid: string; ring: string }> = {
+  ...TONE,
+  rose:  { soft: 'bg-rose-50',  text: 'text-rose-600',  solid: 'bg-rose-500',  ring: 'ring-rose-100' },
+  amber: { soft: 'bg-amber-50', text: 'text-amber-600', solid: 'bg-amber-500', ring: 'ring-amber-100' },
+  sky:   { soft: 'bg-sky-50',   text: 'text-sky-600',   solid: 'bg-sky-500',   ring: 'ring-sky-100' },
+};
+
+/** Mã màu hex theo tone (dùng cho SVG/recharts). */
+export const TONE_HEX: Record<ExtTone, string> = {
+  blue: '#2563EB', green: '#1FA16B', orange: '#F5A524', violet: '#8B5CF6', red: '#EF4444',
+  teal: '#0F5E45', gray: '#94A3B8', rose: '#F43F5E', amber: '#F59E0B', sky: '#0EA5E9',
+};
+
 /* ───────── Card ───────── */
 
 const CARD_TONE = {
@@ -63,12 +79,12 @@ export function CardTitle({ icon: Icon, tone = 'blue', title, subtitle, action, 
   );
 }
 
-export function IconTile({ icon: Icon, tone = 'blue', size = 'md', className }: { icon: LucideIcon; tone?: Tone; size?: 'sm' | 'md' | 'lg'; className?: string }) {
+export function IconTile({ icon: Icon, tone = 'blue', size = 'md', className }: { icon: LucideIcon; tone?: ExtTone; size?: 'sm' | 'md' | 'lg'; className?: string }) {
   const box = size === 'sm' ? 'h-9 w-9 rounded-lg' : size === 'lg' ? 'h-12 w-12 rounded-xl' : 'h-11 w-11 rounded-xl';
   const ico = size === 'sm' ? 'h-[18px] w-[18px]' : size === 'lg' ? 'h-6 w-6' : 'h-[22px] w-[22px]';
   return (
-    <span className={cx('inline-flex shrink-0 items-center justify-center', box, TONE[tone].soft, className)}>
-      <Icon className={cx(ico, TONE[tone].text)} strokeWidth={2.2} aria-hidden />
+    <span className={cx('inline-flex shrink-0 items-center justify-center', box, TONE_EXT[tone].soft, className)}>
+      <Icon className={cx(ico, TONE_EXT[tone].text)} strokeWidth={2.2} aria-hidden />
     </span>
   );
 }
@@ -128,9 +144,17 @@ export function TextLink({ children, className, ...rest }: LinkProps) {
 
 /* ───────── Badge ───────── */
 
-export function Badge({ tone = 'blue', children, icon: Icon, className }: { tone?: Tone; children: ReactNode; icon?: LucideIcon; className?: string }) {
+export function Badge({ tone = 'blue', children, icon: Icon, size = 'md', className }: { tone?: ExtTone; children: ReactNode; icon?: LucideIcon; size?: 'sm' | 'md'; className?: string }) {
   return (
-    <span className={cx('inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold', TONE[tone].soft, TONE[tone].text, className)}>
+    <span
+      className={cx(
+        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full font-semibold',
+        size === 'sm' ? 'h-6 px-2.5 text-[11.5px]' : 'h-7 px-3 text-[13px]',
+        TONE_EXT[tone].soft,
+        TONE_EXT[tone].text,
+        className,
+      )}
+    >
       {Icon && <Icon className="h-3.5 w-3.5" aria-hidden />}
       {children}
     </span>
@@ -161,7 +185,7 @@ export function Toggle({ checked, onChange, label, disabled }: { checked: boolea
       onClick={() => onChange(!checked)}
       className={cx(
         'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-600 disabled:opacity-60',
-        checked ? 'bg-accent-600' : 'bg-[#CBD5E1]',
+        checked ? 'bg-primary-700' : 'bg-[#CBD5E1]',
       )}
     >
       <span className={cx('inline-block h-5 w-5 rounded-full bg-white shadow transition-transform', checked ? 'translate-x-6' : 'translate-x-1')} />

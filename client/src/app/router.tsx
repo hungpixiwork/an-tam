@@ -13,13 +13,14 @@ function safeLazy<T extends React.ComponentType<any>>(factory: () => Promise<{ d
 const OnboardingPage = safeLazy(() => import('@/features/onboarding/OnboardingPage'));
 const LedgerPage = safeLazy(() => import('@/features/ledger/LedgerPage'));
 const OverviewPage = safeLazy(() => import('@/features/overview/OverviewPage'));
-const GoalsPage = safeLazy(() => import('@/features/goals/GoalsPage'));
 const SimulationPage = safeLazy(() => import('@/features/simulation/SimulationPage'));
 const SimulationResultPage = safeLazy(() => import('@/features/simulation/SimulationResultPage'));
-const HabitsPage = safeLazy(() => import('@/features/habits/HabitsPage'));
 const PortfolioPage = safeLazy(() => import('@/features/portfolio/PortfolioPage'));
-const SafetyPlanPage = safeLazy(() => import('@/features/plan/SafetyPlanPage'));
-const AiMonitorPage = safeLazy(() => import('@/features/ai/AiMonitorPage'));
+const SafetyPage = safeLazy(() => import('@/features/safety/SafetyPage'));
+const CalendarPage = safeLazy(() => import('@/features/calendar/CalendarPage'));
+const ChoicesPage = safeLazy(() => import('@/features/choices/ChoicesPage'));
+const WorkspacePage = safeLazy(() => import('@/features/workspace/WorkspacePage'));
+const AuditPage = safeLazy(() => import('@/features/audit/AuditPage'));
 const CommunityPage = safeLazy(() => import('@/features/community/CommunityPage'));
 const SettingsPage = safeLazy(() => import('@/features/settings/SettingsPage'));
 const EarnPage = safeLazy(() => import('@/features/earn/EarnPage'));
@@ -50,16 +51,22 @@ export const router = createBrowserRouter([
         children: [
           { path: '/', element: <OverviewPage /> },
           { path: '/thu-chi', element: <LedgerPage /> },
+          { path: '/quy-an-toan', element: <SafetyPage /> },
           { path: '/tang-thu-nhap', element: <EarnPage /> },
-          { path: '/muc-tieu', element: <GoalsPage /> },
+          { path: '/lua-chon', element: <ChoicesPage /> },
+          { path: '/lich-ai', element: <CalendarPage /> },
           { path: '/mo-phong', element: <SimulationPage /> },
           { path: '/mo-phong/ket-qua/:runId', element: <SimulationResultPage /> },
-          { path: '/thoi-quen', element: <HabitsPage /> },
           { path: '/danh-muc', element: <PortfolioPage /> },
-          { path: '/ke-hoach', element: <SafetyPlanPage /> },
-          { path: '/ai-theo-doi', element: <AiMonitorPage /> },
+          { path: '/ai-workspace', element: <WorkspacePage /> },
+          { path: '/nhat-ky-ai', element: <AuditPage /> },
           { path: '/cong-dong', element: <CommunityPage /> },
           { path: '/cai-dat', element: <SettingsPage /> },
+          // Trang cũ đã gộp vào trang mới (file giữ lại cho các wave sau)
+          { path: '/muc-tieu', element: <Navigate to="/quy-an-toan" replace /> },
+          { path: '/ke-hoach', element: <Navigate to="/quy-an-toan" replace /> },
+          { path: '/ai-theo-doi', element: <Navigate to="/nhat-ky-ai" replace /> },
+          { path: '/thoi-quen', element: <Navigate to="/thu-chi?tab=thoi-quen" replace /> },
         ],
       },
       ...(import.meta.env.DEV ? [{ path: '/dev/pixel', element: <PixelGallery />, errorElement: <RouteErrorBoundary /> }] : []),

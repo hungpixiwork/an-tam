@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, ChevronDown, FileText, Lock, LogOut, Menu, Search, Settings, Target } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Bell, BookOpen, CalendarDays, CalendarCheck, ChevronDown, FileText, LockKeyhole, LogOut, Menu, Search, Settings, Target } from 'lucide-react';
 import { useAuth, useMe } from '@/app/auth';
 import { useLocale } from '@/app/locale';
+import { searchPlaceholderFor } from '@/app/nav';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { PixelAvatar } from '@/components/pixel';
 import { cx } from '@/components/ui';
-import { useNotifications, useSearch } from '@/lib/queries';
+import { useIntegrationStatus, useNotifications, useSearch } from '@/lib/queries';
 
 /** Đóng popover khi bấm ra ngoài hoặc nhấn Esc. */
 function useDismiss(open: boolean, close: () => void) {
@@ -31,6 +32,8 @@ function SearchBox() {
   const [open, setOpen] = useState(false);
   const [debounced, setDebounced] = useState('');
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const placeholder = searchPlaceholderFor(pathname, t);
   const ref = useDismiss(open, () => setOpen(false));
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q.trim()), 200);
@@ -45,7 +48,7 @@ function SearchBox() {
   const ICON = { page: FileText, goal: Target, lesson: BookOpen };
 
   return (
-    <div ref={ref} className="relative hidden w-[200px] md:block xl:w-[240px] 2xl:w-[276px]">
+    <div ref={ref} className="relative hidden min-w-0 max-w-[720px] flex-1 md:block">
       <Search className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-ink-soft" aria-hidden />
       <input
         type="search"
@@ -56,9 +59,10 @@ function SearchBox() {
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={(e) => e.key === 'Enter' && data[0] && go(data[0].to)}
-        placeholder={t('topbar.search_placeholder')}
-        aria-label={t('topbar.search_placeholder')}
-        className="h-11 w-full rounded-xl border border-line bg-[#F4F7FA] pl-10 pr-3 text-sm text-ink placeholder:text-ink-soft focus:border-accent-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-accent-100"
+        placeholder={placeholder}
+        aria-label={placeholder}
+        title={placeholder}
+        className="h-11 w-full truncate rounded-xl border border-line bg-[#F6F8FA] pl-10 pr-3 text-sm text-ink placeholder:text-ink-soft focus:border-accent-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-accent-100"
       />
       {open && debounced && (
         <div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-xl border border-line bg-white py-1 shadow-lift">
@@ -93,8 +97,8 @@ function NotificationBell() {
   const { data = [] } = useNotifications();
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="relative rounded-xl p-2.5 text-ink-soft hover:bg-slate-100" aria-label={`Thông báo${data.length ? ` (${data.length} cảnh báo đang mở)` : ''}`} aria-expanded={open}>
-        <Bell className="h-6 w-6" />
+      <button type="button" onClick={() => setOpen((v) => !v)} className="relative rounded-xl p-2.5 text-ink-soft hover:bg-slate-100" aria-label={data.length ? t('topbar.notifications_count', { n: data.length }) : t('topbar.notifications')} aria-expanded={open}>
+        <Bell className="h-6 w-6" aria-hidden />
         {data.length > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-danger-500 ring-2 ring-white" />}
       </button>
       {open && (
@@ -104,13 +108,13 @@ function NotificationBell() {
             <p className="px-4 py-4 text-sm text-ink-soft">{t('topbar.no_alerts')}</p>
           ) : (
             data.map((n) => (
-              <Link key={n.id} to="/ai-theo-doi" onClick={() => setOpen(false)} className="flex gap-3 px-4 py-3 hover:bg-slate-50">
+              <Link key={n.id} to="/nhat-ky-ai" onClick={() => setOpen(false)} className="flex gap-3 px-4 py-3 hover:bg-slate-50">
                 <span className={cx('mt-1.5 h-2 w-2 shrink-0 rounded-full', SEVERITY_DOT[n.severity])} />
                 <span className="text-sm text-ink">{n.title}</span>
               </Link>
             ))
           )}
-          <Link to="/ai-theo-doi" onClick={() => setOpen(false)} className="block border-t border-line px-4 py-2.5 text-center text-[13px] font-semibold text-accent-600 hover:bg-accent-50">
+          <Link to="/nhat-ky-ai" onClick={() => setOpen(false)} className="block border-t border-line px-4 py-2.5 text-center text-[13px] font-semibold text-accent-600 hover:bg-accent-50">
             {t('topbar.view_all_alerts')}
           </Link>
         </div>
@@ -159,22 +163,47 @@ function UserMenu() {
   );
 }
 
+/** Nút Google Calendar: chưa kết nối → dẫn tới Nhật ký AI › Ứng dụng & tích hợp. */
+function GoogleCalendarButton() {
+  const { t } = useLocale();
+  const { google } = useIntegrationStatus();
+  const connected = google === 'connected';
+  const label = connected ? t('topbar.google_connected') : google === 'error' ? t('topbar.google_reconnect') : t('topbar.connect_google');
+  const Icon = connected ? CalendarCheck : CalendarDays;
+  return (
+    <Link
+      to="/nhat-ky-ai#integrations"
+      title={label}
+      className={cx(
+        'hidden h-11 shrink-0 items-center gap-2 rounded-xl border px-3.5 text-[13px] font-semibold transition-colors 2xl:flex',
+        connected ? 'border-success-100 bg-success-50 text-success-600 hover:bg-success-100' : 'border-line bg-white text-accent-600 hover:bg-accent-50',
+      )}
+    >
+      <Icon className="h-[18px] w-[18px]" aria-hidden />
+      {label}
+    </Link>
+  );
+}
+
+/** Topbar theo mockup: tìm kiếm theo trang · Google Calendar · riêng tư · chuông · ngôn ngữ · tài khoản. Tiêu đề trang chỉ còn H1 ẩn (hero của trang hiển thị tiêu đề). */
 export function Topbar({ title, onMenu }: { title: string; onMenu: () => void }) {
   const { t } = useLocale();
 
   return (
-    <header className="sticky top-0 z-20 flex h-[76px] items-center gap-3 border-b border-line bg-white px-4 md:px-8 md:gap-4">
-      <button type="button" onClick={onMenu} className="rounded-lg p-2 text-ink-soft hover:bg-slate-100 lg:hidden" aria-label="Mở menu">
-        <Menu className="h-6 w-6" />
+    <header className="sticky top-0 z-20 flex h-[72px] items-center gap-2.5 border-b border-line bg-white/95 px-4 backdrop-blur md:gap-3 md:px-6">
+      <button type="button" onClick={onMenu} className="rounded-lg p-2 text-ink-soft hover:bg-slate-100 lg:hidden" aria-label={t('nav.open_menu')}>
+        <Menu className="h-6 w-6" aria-hidden />
       </button>
-      <h1 className="min-w-0 flex-1 truncate text-[22px] font-bold tracking-tight text-ink md:text-[26px] 2xl:text-[28px]">{title}</h1>
+      <h1 className="sr-only">{title}</h1>
       <SearchBox />
-      <Link to="/cai-dat" className="hidden h-11 items-center gap-2 rounded-xl bg-success-50 px-4 text-[13px] font-medium text-success-600 hover:bg-[#D9F2E5] xl:flex">
-        <Lock className="h-4 w-4" aria-hidden />
+      <div className="flex-1 md:hidden" />
+      <GoogleCalendarButton />
+      <Link to="/nhat-ky-ai#privacy" className="hidden h-11 shrink-0 items-center gap-2 rounded-xl bg-success-50 px-3.5 text-[13px] font-semibold text-success-600 hover:bg-success-100 xl:flex">
+        <LockKeyhole className="h-4 w-4" aria-hidden />
         {t('topbar.privacy_badge')}
       </Link>
-      <LanguageSelector variant="button" />
       <NotificationBell />
+      <LanguageSelector variant="button" />
       <UserMenu />
     </header>
   );
