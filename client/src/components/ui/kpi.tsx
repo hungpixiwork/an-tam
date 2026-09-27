@@ -27,12 +27,14 @@ export interface KpiCardProps {
   valueClassName?: string;
   /** Tooltip của icon (i) cạnh nhãn. */
   info?: string;
+  /** Dòng nhỏ ngay dưới giá trị ("So với tháng trước"). */
+  sub?: ReactNode;
   children?: ReactNode;
   className?: string;
 }
 
 /** Thẻ chỉ số: icon tile + nhãn + giá trị lớn + delta/badge + progress + chú thích (mockup Tổng quan, Sổ thu chi, Danh mục). */
-export function KpiCard({ icon, tone = 'green', label, value, unit, delta, badge, progress, footnote, aside, valueClassName, info, children, className }: KpiCardProps) {
+export function KpiCard({ icon, tone = 'green', label, value, unit, delta, badge, progress, footnote, aside, valueClassName, info, sub, children, className }: KpiCardProps) {
   return (
     <section className={cx('flex min-w-0 flex-col rounded-2xl border border-line bg-white p-5 shadow-card', className)}>
       <div className="flex items-start gap-4">
@@ -55,6 +57,7 @@ export function KpiCard({ icon, tone = 'green', label, value, unit, delta, badge
             {badge}
             {aside && <div className="ml-auto shrink-0">{aside}</div>}
           </div>
+          {sub && <div className="mt-2 text-[12.5px] text-ink-soft">{sub}</div>}
         </div>
       </div>
       {progress && (

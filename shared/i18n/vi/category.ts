@@ -7,12 +7,12 @@ const messages: Record<string, string> = {
   "category.other_income": "Thu khác",
   "category.food": "Ăn uống",
   "category.housing": "Nhà ở",
-  "category.transport": "Đi lại",
+  "category.transport": "Di chuyển",
   "category.children": "Con cái",
-  "category.health": "Sức khỏe",
+  "category.health": "Y tế & Sức khỏe",
   "category.shopping": "Mua sắm",
   "category.entertainment": "Giải trí",
-  "category.other_expense": "Chi khác",
+  "category.other_expense": "Khác",
 };
 
 export default messages;

@@ -113,9 +113,9 @@ async function goals() {
 const MONTHS = [
   { d: -5, freelance: 2_500 * K, invest: 1_500 * K, expense: 21_500 * K },
   { d: -4, freelance: 0, invest: 2 * M, expense: 24_500 * K },
-  { d: -3, freelance: 0, invest: 0, expense: 23 * M },
+  { d: -3, freelance: 2_600 * K, invest: 0, expense: 21_980 * K },
   { d: -2, freelance: 3 * M, invest: 2 * M, expense: 18_500 * K },
-  { d: -1, freelance: 4 * M, invest: 2 * M, expense: 18_500 * K },
+  { d: -1, freelance: 1_400 * K, invest: 2 * M, expense: 19_520 * K },
   { d: 0, freelance: 4 * M, invest: 2_500 * K, expense: 21 * M },
 ];
 const SHARES = [
@@ -128,10 +128,41 @@ const SHARES = [
   ['other_expense', 0.08, 'Chi khác', 25],
 ];
 
+// Tháng này (mockup trang 2): chi 21 triệu = Ăn uống 35% · Nhà ở 20% · Di chuyển 12% · Mua sắm 10% · Giải trí 8% · Y tế 7% · Khác 8%.
+// Hóa đơn định kỳ (điện, internet, Netflix, Spotify, bảo hiểm) được ghi ở bước "Hóa đơn" qua "Đánh dấu đã trả".
+function currentMonthTransactions() {
+  const dom = Number(today.slice(8, 10));
+  const day = (n) => `${thisMonth}-${String(Math.max(1, Math.min(n, dom))).padStart(2, '0')}`;
+  const ago = (k) => day(dom - k);
+  const e = (amount, category, note, occurredOn, valueTag = 'essential') => ({ kind: 'expense', amount, category, note, occurredOn, valueTag });
+  return [
+    { kind: 'income', amount: 22 * M, category: 'salary', note: 'Lương – Công ty TNHH ABC', occurredOn: day(5) },
+    { kind: 'income', amount: 2_500 * K, category: 'invest_income', note: 'Lãi quỹ & cổ tức', occurredOn: day(20) },
+    { kind: 'income', amount: 4 * M, category: 'business', note: 'Dự án freelance', occurredOn: ago(1) },
+    e(4_280 * K, 'food', 'Đi chợ & siêu thị', day(3)),
+    e(600 * K, 'food', 'Cà phê, trà sữa', day(8), 'regret'),
+    e(600 * K, 'food', 'Cà phê, trà sữa', day(19), 'regret'),
+    e(600 * K, 'food', 'Đặt món qua ứng dụng', day(10), 'regret'),
+    e(600 * K, 'food', 'Đặt món qua ứng dụng', day(17), 'regret'),
+    e(600 * K, 'food', 'Đặt món qua ứng dụng', day(21), 'regret'),
+    e(70 * K, 'food', 'Phở Bát Đàn', ago(0), 'useful'),
+    e(3_160 * K, 'housing', 'Tiền nhà', day(1)),
+    e(2_400 * K, 'transport', 'Xăng xe & gửi xe', day(6)),
+    e(120 * K, 'transport', 'Grab', ago(3), 'useful'),
+    e(1_650 * K, 'shopping', 'Mua sắm đồ dùng', day(4), 'useful'),
+    e(450 * K, 'shopping', 'Shopee', ago(2), 'useful'),
+    e(1_441 * K, 'entertainment', 'Xem phim & đi chơi cuối tuần', day(13), 'joy'),
+    e(1_120 * K, 'health', 'Khám sức khỏe & thuốc', day(16)),
+    e(1_180 * K, 'other_expense', 'Chi khác', day(18)),
+    e(500 * K, 'other_expense', 'Đăng ký app ít dùng', day(14), 'regret'),
+  ];
+}
+
 function monthTransactions({ d, freelance, invest, expense }) {
+  if (d === 0) return currentMonthTransactions();
   const month = addMonths(thisMonth, d);
   const day = (n) => `${month}-${String(n).padStart(2, '0')}`;
-  const list = [{ kind: 'income', amount: 22 * M, category: 'salary', note: 'Lương tháng', occurredOn: day(5) }];
+  const list = [{ kind: 'income', amount: 22 * M, category: 'salary', note: 'Lương – Công ty TNHH ABC', occurredOn: day(5) }];
   if (freelance) list.push({ kind: 'income', amount: freelance, category: 'business', note: 'Dự án freelance', occurredOn: day(15) });
   if (invest) list.push({ kind: 'income', amount: invest, category: 'invest_income', note: 'Lãi quỹ & cổ tức', occurredOn: day(20) });
   let left = expense;
@@ -140,17 +171,7 @@ function monthTransactions({ d, freelance, invest, expense }) {
     left -= amount;
     list.push({ kind: 'expense', amount, category, note, occurredOn: day(n), valueTag: 'essential' });
   });
-  if (d === 0) {
-    // Tháng này: tách các khoản "không đáng" để AI gợi ý cắt giảm (~1,2 triệu)
-    const food = list.find((t) => t.category === 'food');
-    food.amount -= 700 * K;
-    list.push({ kind: 'expense', amount: 700 * K, category: 'food', note: 'Đồ ăn ngoài, trà sữa', occurredOn: day(9), valueTag: 'regret' });
-    const other = list.find((t) => t.category === 'other_expense');
-    other.amount -= 500 * K;
-    list.push({ kind: 'expense', amount: 500 * K, category: 'other_expense', note: 'Đăng ký app ít dùng', occurredOn: day(11), valueTag: 'regret' });
-  }
-  // Không ghi giao dịch trong tương lai
-  return list.filter((t) => t.occurredOn <= today);
+  return list;
 }
 
 async function ledger() {
@@ -158,6 +179,28 @@ async function ledger() {
     const month = addMonths(thisMonth, m.d);
     for (const t of (await get(`/transactions?month=${month}`)).items) await del(`/transactions/${t.id}`);
     for (const t of monthTransactions(m)) await post('/transactions', t);
+  }
+}
+
+/* ───────── 5b. Ngân sách & hóa đơn định kỳ ───────── */
+const BILLS = [
+  { name: 'Tiền điện', amount: 820 * K, category: 'housing', dayOfMonth: 10, autoRenew: false, icon: 'zap' },
+  { name: 'Tiền internet', amount: 220 * K, category: 'housing', dayOfMonth: 15, autoRenew: false, icon: 'wifi' },
+  { name: 'Netflix', amount: 180 * K, category: 'entertainment', dayOfMonth: 20, autoRenew: true, icon: 'tv' },
+  { name: 'Spotify', amount: 59 * K, category: 'entertainment', dayOfMonth: 22, autoRenew: true, icon: 'music' },
+  { name: 'Bảo hiểm sức khỏe', amount: 350 * K, category: 'health', dayOfMonth: 25, autoRenew: true, icon: 'shield' },
+];
+
+async function billsAndBudget() {
+  // Ngân sách chi tháng này 31 triệu (đã chi 21 triệu ≈ 68%, còn 10 triệu)
+  await put(`/budgets/${thisMonth}`, { limit: 31 * M });
+  for (const b of await get('/bills')) await del(`/bills/${b.id}`);
+  const dom = Number(today.slice(8, 10));
+  for (const b of BILLS) {
+    const { id } = await post('/bills', b);
+    // Tháng này đã trả hết (bảo hiểm trả sớm trước hạn)
+    const paidDay = Math.min(b.name === 'Bảo hiểm sức khỏe' ? dom - 4 : b.dayOfMonth, dom);
+    if (paidDay >= 1) await post(`/bills/${id}/paid`, { occurredOn: `${thisMonth}-${String(paidDay).padStart(2, '0')}` });
   }
 }
 
@@ -224,6 +267,7 @@ const steps = [
   ['Tài sản & nợ', assets],
   ['Mục tiêu', goals],
   ['Sổ thu chi 6 tháng', ledger],
+  ['Ngân sách & hóa đơn', billsAndBudget],
   ['Thu nhập, thời gian, kỹ năng', earn],
   ['Lịch hôm nay', calendar],
   ['Lựa chọn cuộc đời', lifeChoices],
@@ -237,9 +281,12 @@ try {
     console.log('xong');
   }
   const o = await get('/overview');
+  const l = await get('/ledger/dashboard');
   console.log(
     `\nĐiểm An Tâm ${o.peace.score} (${o.peaceDelta >= 0 ? '+' : ''}${o.peaceDelta ?? '—'}) · an toàn ${o.safeMonths.months} tháng · dòng tiền ${o.cashflow6m.net.toLocaleString('vi-VN')}đ` +
-      ` · tiết kiệm ${Math.round((o.savingsRateVsPeers.rate ?? 0) * 100)}% · tài sản ròng ${o.netWorthBreakdown.net.toLocaleString('vi-VN')}đ · ${o.todayEvents.length} việc hôm nay`,
+      ` · tiết kiệm ${Math.round((o.savingsRateVsPeers.rate ?? 0) * 100)}% · tài sản ròng ${o.netWorthBreakdown.net.toLocaleString('vi-VN')}đ · ${o.todayEvents.length} việc hôm nay` +
+      `
+Sổ thu chi: thu ${l.totals.income.toLocaleString('vi-VN')}đ · chi ${l.totals.expense.toLocaleString('vi-VN')}đ · ngân sách ${Math.round((l.budget.pct ?? 0) * 100)}% · ${l.categories.map((c) => `${c.key} ${Math.round(c.pct * 100)}%`).join(' ')} · tiết kiệm được ${l.advice.saving?.monthly ?? 0}`,
   );
 } catch (e) {
   console.error(`\nLỗi: ${e.message}`);

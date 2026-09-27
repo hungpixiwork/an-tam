@@ -19,12 +19,12 @@ export const TRANSACTION_CATEGORIES: TransactionCategory[] = [
   { key: 'other_income', kind: 'income', label: 'Thu khác', icon: 'plus-circle' },
   { key: 'food', kind: 'expense', label: 'Ăn uống', icon: 'utensils' },
   { key: 'housing', kind: 'expense', label: 'Nhà ở', icon: 'home' },
-  { key: 'transport', kind: 'expense', label: 'Đi lại', icon: 'car' },
+  { key: 'transport', kind: 'expense', label: 'Di chuyển', icon: 'car' },
   { key: 'children', kind: 'expense', label: 'Con cái', icon: 'baby' },
-  { key: 'health', kind: 'expense', label: 'Sức khỏe', icon: 'heart-pulse' },
+  { key: 'health', kind: 'expense', label: 'Y tế & Sức khỏe', icon: 'heart-pulse' },
   { key: 'shopping', kind: 'expense', label: 'Mua sắm', icon: 'shopping-bag' },
   { key: 'entertainment', kind: 'expense', label: 'Giải trí', icon: 'party-popper' },
-  { key: 'other_expense', kind: 'expense', label: 'Chi khác', icon: 'more-horizontal' },
+  { key: 'other_expense', kind: 'expense', label: 'Khác', icon: 'more-horizontal' },
 ];
 
 export const categoryOf = (key: string): TransactionCategory | undefined => TRANSACTION_CATEGORIES.find((c) => c.key === key);

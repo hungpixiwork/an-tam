@@ -44,7 +44,8 @@ describe('GET /api/health', () => {
   });
 });
 
-const STUBS: [string, string][] = [
+/** Route mới đã có handler thật (trang 2 Sổ thu chi) — vẫn phải yêu cầu đăng nhập. */
+const IMPLEMENTED: [string, string][] = [
   ['GET', '/api/ledger/dashboard?month=2026-09'],
   ['POST', '/api/ledger/split'],
   ['PUT', '/api/settings/payout-account'],
@@ -52,6 +53,9 @@ const STUBS: [string, string][] = [
   ['PUT', '/api/budgets/2026-09'],
   ['GET', '/api/bills'],
   ['POST', '/api/bills/b1/paid'],
+];
+
+const STUBS: [string, string][] = [
   ['GET', '/api/safety'],
   ['PUT', '/api/safety/target'],
   ['GET', '/api/skills'],
@@ -85,7 +89,7 @@ const STUBS: [string, string][] = [
 
 describe('Stub routes Wave 0', () => {
   it('chưa đăng nhập → 401 cho mọi route mới', async () => {
-    for (const [method, path] of STUBS) {
+    for (const [method, path] of [...IMPLEMENTED, ...STUBS]) {
       const res = await worker.fetch(req(path, { method }), envWith());
       expect(res.status, `${method} ${path}`).toBe(401);
     }

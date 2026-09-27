@@ -10,7 +10,7 @@ import { HeroLakeCity, PixelAvatar } from '@/components/pixel';
 import { Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, ScoreRing, ButtonLink, cx, type Tone } from '@/components/ui';
 import { useAnswerHabit, useHabits, useSetSelfScore } from '@/lib/queries';
 
-export default function HabitsPage() {
+export default function HabitsTab() {
   const { data, error, refetch, isPending } = useHabits();
   if (isPending) return <PageSkeleton />;
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />;
