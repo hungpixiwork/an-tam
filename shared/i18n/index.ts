@@ -1,9 +1,9 @@
 export type Locale = 'vi' | 'en' | 'zh';
 export type Currency = 'VND' | 'CNY' | 'USD';
 
-import viMessages from './vi';
-import enMessages from './en';
-import zhMessages from './zh';
+import viMessages from './vi/index';
+import enMessages from './en/index';
+import zhMessages from './zh/index';
 
 export function getMessages(locale: Locale): Record<string, string> {
   switch (locale) {

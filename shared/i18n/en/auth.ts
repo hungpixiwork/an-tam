@@ -1,0 +1,31 @@
+const messages: Record<string, string> = {
+  // Auth (Login / Register)
+  "auth.login_title": "Welcome back",
+  "auth.login_subtitle": "Sign in to see your financial health today.",
+  "auth.email": "Email",
+  "auth.password": "Password",
+  "auth.password_hint": "At least 8 characters",
+  "auth.login_btn": "Sign In",
+  "auth.logging_in": "Signing in…",
+  "auth.no_account": "Don't have an account?",
+  "auth.create_account": "Create account",
+  "auth.register_title": "Create your account",
+  "auth.register_subtitle": "Takes just 2 minutes for An Tam AI to understand your financial profile.",
+  "auth.salutation": "Salutation",
+  "auth.salutation.anh": "Mr.",
+  "auth.salutation.chi": "Ms.",
+  "auth.salutation.ban": "You",
+  "auth.full_name": "Full name",
+  "auth.full_name_placeholder": "Your full name",
+  "auth.register_btn": "Create Account",
+  "auth.registering": "Creating account…",
+  "auth.have_account": "Already have an account?",
+  "auth.footer_secure": "Encrypted HTTPS connection. Passwords securely hashed.",
+  "auth.login_failed": "Sign in failed",
+  "auth.register_failed": "Registration failed",
+  "auth.demo_btn": "Quick Demo Login",
+  "auth.demo_logging_in": "Launching demo…",
+  "auth.or_divider": "or",
+};
+
+export default messages;

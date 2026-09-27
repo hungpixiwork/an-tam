@@ -1,0 +1,31 @@
+const messages: Record<string, string> = {
+  // 认证 (登录 / 注册)
+  "auth.login_title": "欢迎回来",
+  "auth.login_subtitle": "登录以查看您今天的财务健康状况与行动建议。",
+  "auth.email": "电子邮箱",
+  "auth.password": "账户密码",
+  "auth.password_hint": "至少 8 位字符",
+  "auth.login_btn": "立即登录",
+  "auth.logging_in": "正在登录…",
+  "auth.no_account": "还没有账户？",
+  "auth.create_account": "免费注册",
+  "auth.register_title": "创建您的账户",
+  "auth.register_subtitle": "只需 2 分钟，让安心 AI 快速了解您的财务状况与目标。",
+  "auth.salutation": "称谓",
+  "auth.salutation.anh": "先生",
+  "auth.salutation.chi": "女士",
+  "auth.salutation.ban": "您",
+  "auth.full_name": "真实姓名",
+  "auth.full_name_placeholder": "请输入您的姓名",
+  "auth.register_btn": "立即注册",
+  "auth.registering": "正在创建账户…",
+  "auth.have_account": "已有账户？",
+  "auth.footer_secure": "全程 HTTPS 加密传输，密码经高强度单向哈希存储。",
+  "auth.login_failed": "登录失败，请检查账号密码",
+  "auth.register_failed": "注册失败，请稍后重试",
+  "auth.demo_btn": "快速体验演示 (Demo)",
+  "auth.demo_logging_in": "正在进入演示模式…",
+  "auth.or_divider": "或者",
+};
+
+export default messages;

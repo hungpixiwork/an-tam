@@ -61,6 +61,29 @@ describe('i18n key parity', () => {
     expect(extraInZh, `Extra in ZH: ${extraInZh.join(', ')}`).toEqual([]);
   });
 
+  it('namespace files are split by key prefix and match across locales', async () => {
+    const { namespaces: vi } = await import('../shared/i18n/vi');
+    const { namespaces: en } = await import('../shared/i18n/en');
+    const { namespaces: zh } = await import('../shared/i18n/zh');
+
+    expect(Object.keys(en).sort()).toEqual(Object.keys(vi).sort());
+    expect(Object.keys(zh).sort()).toEqual(Object.keys(vi).sort());
+    for (const expected of ['nav', 'topbar', 'common', 'safety', 'calendar', 'choices', 'workspace', 'audit', 'portfolio', 'overview']) {
+      expect(Object.keys(vi)).toContain(expected);
+    }
+
+    for (const locale of [vi, en, zh]) {
+      for (const [ns, msgs] of Object.entries(locale)) {
+        const stray = Object.keys(msgs).filter((k) => k.split('.')[0] !== ns);
+        expect(stray, `Keys outside namespace "${ns}": ${stray.join(', ')}`).toEqual([]);
+      }
+    }
+    for (const ns of Object.keys(vi) as (keyof typeof vi)[]) {
+      expect(Object.keys(en[ns]).sort(), `EN namespace ${ns}`).toEqual(Object.keys(vi[ns]).sort());
+      expect(Object.keys(zh[ns]).sort(), `ZH namespace ${ns}`).toEqual(Object.keys(vi[ns]).sort());
+    }
+  });
+
   it('translates spending tags correctly', () => {
     expect(t('vi', 'spending.tag.essential')).toBe('Thiết yếu');
     expect(t('en', 'spending.tag.essential')).toBe('Essential');

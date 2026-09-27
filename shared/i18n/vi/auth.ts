@@ -1,0 +1,31 @@
+const messages: Record<string, string> = {
+  // Xác thực (Đăng nhập / Đăng ký)
+  "auth.login_title": "Chào mừng trở lại",
+  "auth.login_subtitle": "Đăng nhập để xem tình hình tài chính của bạn hôm nay.",
+  "auth.email": "Email",
+  "auth.password": "Mật khẩu",
+  "auth.password_hint": "Ít nhất 8 ký tự",
+  "auth.login_btn": "Đăng nhập",
+  "auth.logging_in": "Đang đăng nhập…",
+  "auth.no_account": "Chưa có tài khoản?",
+  "auth.create_account": "Tạo tài khoản",
+  "auth.register_title": "Tạo tài khoản",
+  "auth.register_subtitle": "Chỉ mất khoảng 2 phút để An Tâm AI hiểu tình hình tài chính của bạn.",
+  "auth.salutation": "Xưng hô",
+  "auth.salutation.anh": "Anh",
+  "auth.salutation.chi": "Chị",
+  "auth.salutation.ban": "Bạn",
+  "auth.full_name": "Họ và tên",
+  "auth.full_name_placeholder": "Họ và tên của bạn",
+  "auth.register_btn": "Tạo tài khoản",
+  "auth.registering": "Đang tạo tài khoản…",
+  "auth.have_account": "Đã có tài khoản?",
+  "auth.footer_secure": "Kết nối được mã hóa HTTPS. Mật khẩu được băm an toàn.",
+  "auth.login_failed": "Đăng nhập thất bại",
+  "auth.register_failed": "Đăng ký thất bại",
+  "auth.demo_btn": "Trải nghiệm nhanh (Demo)",
+  "auth.demo_logging_in": "Đang vào bản trải nghiệm…",
+  "auth.or_divider": "hoặc",
+};
+
+export default messages;
