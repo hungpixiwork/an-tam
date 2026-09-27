@@ -10,7 +10,19 @@ import { useLocale } from '@/app/locale';
 const STATUS_TONE = { du: 'green', thieu: 'orange', du_du: 'blue' } as const;
 
 function Chance({ item }: { item: SavingsItem }) {
-  if (item.probabilityBefore === null || item.probabilityAfter === null) return <span className="text-ink-mute">—</span>;
+  if (item.probabilityBefore === null || item.probabilityAfter === null) {
+    // Quỹ dự phòng / nợ: so tháng dự kiến xong ("MM/YYYY").
+    const mm = (m: string | null) => (m ? `${m.slice(5, 7)}/${m.slice(0, 4)}` : '—');
+    if (!item.completionAfter) return <span className="text-ink-mute">—</span>;
+    const sooner = !item.completionBefore || item.completionAfter <= item.completionBefore;
+    return (
+      <span className="inline-flex items-center gap-1 tabular-nums">
+        {item.completionBefore && <span className="text-ink-soft">{mm(item.completionBefore)}</span>}
+        {item.completionBefore && <ArrowRight className="h-3 w-3 text-ink-mute" aria-hidden />}
+        <span className={cx('font-bold', sooner ? 'text-success-700' : 'text-amber-600')}>{mm(item.completionAfter)}</span>
+      </span>
+    );
+  }
   const up = item.probabilityAfter >= item.probabilityBefore;
   return (
     <span className="inline-flex items-center gap-1 tabular-nums">
@@ -32,6 +44,11 @@ export function AllocationModal({ plan, onClose }: { plan: SavingsPlan; onClose:
       <p className="text-[13.5px] leading-relaxed text-ink-soft">
         {plan.capacity > 0 ? t('safety.alloc.intro', { amount: formatVnd(plan.capacity) }) : t('safety.alloc.no_capacity')}
       </p>
+      {plan.overcommitted > 0 && plan.capacity > 0 && (
+        <p className="mt-2 rounded-xl bg-amber-50/70 px-3 py-2 text-[12.5px] leading-relaxed text-ink">
+          {t('safety.alloc.overcommitted', { committed: formatVnd(plan.committed), over: formatVnd(plan.overcommitted) })}
+        </p>
+      )}
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[480px] text-left text-[13px]">

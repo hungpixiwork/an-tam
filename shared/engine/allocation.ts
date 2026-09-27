@@ -131,14 +131,21 @@ export function allocateSavings(state: UserState): SavingsPlan {
   if (emergency) give(emergency); // lượt 2: bù phần quỹ dự phòng còn thiếu
 
   const drafts = [...(emergency ? [emergency] : []), ...debts, ...goals];
+  // Số đang để dành hiện tại có thể vượt tiền dư thật → "trước" chỉ tính phần thực sự đủ tiền (chia theo tỷ lệ).
+  const committed = drafts.reduce((s, d) => s + d.item.current, 0);
+  const afford = committed > capacity && committed > 0 ? Math.max(0, capacity) / committed : 1;
   const fixes: SavingsFix[] = [];
   for (const d of drafts) {
     const it = d.item;
     it.status = statusOf(it.required, it.suggested);
-    if (d.goal) {
-      it.probabilityBefore = goalProbability(d.goal, state, { monthlyContribution: it.current });
+    if (d.goal && it.kind === 'emergency') {
+      // Quỹ dự phòng: hiện tháng dự kiến đủ thay vì % (hạn ngắn làm % luôn gần 0, gây hiểu nhầm).
+      it.completionBefore = expectedCompletion(d.goal, state, { monthlyContribution: it.current * afford });
+      it.completionAfter = expectedCompletion(d.goal, state, { monthlyContribution: it.suggested });
+    } else if (d.goal) {
+      it.probabilityBefore = goalProbability(d.goal, state, { monthlyContribution: it.current * afford });
       it.probabilityAfter = goalProbability(d.goal, state, { monthlyContribution: it.suggested });
-      it.completionBefore = expectedCompletion(d.goal, state, { monthlyContribution: it.current });
+      it.completionBefore = expectedCompletion(d.goal, state, { monthlyContribution: it.current * afford });
       it.completionAfter = expectedCompletion(d.goal, state, { monthlyContribution: it.suggested });
     } else {
       const l = state.liabilities!.find((x) => x.id === it.liabilityId)!;
@@ -158,6 +165,8 @@ export function allocateSavings(state: UserState): SavingsPlan {
   const allocated = items.reduce((s, i) => s + i.suggested, 0);
   return {
     capacity,
+    committed,
+    overcommitted: Math.max(0, committed - Math.max(0, capacity)),
     items,
     allocated,
     unallocated: Math.max(0, capacity - allocated),

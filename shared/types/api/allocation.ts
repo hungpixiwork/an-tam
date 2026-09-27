@@ -41,6 +41,10 @@ export interface SavingsFix {
 export interface SavingsPlan {
   /** Tiền dư mỗi tháng = thu nhập − chi tiêu. */
   capacity: number;
+  /** Tổng đang để dành hằng tháng cho các mục tiêu (theo mục tiêu người dùng đặt). */
+  committed: number;
+  /** Phần đang để dành vượt quá tiền dư (0 nếu vừa sức). */
+  overcommitted: number;
   items: SavingsItem[];
   /** Tổng đề xuất (≤ capacity). */
   allocated: number;
