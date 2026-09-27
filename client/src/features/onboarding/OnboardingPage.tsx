@@ -4,10 +4,13 @@ import { Bot, Check, Coins, GraduationCap, House, NotebookPen, Palmtree, PieChar
 import type { OnboardingResult } from '@shared/types/api';
 import type { AssetCategory, GoalKind } from '@shared/types/domain';
 import { addMonths, currentMonth } from '@shared/engine/month';
-import { formatVnd } from '@shared/format';
+import { formatPct, formatVnd, formatVndFull } from '@shared/format';
+import { CATEGORY_ORDER } from '@shared/engine/portfolio';
 import { useAuth } from '@/app/auth';
 import { Badge, Button, Card, FormAlert, FormField, IconTile, MoneyInput, ScoreRing, Segmented, Select, cx, type Tone } from '@/components/ui';
 import { useOnboarding, type GoalInput, type OnboardingInput } from '@/lib/queries';
+import { useLocale } from '@/app/locale';
+import { CATEGORY_COLOR } from '@/features/portfolio/RiskRow';
 
 const M = 1_000_000;
 
@@ -315,7 +318,65 @@ function PersonaStep({ onSelect }: { onSelect: (p: Persona) => void }) {
 const SEVERITY_TONE = { danger: 'red', warning: 'orange', action: 'blue' } as const;
 const LEVEL_TONE = { stable: 'green', watch: 'orange', action: 'red' } as const;
 
+/** Tóm tắt sau khi nhập: chia tiền để dành (3 khoản đầu), danh mục đề xuất, khả năng đạt mục tiêu lớn nhất. */
+function AllocationSummary({ allocation }: { allocation: OnboardingResult['allocation'] }) {
+  const { t } = useLocale();
+  const mix = CATEGORY_ORDER.filter((c) => allocation.mix[c] > 0.005);
+  const prob = allocation.topGoal?.probability ?? 0;
+  return (
+    <div className="grid gap-3 md:grid-cols-3">
+      <div className="rounded-xl border border-line p-3.5">
+        <p className="text-sm font-bold text-ink">{t('onboarding.result.savings_title')}</p>
+        {allocation.capacity > 0 && allocation.savings.length > 0 ? (
+          <>
+            <p className="text-xs text-ink-soft">{t('onboarding.result.savings_sub', { amount: formatVndFull(allocation.capacity) })}</p>
+            <ul className="mt-2 space-y-1.5 text-[13px]">
+              {allocation.savings.map((i) => (
+                <li key={i.goalId ?? i.liabilityId ?? i.kind} className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-ink">{i.kind === 'debt' ? t('safety.alloc.debt', { title: i.title }) : i.title}</span>
+                  <span className={cx('shrink-0 font-bold tabular-nums', i.status === 'thieu' ? 'text-amber-600' : 'text-success-700')}>{formatVndFull(i.suggested)}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="mt-1 text-xs text-ink-soft">{t('onboarding.result.savings_empty')}</p>
+        )}
+      </div>
+      <div className="rounded-xl border border-line p-3.5">
+        <p className="text-sm font-bold text-ink">{t('onboarding.result.mix_title')}</p>
+        <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-line" aria-hidden>
+          {mix.map((c) => <span key={c} style={{ width: `${allocation.mix[c] * 100}%`, background: CATEGORY_COLOR[c] }} />)}
+        </div>
+        <ul className="mt-2 space-y-1 text-[13px]">
+          {mix.map((c) => (
+            <li key={c} className="flex items-center justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-2 text-ink">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: CATEGORY_COLOR[c] }} aria-hidden />
+                <span className="truncate">{t(`portfolio.cat.${c}`)}</span>
+              </span>
+              <span className="font-bold tabular-nums text-ink">{formatPct(allocation.mix[c])}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="rounded-xl border border-line p-3.5">
+        <p className="text-sm font-bold text-ink">{t('onboarding.result.chance_title')}</p>
+        {allocation.topGoal ? (
+          <>
+            <p className={cx('mt-2 text-[28px] font-extrabold leading-none tabular-nums', prob >= 0.7 ? 'text-success-700' : prob >= 0.4 ? 'text-amber-600' : 'text-danger-600')}>{formatPct(prob)}</p>
+            <p className="mt-1.5 text-xs text-ink-soft">{t('onboarding.result.chance_body', { title: allocation.topGoal.title })}</p>
+          </>
+        ) : (
+          <p className="mt-1 text-xs text-ink-soft">{t('onboarding.result.chance_empty')}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ResultStep({ result }: { result: OnboardingResult }) {
+  const { t } = useLocale();
   const { finish } = useOnboarding();
   const { me } = useAuth();
   const navigate = useNavigate();
@@ -351,6 +412,8 @@ function ResultStep({ result }: { result: OnboardingResult }) {
         </div>
       </div>
 
+      {!empty && <AllocationSummary allocation={result.allocation} />}
+
       {result.alerts.length > 0 && (
         <div>
           <p className="mb-2 flex items-center gap-2 text-sm font-bold text-ink">
@@ -374,7 +437,7 @@ function ResultStep({ result }: { result: OnboardingResult }) {
           Ghi khoản thu chi đầu tiên
         </Button>
         <Button arrow onClick={() => go('/')}>
-          Vào Tổng quan
+          {t('onboarding.result.cta')}
         </Button>
       </div>
     </Card>

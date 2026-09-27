@@ -99,6 +99,21 @@ const messages: Record<string, string> = {
   "portfolio.form.employer": "我所在公司的股票",
   "portfolio.form.in_portfolio": "计入投资组合",
   "portfolio.form.in_portfolio_hint": "应急金、日常账户、住房、车辆请关闭。",
+
+  "portfolio.alloc.mode": "查看结构",
+  "portfolio.alloc.mode.current": "当前",
+  "portfolio.alloc.mode.target": "建议",
+  "portfolio.alloc.target_hint": "最近的目标（{goal}）还有 {n} 个月 → 股票和基金最多占 {pct}%。",
+  "portfolio.alloc.target_hint_nogoal": "暂无近期目标 → 股票和基金最多可占 {pct}%。",
+  "portfolio.alloc.steps": "建议步骤",
+  "portfolio.alloc.step": "将 {amount} 从{from}转到{to}",
+  "portfolio.alloc.from_employer": "公司股票",
+  "portfolio.alloc.reason.employer_cap": "公司股票应不超过组合的 {pct}%。",
+  "portfolio.alloc.reason.too_risky": "减少波动，确保近期目标按时达成。",
+  "portfolio.alloc.reason.more_growth": "目标尚远，可增加增长型资产。",
+  "portfolio.alloc.reason.emergency_cash": "应急基金保持为现金。",
+  "portfolio.alloc.reason.balance": "按建议比例重新平衡。",
+  "portfolio.alloc.no_steps": "当前结构已接近建议，暂不需要调整。",
 };
 
 export default messages;

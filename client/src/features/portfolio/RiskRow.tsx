@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { AlertCircle, ArrowRight, BriefcaseBusiness, ChevronRight, Info, Lightbulb } from 'lucide-react';
-import type { PortfolioRisk } from '@shared/types/api';
+import type { AllocationData, PortfolioRisk } from '@shared/types/api';
+import { ALLOCATION_ASSUMPTIONS } from '@shared/engine/allocation';
+import { CATEGORY_ORDER } from '@shared/engine/portfolio';
 import type { AssetCategory } from '@shared/types/domain';
 import { formatVndFull } from '@shared/format';
-import { DonutChart, Gauge, SectionCard, cx, type ExtTone } from '@/components/ui';
+import { DonutChart, Gauge, SectionCard, Segmented, cx, type ExtTone } from '@/components/ui';
 import { useLocale } from '@/app/locale';
 
 export const CATEGORY_COLOR: Record<AssetCategory, string> = {
@@ -32,40 +35,90 @@ function ArrowLink({ children, onClick, tone = 'text-accent-600' }: { children: 
   );
 }
 
-/** Cơ cấu danh mục đầu tư: donut + 5 dòng loại tài sản. Bấm dòng → xuống bảng các khoản. */
-export function AllocationCard({ risk, onPick }: { risk: PortfolioRisk; onPick: (c: AssetCategory) => void }) {
+/** Cơ cấu danh mục đầu tư: donut + 5 dòng loại tài sản. Bấm dòng → xuống bảng các khoản.
+ *  Nút "Hiện tại | Đề xuất": Đề xuất đổi donut + chú thích sang danh mục đề xuất và thêm các bước chuyển tiền ngay trong thẻ. */
+export function AllocationCard({ risk, plan, onPick }: { risk: PortfolioRisk; plan?: AllocationData; onPick: (c: AssetCategory) => void }) {
   const { t } = useLocale();
-  const total = risk.netWorth.invested;
+  const [mode, setMode] = useState<'current' | 'target'>('current');
+  const target = mode === 'target' && plan ? plan.targetPortfolio : null;
+  const total = target ? target.base : risk.netWorth.invested;
+  const rows = target
+    ? CATEGORY_ORDER.map((category) => ({ category, pct: target.target[category], value: Math.round(target.base * target.target[category]) })).filter((r) => r.pct > 0.001)
+    : risk.allocation;
+  const catLabel = (c: AssetCategory, employer = false) => (employer ? t('portfolio.alloc.from_employer') : t(`portfolio.cat.${c}`));
+  const hint = plan
+    ? plan.targetPortfolio.horizonGoal
+      ? t('portfolio.alloc.target_hint', { goal: plan.targetPortfolio.horizonGoal.title, n: plan.targetPortfolio.horizonGoal.months, pct: Math.round(plan.targetPortfolio.riskyShare * 100) })
+      : t('portfolio.alloc.target_hint_nogoal', { pct: Math.round(plan.targetPortfolio.riskyShare * 100) })
+    : '';
   return (
-    <SectionCard title={t('portfolio.alloc.title')} className="h-full">
+    <SectionCard
+      title={t('portfolio.alloc.title')}
+      className="h-full"
+      extra={
+        plan && risk.allocation.length > 0 ? (
+          <div title={hint}>
+            <Segmented
+              label={t('portfolio.alloc.mode')}
+              value={mode}
+              onChange={setMode}
+              options={[{ value: 'current', label: t('portfolio.alloc.mode.current') }, { value: 'target', label: t('portfolio.alloc.mode.target') }]}
+              className="-my-1 p-0.5 [&>button]:h-7 [&>button]:whitespace-nowrap [&>button]:px-2.5 [&>button]:text-[12.5px]"
+            />
+          </div>
+        ) : undefined
+      }
+    >
       {risk.allocation.length === 0 ? (
         <p className="text-sm text-ink-soft">{t('portfolio.alloc.empty')}</p>
       ) : (
-        <div className="flex flex-col items-center gap-6 sm:flex-row">
-          <DonutChart data={risk.allocation.map((a) => ({ key: a.category, value: a.value, color: CATEGORY_COLOR[a.category] }))} size={168} thickness={30}>
-            <span className="text-[30px] font-extrabold leading-none text-ink tabular-nums">{Math.round(total / 1_000_000).toLocaleString('vi-VN')}</span>
-            <span className="mt-1 text-[13px] text-ink-soft">{t('portfolio.alloc.unit')}</span>
-          </DonutChart>
-          <ul className="w-full min-w-0 flex-1 space-y-1">
-            {risk.allocation.map((a) => (
-              <li key={a.category}>
-                <button
-                  type="button"
-                  onClick={() => onPick(a.category)}
-                  className="grid w-full grid-cols-[1fr_auto_auto_auto] items-center gap-2.5 rounded-lg px-1 py-2 text-left text-[13.5px] hover:bg-canvas"
-                >
-                  <span className="flex min-w-0 items-center gap-2.5 text-ink">
-                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: CATEGORY_COLOR[a.category] }} aria-hidden />
-                    <span className="truncate">{t(`portfolio.cat.${a.category}`)}</span>
-                  </span>
-                  <span className="w-11 text-right font-bold text-ink tabular-nums">{Math.round(a.pct * 100)}%</span>
-                  <span className="text-right text-ink-soft tabular-nums">{formatVndFull(a.value)}</span>
-                  <ChevronRight className="h-4 w-4 text-ink-mute" aria-hidden />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <>
+          <div className="flex flex-col items-center gap-6 sm:flex-row">
+            <DonutChart data={rows.map((a) => ({ key: a.category, value: a.value, color: CATEGORY_COLOR[a.category] }))} size={168} thickness={30}>
+              <span className="text-[30px] font-extrabold leading-none text-ink tabular-nums">{Math.round(total / 1_000_000).toLocaleString('vi-VN')}</span>
+              <span className="mt-1 text-[13px] text-ink-soft">{t('portfolio.alloc.unit')}</span>
+            </DonutChart>
+            <ul className="w-full min-w-0 flex-1 space-y-1">
+              {rows.map((a) => (
+                <li key={a.category}>
+                  <button
+                    type="button"
+                    onClick={() => onPick(a.category)}
+                    className={cx('grid w-full grid-cols-[1fr_auto_auto_auto] items-center gap-2.5 rounded-lg px-1 text-left text-[13.5px] hover:bg-canvas', target ? 'py-1' : 'py-2')}
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5 text-ink">
+                      <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: CATEGORY_COLOR[a.category] }} aria-hidden />
+                      <span className="truncate">{t(`portfolio.cat.${a.category}`)}</span>
+                    </span>
+                    <span className="w-11 text-right font-bold text-ink tabular-nums">{Math.round(a.pct * 100)}%</span>
+                    <span className="text-right text-ink-soft tabular-nums">{formatVndFull(a.value)}</span>
+                    <ChevronRight className="h-4 w-4 text-ink-mute" aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          {target && plan && (
+            <div className="mt-3 border-t border-line pt-2.5">
+              <p className="text-[13px] font-bold text-ink">{t('portfolio.alloc.steps')}</p>
+              {plan.rebalanceSteps.length === 0 ? (
+                <p className="mt-1 text-[12.5px] text-ink-soft">{t('portfolio.alloc.no_steps')}</p>
+              ) : (
+                <ol className="mt-1 space-y-1">
+                  {plan.rebalanceSteps.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-[12.5px] leading-snug">
+                      <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent-50 text-[10.5px] font-bold text-accent-700">{i + 1}</span>
+                      <span className="min-w-0">
+                        <span className="font-semibold text-ink">{t('portfolio.alloc.step', { amount: formatVndFull(s.amount), from: catLabel(s.from, s.fromEmployer), to: catLabel(s.to) })}</span>
+                        <span className="text-ink-soft"> · {t(`portfolio.alloc.reason.${s.reason}`, { pct: Math.round(ALLOCATION_ASSUMPTIONS.employerStockCap * 100) })}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          )}
+        </>
       )}
     </SectionCard>
   );

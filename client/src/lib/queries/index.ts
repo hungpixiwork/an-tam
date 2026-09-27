@@ -21,3 +21,4 @@ export * from './safety';
 export * from './choices';
 export * from './audit';
 export * from './agent';
+export * from './allocation';

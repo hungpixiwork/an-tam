@@ -99,6 +99,21 @@ const messages: Record<string, string> = {
   "portfolio.form.employer": "Cổ phiếu của công ty tôi đang làm",
   "portfolio.form.in_portfolio": "Tính vào danh mục đầu tư",
   "portfolio.form.in_portfolio_hint": "Tắt với quỹ dự phòng, tài khoản chi tiêu, nhà ở, xe.",
+
+  "portfolio.alloc.mode": "Xem cơ cấu",
+  "portfolio.alloc.mode.current": "Hiện tại",
+  "portfolio.alloc.mode.target": "Đề xuất",
+  "portfolio.alloc.target_hint": "Mục tiêu gần nhất ({goal}) còn {n} tháng → nên để tối đa {pct}% vào cổ phiếu & quỹ.",
+  "portfolio.alloc.target_hint_nogoal": "Chưa có mục tiêu gần → có thể để tới {pct}% vào cổ phiếu & quỹ.",
+  "portfolio.alloc.steps": "Các bước nên làm",
+  "portfolio.alloc.step": "Chuyển {amount} từ {from} sang {to}",
+  "portfolio.alloc.from_employer": "cổ phiếu công ty",
+  "portfolio.alloc.reason.employer_cap": "Cổ phiếu công ty nên ≤ {pct}% danh mục.",
+  "portfolio.alloc.reason.too_risky": "Giảm phần dễ lên xuống để kịp mục tiêu gần.",
+  "portfolio.alloc.reason.more_growth": "Mục tiêu còn xa, nên tăng phần sinh lời.",
+  "portfolio.alloc.reason.emergency_cash": "Giữ quỹ dự phòng ở tiền mặt.",
+  "portfolio.alloc.reason.balance": "Cân bằng lại theo tỷ lệ đề xuất.",
+  "portfolio.alloc.no_steps": "Danh mục đã gần với đề xuất, chưa cần chuyển.",
 };
 
 export default messages;

@@ -3,17 +3,20 @@
 import { useState } from 'react';
 import type { Goal } from '@shared/types/domain';
 import { ErrorState, HeroBanner, PageSkeleton } from '@/components/ui';
-import { useSafety } from '@/lib/queries';
+import { useAllocation, useSafety } from '@/lib/queries';
 import { useLocale } from '@/app/locale';
 import { FundRow } from './FundRow';
 import { GoalsSection } from './GoalsSection';
 import { AdviceSection } from './AdviceSection';
 import { GoalFormModal } from './GoalFormModal';
+import { AllocationModal } from './AllocationModal';
 
 export default function SafetyPage() {
   const { t } = useLocale();
   const { data, error, refetch, isPending } = useSafety();
+  const allocation = useAllocation();
   const [editing, setEditing] = useState<{ goal: Goal | null; key: number } | null>(null);
+  const [planOpen, setPlanOpen] = useState(false);
   if (isPending) return <PageSkeleton />;
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />;
 
@@ -34,8 +37,9 @@ export default function SafetyPage() {
         className="!min-h-[124px] [&>div]:py-5 [&_h2+p]:text-[15px] [&_h2+p]:text-ink-soft"
       />
       <FundRow data={data} onAdjust={() => open(emergency)} />
-      <GoalsSection data={data} onEdit={open} onAdd={() => open(null)} />
+      <GoalsSection data={data} plan={allocation.data?.savingsPlan} onEdit={open} onAdd={() => open(null)} onPlan={() => setPlanOpen(true)} />
       <AdviceSection data={data} />
+      {planOpen && allocation.data && <AllocationModal plan={allocation.data.savingsPlan} onClose={() => setPlanOpen(false)} />}
       {editing && <GoalFormModal key={editing.key} goal={editing.goal} onClose={() => setEditing(null)} />}
     </div>
   );

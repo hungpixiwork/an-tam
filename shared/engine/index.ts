@@ -19,3 +19,4 @@ export * from './resources';
 export * from './lifeChoice';
 export * from './safety';
 export * from './earnDashboard';
+export * from './allocation';

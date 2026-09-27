@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import type { AssetCategory, Holding } from '@shared/types/domain';
 import { ErrorState, PageSkeleton } from '@/components/ui';
 import { useLocale } from '@/app/locale';
-import { useHoldings, usePortfolioRisk } from '@/lib/queries';
+import { useAllocation, useHoldings, usePortfolioRisk } from '@/lib/queries';
 import { HoldingFormModal } from './HoldingFormModal';
 import { HoldingsCard } from './HoldingsCard';
 import { KpiRow } from './KpiRow';
@@ -18,6 +18,7 @@ export default function PortfolioPage() {
   const { t } = useLocale();
   const risk = usePortfolioRisk();
   const holdings = useHoldings();
+  const allocation = useAllocation();
   // undefined = đóng; null = thêm mới; Holding = đang sửa
   const [editing, setEditing] = useState<Holding | null | undefined>(undefined);
   const [highlight, setHighlight] = useState<AssetCategory | null>(null);
@@ -52,6 +53,7 @@ export default function PortfolioPage() {
       <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-[1.6fr_1fr_1fr]">
         <AllocationCard
           risk={data}
+          plan={allocation.data}
           onPick={(c) => {
             setHighlight(c);
             scrollTo(holdingsRef.current);

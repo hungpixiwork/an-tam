@@ -99,6 +99,21 @@ const messages: Record<string, string> = {
   "portfolio.form.employer": "Stock of the company I work for",
   "portfolio.form.in_portfolio": "Count as an investment",
   "portfolio.form.in_portfolio_hint": "Turn off for emergency fund, spending account, home, vehicle.",
+
+  "portfolio.alloc.mode": "View mix",
+  "portfolio.alloc.mode.current": "Current",
+  "portfolio.alloc.mode.target": "Suggested",
+  "portfolio.alloc.target_hint": "Nearest goal ({goal}) is {n} months away → keep at most {pct}% in stocks & funds.",
+  "portfolio.alloc.target_hint_nogoal": "No near-term goal → up to {pct}% can go into stocks & funds.",
+  "portfolio.alloc.steps": "Suggested steps",
+  "portfolio.alloc.step": "Move {amount} from {from} to {to}",
+  "portfolio.alloc.from_employer": "company shares",
+  "portfolio.alloc.reason.employer_cap": "Company shares should be ≤ {pct}% of the portfolio.",
+  "portfolio.alloc.reason.too_risky": "Less ups and downs so the near goal stays on track.",
+  "portfolio.alloc.reason.more_growth": "Goals are far away, so add more growth.",
+  "portfolio.alloc.reason.emergency_cash": "Keep the emergency fund in cash.",
+  "portfolio.alloc.reason.balance": "Rebalance to the suggested mix.",
+  "portfolio.alloc.no_steps": "Your mix is already close to the suggestion.",
 };
 
 export default messages;
