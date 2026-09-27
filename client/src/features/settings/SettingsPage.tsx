@@ -334,7 +334,9 @@ function CommitmentBanner() {
           Chúng tôi xây dựng AI để giúp người dùng hiểu tài chính rõ hơn, không phải để thay thế suy nghĩ của họ.
         </p>
       </div>
-      <WindingPath className="hidden lg:block h-[90px] w-[260px] shrink-0" />
+      <div className="hidden lg:block h-[90px] w-[260px] shrink-0 overflow-hidden rounded-xl">
+        <WindingPath />
+      </div>
     </Card>
   );
 }
