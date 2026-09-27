@@ -17,3 +17,4 @@ export * from './earn';
 export * from './topbar';
 export * from './integrations';
 export * from './calendar';
+export * from './safety';

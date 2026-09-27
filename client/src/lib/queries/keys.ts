@@ -6,6 +6,7 @@ export const qk = {
   me: ['me'] as const,
   overview: (range: number) => ['overview', range] as const,
   goals: ['goals'] as const,
+  safety: ['safety'] as const,
   presets: ['presets'] as const,
   runs: ['runs'] as const,
   run: (id: string) => ['run', id] as const,
@@ -25,7 +26,7 @@ export const qk = {
 };
 
 /** Dữ liệu tài chính thay đổi → làm mới các màn phụ thuộc. */
-export const FINANCE_KEYS = [['overview'], ['goals'], ['portfolio'], ['plans'], ['ai'], ['notifications'], ['transactions'], ['profile'], ['holdings'], ['preview']];
+export const FINANCE_KEYS = [['overview'], ['goals'], ['safety'], ['portfolio'], ['plans'], ['ai'], ['notifications'], ['transactions'], ['profile'], ['holdings'], ['preview']];
 
 export const useInvalidateFinance = () => {
   const qc = useQueryClient();

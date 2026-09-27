@@ -108,6 +108,21 @@ async function goals() {
   for (const g of GOALS) await post('/goals', g);
 }
 
+/* ───────── 4b. Biểu tượng & kỳ hạn mục tiêu (trang 3) ───────── */
+const GOAL_LOOKS = {
+  'Quỹ dự phòng': { icon: 'umbrella', horizon: 'short' },
+  'Du lịch Nhật Bản': { icon: 'plane', horizon: 'short' },
+  'Học tập MBA': { icon: 'graduation-cap', horizon: 'mid' },
+  'Mua xe ô tô': { icon: 'car', horizon: 'long' },
+};
+
+async function goalLooks() {
+  for (const g of (await get('/goals/summary')).goals) {
+    const look = GOAL_LOOKS[g.title];
+    if (look) await patch(`/goals/${g.id}`, look);
+  }
+}
+
 /* ───────── 5. Sổ thu chi 6 tháng ───────── */
 // Thu: lương 22 triệu + làm thêm + lãi đầu tư. Chi tháng này 21 triệu theo cơ cấu mockup trang 2.
 const MONTHS = [
@@ -223,6 +238,7 @@ const steps = [
   ['Thu chi cơ bản', profile],
   ['Tài sản & nợ', assets],
   ['Mục tiêu', goals],
+  ['Biểu tượng & kỳ hạn mục tiêu', goalLooks],
   ['Sổ thu chi 6 tháng', ledger],
   ['Thu nhập, thời gian, kỹ năng', earn],
   ['Lịch hôm nay', calendar],
