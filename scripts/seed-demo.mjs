@@ -359,6 +359,35 @@ async function skills() {
   }
 }
 
+/* ───────── 10. AI Workspace: lịch cố định tuần tới + 1 lượt agent thật (chờ duyệt) ───────── */
+// [thứ (0 = Thứ Hai tuần tới), tiêu đề, loại, từ, đến]
+const NEXT_WEEK = [
+  [0, 'Họp khách freelance A', 'work', '09:00', '10:30'],
+  [0, 'Làm dự án', 'work', '13:00', '16:00'],
+  [1, 'Tập thể dục', 'rest', '08:00', '09:00'],
+  [1, 'Làm dự án', 'work', '10:00', '12:00'],
+  [2, 'Họp khách freelance B', 'work', '09:00', '10:00'],
+  [2, 'Làm dự án', 'work', '13:00', '16:00'],
+  [2, 'Đọc sách', 'personal', '19:00', '20:00'],
+  [3, 'Làm dự án', 'work', '10:00', '12:00'],
+  [4, 'Họp khách freelance C', 'work', '09:00', '10:00'],
+  [4, 'Làm dự án', 'work', '13:00', '16:00'],
+  [5, 'Học khóa online', 'skill', '09:00', '11:00'],
+];
+const WORKSPACE_PROMPT = 'Hãy sắp lịch tuần tới để tôi vừa tiết kiệm, vừa học kỹ năng và theo dõi khách freelance.';
+
+async function workspace() {
+  for (const a of await get('/agent/actions?status=pending')) await postIdem(`/agent/actions/${a.id}/reject`);
+  const next = addDays(monday, 7);
+  for (const e of (await get(`/calendar?week=${next}`)).events.filter((x) => x.source !== 'google')) await del(`/calendar/events/${e.id}`);
+  for (const [d, title, category, from, to] of NEXT_WEEK) {
+    const day = addDays(next, d);
+    await post('/calendar/events', { title, note: '', category, startsAt: `${day}T${from}`, endsAt: `${day}T${to}` });
+  }
+  const run = await post('/agent/runs', { prompt: WORKSPACE_PROMPT });
+  return run;
+}
+
 /* ───────── Chạy ───────── */
 const steps = [
   ['Tài khoản', login],
@@ -372,6 +401,7 @@ const steps = [
   ['Lịch AI cả tuần', calendar],
   ['Lựa chọn cuộc đời', lifeChoices],
   ['Kỹ năng & kế hoạch học', skills],
+  ['AI Workspace: lượt agent chờ duyệt', workspace],
   ['Hiện lại đề xuất đã ẩn', () => del('/overview/suggestions/dismissals')],
 ];
 

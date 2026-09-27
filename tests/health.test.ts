@@ -55,13 +55,6 @@ const IMPLEMENTED: [string, string][] = [
   ['POST', '/api/bills/b1/paid'],
   ['GET', '/api/safety'],
   ['PUT', '/api/safety/target'],
-];
-
-const STUBS: [string, string][] = [
-  ['GET', '/api/life-choices/templates'],
-  ['POST', '/api/life-choices/evaluate'],
-  ['POST', '/api/life-choices/compare'],
-  ['PATCH', '/api/life-choices/c1/tasks/t1'],
   ['GET', '/api/agents'],
   ['POST', '/api/agent/runs'],
   ['GET', '/api/agent/runs/r1'],
@@ -70,6 +63,13 @@ const STUBS: [string, string][] = [
   ['POST', '/api/agent/actions/a1/approve'],
   ['POST', '/api/agent/actions/a1/reject'],
   ['POST', '/api/agent/actions/a1/request-changes'],
+];
+
+const STUBS: [string, string][] = [
+  ['GET', '/api/life-choices/templates'],
+  ['POST', '/api/life-choices/evaluate'],
+  ['POST', '/api/life-choices/compare'],
+  ['PATCH', '/api/life-choices/c1/tasks/t1'],
   ['GET', '/api/audit?status=approved'],
   ['POST', '/api/integrations/sepay/link'],
   ['DELETE', '/api/integrations/notion'],
