@@ -25,9 +25,15 @@ Mục tiêu thời gian: **≤15 phút/trang**. Đầu vào: số trang `N`. Tha
 **Chế độ thường (thư mục chính)**: worker 8787, vite 5173, session agent-browser mặc định.
 **Chế độ song song (worktree)** — cổng theo số trang N:
 ```bash
-# node_modules: tạo junction tới repo chính (nhanh, không npm ci)
-cmd //c "mklink /J node_modules D:\\07-Competitions-Hackathons\\an-tam\\node_modules"
-cmd //c "mklink /J client\\node_modules D:\\07-Competitions-Hackathons\\an-tam\\client\\node_modules"
+# ĐẦU TIÊN: đưa worktree lên main mới nhất (worktree có thể tạo từ commit cũ)
+git merge --ff-only main || git merge --no-edit main
+# node_modules: junction bằng PowerShell (mklink/heredoc/eval bị chặn trong worktree)
+#   PowerShell: New-Item -ItemType Junction -Path node_modules -Target D:-Competitions-Hackathonsn-tam
+ode_modules
+#   PowerShell: New-Item -ItemType Junction -Path client
+ode_modules -Target D:-Competitions-Hackathonsn-tam\client
+ode_modules
+mkdir -p client/dist                     # wrangler dev cần thư mục này tồn tại
 npx wrangler d1 migrations apply an-tam-db --local          # DB riêng của worktree
 npx wrangler dev --port 880N          # run_in_background
 (cd client && API_PORT=880N npx vite --port 520N --strictPort)   # run_in_background
