@@ -19,7 +19,7 @@ const ROUTES = (args.routes ?? '/,/thu-chi,/quy-an-toan,/tang-thu-nhap,/lich-ai,
   // Git Bash đổi '/thu-chi' thành 'C:/Program Files/Git/thu-chi' — gỡ tiền tố đó.
   .map((r) => r.replace(/^[A-Za-z]:[\/].*?[\/]Git(?=[\/]|$)/, '') || '/');
 // Từ không được xuất hiện trên giao diện tiếng Việt (xem skill an-tam-conventions).
-const BANNED = /b(runway|HHI|KPI|human capital|exposure)b|bcashflowb(?! agent)/i; // "Cashflow Agent" là tên riêng trong mockup
+const BANNED = /\b(runway|HHI|KPI|human capital|exposure)\b|\bcashflow\b(?! agent)/i; // "Cashflow Agent" là tên riêng trong mockup
 
 // Windows: gọi thẳng file .exe (Node không chạy được .cmd khi không có shell).
 const WIN_EXE = join(process.env.APPDATA ?? '', 'npm', 'node_modules', 'agent-browser', 'bin', 'agent-browser-win32-x64.exe');
