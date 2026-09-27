@@ -45,7 +45,8 @@ async function read(db: D1Database, userId: string): Promise<Record<Key, any>> {
 }
 
 /** Bảng dữ liệu cá nhân được đưa vào bản xuất. */
-const EXPORT_TABLES = ['financial_profiles', 'holdings', 'goals', 'net_worth_snapshots', 'simulation_runs', 'habit_answers', 'transactions', 'safety_plans', 'ai_events', 'ai_alerts', 'user_settings'] as const;
+const EXPORT_TABLES = ['financial_profiles', 'holdings', 'goals', 'net_worth_snapshots', 'simulation_runs', 'habit_answers', 'transactions', 'safety_plans', 'ai_events', 'ai_alerts', 'user_settings',
+  'liabilities', 'agent_runs', 'agent_steps', 'agent_actions', 'audit_log'] as const;
 
 export const settings = new Hono<AppEnv>()
   .get('/settings', async (c) => ok(c, await read(c.env.DB, c.get('userId'))))
@@ -101,6 +102,12 @@ export const settings = new Hono<AppEnv>()
   .delete('/me', async (c) => {
     const userId = c.get('userId');
     await destroySession(c);
-    await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
+    // audit_log không có FK và chặn DELETE; ghi yêu cầu xóa (tombstone, không chứa PII) để trigger cho phép xóa nhật ký.
+    const db = c.env.DB;
+    await db.batch([
+      db.prepare('INSERT OR IGNORE INTO erasure_requests (user_id, requested_at) VALUES (?, ?)').bind(userId, new Date().toISOString()),
+      db.prepare('DELETE FROM audit_log WHERE user_id = ?').bind(userId),
+      db.prepare('DELETE FROM users WHERE id = ?').bind(userId),
+    ]);
     return ok(c, null);
   });

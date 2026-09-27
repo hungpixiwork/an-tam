@@ -12,3 +12,5 @@ export * from './ledger';
 export * from './earn';
 export * from './spending';
 export * from './nba';
+export * from './concentration';
+export * from './humanCapital';

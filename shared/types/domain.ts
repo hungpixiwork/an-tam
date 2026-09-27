@@ -8,12 +8,18 @@ export type Salutation = 'anh' | 'chị' | 'bạn';
 export type TransactionKind = 'income' | 'expense';
 export type SpendingTag = 'essential' | 'useful' | 'joy' | 'growth' | 'regret';
 export type TimeCategory = 'sleep' | 'work' | 'life' | 'learning' | 'side_income' | 'unallocated';
+/** 8 nhóm ngành (ba.md §5.2) — khớp CHECK trong migrations/0009_profile_career.sql. */
+export type Sector = 'technology' | 'finance' | 'real_estate' | 'manufacturing' | 'consumer' | 'healthcare' | 'education_public' | 'other';
+export type GoalHorizon = 'short' | 'mid' | 'long';
+export type LiabilityKind = 'mortgage' | 'consumer' | 'credit_card' | 'student' | 'other';
 
 export interface FinancialProfile {
   monthlyIncome: number;
   monthlyExpense: number;
   emergencyTargetMonths: number;
   riskSelfScore: number;
+  birthYear?: number | null;
+  retirementAge?: number;
 }
 
 export interface Holding {
@@ -25,6 +31,9 @@ export interface Holding {
   volatility: Volatility;
   riskGroup: string;
   isMain: boolean;
+  sector?: Sector;
+  /** Cổ phiếu của chính công ty đang làm (cổ phiếu thưởng) — β = 1 với ngành nghề hiện tại. */
+  isEmployerStock?: boolean;
 }
 
 export interface Goal {
@@ -36,6 +45,8 @@ export interface Goal {
   targetMonth: string;
   monthlyContribution: number;
   priority: number;
+  icon?: string | null;
+  horizon?: GoalHorizon | null;
 }
 
 export interface Snapshot {
@@ -44,6 +55,19 @@ export interface Snapshot {
   emergency: number;
   invested: number;
   cashflow: number;
+  cash?: number;
+  other?: number;
+  debt?: number;
+}
+
+export interface Liability {
+  id: string;
+  name: string;
+  kind: LiabilityKind;
+  balance: number;
+  monthlyPayment: number;
+  /** Lãi suất năm theo basis point (1250 = 12,5%). */
+  rateBp: number;
 }
 
 /** Tổng thu / chi của 1 tháng trong sổ thu chi. */
@@ -97,6 +121,8 @@ export interface IncomeProfile {
   occupation: string;
   hoursPerWeek: number;
   focusSkill: string;
+  sector?: Sector | null;
+  iscoCode?: string | null;
 }
 
 export interface ValueActivity {

@@ -1,0 +1,20 @@
+# Chép thành .dev.vars cho `wrangler dev` (KHÔNG commit .dev.vars). Production: `wrangler secret put <TÊN>`.
+
+# 32 byte ngẫu nhiên, base64 — mã hóa token tích hợp (AES-256-GCM).
+# Tạo: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+TOKEN_ENC_KEY=
+
+# Khóa HMAC cho chuỗi hash audit_log (chuỗi ngẫu nhiên dài)
+AUDIT_HASH_SALT=
+
+# Google OAuth (Calendar, Gmail, Sheets) — redirect: <APP_ORIGIN>/api/integrations/google/callback
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# Notion public integration
+NOTION_CLIENT_ID=
+NOTION_CLIENT_SECRET=
+
+# SePay: API key xác thực webhook + API token Bank Hub
+SEPAY_WEBHOOK_KEY=
+SEPAY_API_TOKEN=

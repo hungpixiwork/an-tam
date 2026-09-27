@@ -18,6 +18,20 @@ import { profile } from './routes/profile';
 import { holdings } from './routes/holdings';
 import { transactions } from './routes/transactions';
 import { earn } from './routes/earn';
+import { ledger, payoutAccount } from './routes/ledger';
+import { budgets } from './routes/budgets';
+import { bills } from './routes/bills';
+import { safety } from './routes/safety';
+import { skills, humanCapitalRoutes } from './routes/skills';
+import { calendar } from './routes/calendar';
+import { automationRules } from './routes/automation';
+import { lifeChoices } from './routes/lifeChoices';
+import { portfolioRisk } from './routes/portfolioRisk';
+import { agent, agents } from './routes/agent';
+import { audit } from './routes/audit';
+import { integrations } from './routes/integrations';
+import { webhooks } from './routes/webhooks';
+import { health, APP_VERSION, BUILD_TIME } from './routes/health';
 import { runMonitor } from './jobs/monitor';
 
 const app = new Hono<AppEnv>();
@@ -59,11 +73,12 @@ app.all('/assets/*', async (c) => {
   return res;
 });
 
+// ── Công khai (trước requireAuth) ──
 app.route('/api/auth', auth);
+app.route('/api/health', health);
+app.route('/api/webhooks', webhooks);
 
 // Phiên bản ứng dụng phục vụ chunk-load recovery
-const APP_VERSION = '1.0.0';
-const BUILD_TIME = '2026-09-26T00:00:00.000Z';
 app.get('/api/version', (c) =>
   c.json({
     success: true,
@@ -85,17 +100,42 @@ app.route('/api/goals', goals);
 app.route('/api/simulations', simulations);
 app.route('/api/habits', habits);
 app.route('/api/portfolio', portfolio);
+app.route('/api/portfolio', portfolioRisk); // /risk, /what-if
 app.route('/api/plans', plans);
 app.route('/api/ai', ai);
 app.route('/api/lessons', lessons);
+// ── Redesign: mỗi màn một router — wave sau chỉ sửa file route của mình ──
+app.route('/api/ledger', ledger);
+app.route('/api/settings/payout-account', payoutAccount);
+app.route('/api/budgets', budgets);
+app.route('/api/bills', bills);
+app.route('/api/safety', safety);
+app.route('/api/skills', skills);
+app.route('/api/human-capital', humanCapitalRoutes);
+app.route('/api/calendar', calendar);
+app.route('/api/automation-rules', automationRules);
+app.route('/api/life-choices', lifeChoices);
+app.route('/api/agents', agents);
+app.route('/api/agent', agent);
+app.route('/api/audit', audit);
+app.route('/api/integrations', integrations);
 app.route('/api', settings);
 app.route('/api', common);
 
 app.notFound((c) => c.json({ success: false, error: { code: 'not_found', message: 'API không tồn tại' } }, 404));
 
+/** Khớp "triggers.crons" trong wrangler.jsonc (worker entry không export hằng số — workerd coi named export là entrypoint). Hằng ngày: "0 1 * * *". */
+const CRON_FREQUENT = '*/15 * * * *';
+
+/** Mỗi 15 phút: automation / đồng bộ lịch / dọn dữ liệu hết hạn — các wave sau gắn job vào đây. */
+async function runFrequent(_env: Env): Promise<void> {
+  // TODO(wave 2–3): worker/jobs/{automation,sync,purge}.ts
+}
+
 export default {
   fetch: app.fetch,
-  scheduled: (_controller: ScheduledController, env: Env, ctx: ExecutionContext) => {
-    ctx.waitUntil(runMonitor(env));
+  scheduled: (controller: ScheduledController, env: Env, ctx: ExecutionContext) => {
+    // Cron lạ (vd. wrangler dev --test-scheduled) chạy job hằng ngày như trước
+    ctx.waitUntil(controller.cron === CRON_FREQUENT ? runFrequent(env) : runMonitor(env));
   },
 } satisfies ExportedHandler<Env>;

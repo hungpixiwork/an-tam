@@ -20,7 +20,27 @@
       "migrations_dir": "migrations"
     }
   ],
-  // 08:00 giờ Việt Nam — "AI theo dõi" chạy lại cảnh báo cho mọi người dùng
-  "triggers": { "crons": ["0 1 * * *"] },
+  "vars": {
+    // Origin công khai cho redirect OAuth; để trống = lấy origin từ request
+    "APP_ORIGIN": "",
+    // Bộ phân loại ý định agent: "rules" (mặc định) | "workers-ai"
+    "INTENT_PROVIDER": "rules"
+  },
+  // Secrets (wrangler secret put …, local: .dev.vars — xem .dev.vars.example):
+  // TOKEN_ENC_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, NOTION_CLIENT_ID, NOTION_CLIENT_SECRET,
+  // SEPAY_WEBHOOK_KEY, SEPAY_API_TOKEN, AUDIT_HASH_SALT
+  //
+  // Wave sau thêm (cần ID thật / remote):
+  // "ai": { "binding": "AI" },
+  // "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "<wrangler kv namespace create OAUTH_KV>" }],
+  // và run_worker_first thêm "/mcp", "/oauth/*", "/.well-known/*"
+  "triggers": {
+    "crons": [
+      // 08:00 giờ Việt Nam — "AI theo dõi" chạy lại cảnh báo cho mọi người dùng
+      "0 1 * * *",
+      // Mỗi 15 phút — automation / đồng bộ / dọn dữ liệu hết hạn (worker/index.ts → scheduled)
+      "*/15 * * * *"
+    ]
+  },
   "observability": { "enabled": true }
 }
