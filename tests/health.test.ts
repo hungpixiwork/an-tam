@@ -65,8 +65,6 @@ const STUBS: [string, string][] = [
   ['POST', '/api/life-choices/evaluate'],
   ['POST', '/api/life-choices/compare'],
   ['PATCH', '/api/life-choices/c1/tasks/t1'],
-  ['GET', '/api/portfolio/risk'],
-  ['POST', '/api/portfolio/what-if'],
   ['GET', '/api/agents'],
   ['POST', '/api/agent/runs'],
   ['GET', '/api/agent/runs/r1'],

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppEnv } from '../env';
 import { holdingDefaults } from '../../shared/engine/ledger';
-import { totalValue } from '../../shared/engine/portfolio';
+import { defaultInPortfolio, totalValue } from '../../shared/engine/portfolio';
 import { formatVnd } from '../../shared/format';
 import { notFound, ok } from '../lib/http';
 import { afterChange } from '../lib/refresh';
@@ -15,6 +15,12 @@ export const holdingSchema = z.object({
   value: money,
   /** Bỏ trống → suy ra từ loại tài sản. */
   volatility: z.enum(['low', 'mid', 'high']).optional(),
+  /** Ngành của khoản (rủi ro tập trung). Mặc định "other". */
+  sector: z.enum(['technology', 'finance', 'real_estate', 'manufacturing', 'consumer', 'healthcare', 'education_public', 'other']).optional(),
+  /** Cổ phiếu của công ty mình đang làm. */
+  isEmployerStock: z.boolean().optional(),
+  /** Tính vào danh mục đầu tư. Bỏ trống → cổ phiếu / quỹ / trái phiếu = có, tiền mặt / khác = không. */
+  inPortfolio: z.boolean().optional(),
 });
 export type HoldingInput = z.infer<typeof holdingSchema>;
 
@@ -22,11 +28,16 @@ export function insertHolding(db: D1Database, userId: string, h: HoldingInput) {
   const d = holdingDefaults(h.category);
   return db
     .prepare(
-      `INSERT INTO holdings (id, user_id, name, category, value, role, volatility, risk_group, is_main, order_idx)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, (SELECT COALESCE(MAX(order_idx), 0) + 1 FROM holdings WHERE user_id = ?))`,
+      `INSERT INTO holdings (id, user_id, name, category, value, role, volatility, risk_group, is_main, sector, is_employer_stock, in_portfolio, order_idx)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, (SELECT COALESCE(MAX(order_idx), 0) + 1 FROM holdings WHERE user_id = ?))`,
     )
-    .bind(crypto.randomUUID(), userId, h.name, h.category, h.value, d.role, h.volatility ?? d.volatility, d.riskGroup, userId);
+    .bind(
+      crypto.randomUUID(), userId, h.name, h.category, h.value, d.role, h.volatility ?? d.volatility, d.riskGroup,
+      h.sector ?? 'other', h.isEmployerStock ? 1 : 0, (h.inPortfolio ?? defaultInPortfolio(h.category)) ? 1 : 0, userId,
+    );
 }
+
+const b01 = (v: boolean | undefined) => (v === undefined ? undefined : v ? 1 : 0);
 
 const totalLine = (s: LoadedState) => `Tổng tài sản: ${formatVnd(totalValue(s.holdings))}.`;
 
@@ -52,6 +63,9 @@ export const holdings = new Hono<AppEnv>()
       role: d?.role,
       risk_group: d?.riskGroup,
       volatility: h.volatility ?? d?.volatility,
+      sector: h.sector,
+      is_employer_stock: b01(h.isEmployerStock),
+      in_portfolio: b01(h.inPortfolio),
     };
     const entries = Object.entries(cols).filter(([, v]) => v !== undefined);
     if (entries.length === 0) return ok(c, null);

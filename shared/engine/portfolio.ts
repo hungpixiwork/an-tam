@@ -57,6 +57,12 @@ export function portfolioStats(holdings: Holding[]): PortfolioStats {
   return { expectedReturn, volatility: volatility * DIVERSIFICATION, riskyShare: risky };
 }
 
+/** Mặc định khi người dùng chưa chọn: cổ phiếu / quỹ / trái phiếu thuộc danh mục đầu tư, tiền mặt / khác thì không. */
+export const defaultInPortfolio = (category: AssetCategory): boolean => category === 'stock' || category === 'fund' || category === 'bond';
+
+/** Khoản thuộc danh mục đầu tư (trang Danh mục) — phần còn lại là "tài sản khác". */
+export const isInvestment = (h: Holding): boolean => h.inPortfolio ?? defaultInPortfolio(h.category);
+
 /** Tổng giá trị các khoản mang tính đầu tư (quỹ mở + cổ phiếu). */
 export const investedValue = (holdings: Holding[]): number =>
   holdings.filter((h) => h.category === 'stock' || h.category === 'fund').reduce((s, h) => s + h.value, 0);

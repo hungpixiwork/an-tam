@@ -1,5 +1,5 @@
 import type { CalendarEvent, LifeChoice, OverviewData, Kpi, SetupStatus } from '../types/api';
-import type { FinancialProfile, IncomeProfile, Salutation, Snapshot, TimeAllocation, Transaction, UserState } from '../types/domain';
+import type { FinancialProfile, Holding, IncomeProfile, Salutation, Snapshot, TimeAllocation, Transaction, UserState } from '../types/domain';
 import { peerBenchmark } from '../data/peer-benchmarks';
 import { lifeChoiceReadiness } from './lifeChoice';
 import { resourceRings } from './resources';
@@ -9,7 +9,7 @@ import { nearestMajorGoal } from './goals';
 import { addMonths, monthsBetween } from './month';
 import { greetingName, levelKey, templateNarrator, type Narrator } from './narrate';
 import { emergencyAmount, emergencyMonths, freeCashflow, peaceScore, peaceScoreAsOf, type PeaceLevel } from './peace';
-import { allocation, investedValue, totalValue } from './portfolio';
+import { allocation, investedValue, isInvestment, totalValue } from './portfolio';
 import { DEFAULT_PARAMS, simulate } from './simulate';
 import { nextBestActions } from './nba';
 
@@ -72,10 +72,11 @@ export const NET_WORTH_COMPARE_MONTHS = 3;
  * thực tế trong sổ thu chi của 3 tháng gần nhất (tài sản ròng trước ≈ hiện tại − số đã để dành).
  */
 export function netWorthBreakdown(state: UserState): OverviewData['netWorthBreakdown'] {
-  const sum = (pred: (c: string) => boolean) => state.holdings.filter((h) => pred(h.category)).reduce((s, h) => s + h.value, 0);
-  const cash = sum((c) => c === 'cash');
-  const invested = sum((c) => c === 'fund' || c === 'stock' || c === 'bond');
-  const other = sum((c) => c === 'other');
+  // Đầu tư = các khoản thuộc danh mục (trang Danh mục); tiền mặt / khác = phần còn lại
+  const sum = (pred: (h: Holding) => boolean) => state.holdings.filter(pred).reduce((s, h) => s + h.value, 0);
+  const invested = sum(isInvestment);
+  const cash = sum((h) => !isInvestment(h) && h.category === 'cash');
+  const other = sum((h) => !isInvestment(h) && h.category !== 'cash');
   const debt = (state.liabilities ?? []).reduce((s, l) => s + l.balance, 0);
   const net = cash + invested + other - debt;
 

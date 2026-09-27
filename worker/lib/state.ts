@@ -14,6 +14,7 @@ interface UserRow {
 interface HoldingRow {
   id: string; name: string; category: Holding['category']; value: number; role: string;
   volatility: Holding['volatility']; risk_group: string; is_main: number;
+  sector: Holding['sector']; is_employer_stock: number; in_portfolio: number;
 }
 interface LiabilityRow {
   id: string; name: string; kind: Liability['kind']; balance: number; monthly_payment: number; rate_bp: number;
@@ -82,6 +83,7 @@ export async function loadUserState(db: D1Database, userId: string, today = curr
     holdings: (holdings.results as unknown as HoldingRow[]).map((h) => ({
       id: h.id, name: h.name, category: h.category, value: h.value, role: h.role,
       volatility: h.volatility, riskGroup: h.risk_group, isMain: h.is_main === 1,
+      sector: h.sector ?? 'other', isEmployerStock: h.is_employer_stock === 1, inPortfolio: h.in_portfolio !== 0,
     })),
     goals: (goals.results as unknown as GoalRow[]).map((g) => ({
       id: g.id, kind: g.kind, title: g.title, targetAmount: g.target_amount, currentAmount: g.current_amount,
