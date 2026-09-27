@@ -10,7 +10,7 @@ Làm tuần tự bằng skill `.claude/skills/mockup-page` — xong trang N (đ�
 | 4 | Tăng thu nhập & kỹ năng | `/tang-thu-nhap` | 📐 | |
 | 5 | Lịch AI | `/lich-ai` | 📐 | |
 | 6 | Lựa chọn cuộc đời | `/lua-chon` | 📐 | |
-| 7 | Danh mục & rủi ro tập trung | `/danh-muc` | 📐 | |
+| 7 | Danh mục & rủi ro tập trung | `/danh-muc` | ✅ 2026-09-28 | nhánh worktree |
 | 8 | AI Workspace | `/ai-workspace` | 📐 | |
 | 9 | Nhật ký AI & quyền riêng tư | `/nhat-ky-ai` | 📐 | |
 

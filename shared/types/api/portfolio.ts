@@ -23,10 +23,12 @@ export interface WhatIfInput {
   humanCapital?: number;
   annualIncome?: number;
   occupationSector?: Sector;
+  /** Tài sản đa ngành (quỹ ETF toàn cầu): chia đều cho mọi ngành khi tính mức phụ thuộc. */
+  diversified?: boolean;
 }
 
 export interface WhatIfSnapshot {
-  /** Chỉ số tập trung 0..100 (HHI chuẩn hóa theo ngành). */
+  /** Mức độ rủi ro tập trung 0..100 (0 = chia đều mọi ngành, 100 = dồn hết vào một ngành). */
   concentration: number;
   topSector: SectorExposureItem | null;
   /** C_s của ngành được chọn. */
@@ -43,4 +45,29 @@ export interface WhatIfResult {
   deltas: { concentration: number; sectorShare: number; runwayMonths: number; goalProbability: number | null };
   projected: { expected: number; worstCase: number };
   explain: string[];
+  /** Gợi ý ngắn, dễ hiểu cho người dùng. */
+  advice: string;
+  /** Phần tiền lấy từ tiền chờ đầu tư / quỹ dự phòng. */
+  funding: { fromPortfolioCash: number; fromEmergency: number; newMoney: number };
+}
+
+/** Các lựa chọn "Loại tài sản" của form Thử trước khi đầu tư. */
+export type WhatIfPresetKey = 'global_etf' | 'vn_etf' | 'tech_stock' | 'bond' | 'gold' | 'real_estate';
+
+export interface PortfolioRisk {
+  netWorth: { net: number; deltaPct: number | null; compareMonths: number; totalAssets: number; invested: number; other: number; debt: number };
+  /** Cơ cấu danh mục đầu tư theo loại (chỉ các khoản thuộc danh mục). */
+  allocation: { category: AssetCategory; value: number; pct: number }[];
+  /** Cổ phiếu công ty mình: giá trị + tỷ trọng trên danh mục đầu tư. */
+  employer: { value: number; share: number; level: ConcentrationLevel };
+  /** Ngành nghề hiện tại (hồ sơ thu nhập); null = chưa khai báo. */
+  careerSector: Sector | null;
+  /** Thu nhập tính vào mức phụ thuộc ngành (thu nhập năm × số năm). */
+  careerValue: number;
+  /** Mức phụ thuộc theo ngành, tính cả thu nhập từ công việc + tài sản đầu tư. */
+  exposure: SectorExposureItem[];
+  /** Phần danh mục đầu tư nằm trong ngành lớn nhất (không tính thu nhập). */
+  topSectorAssetShare: number;
+  score: number;
+  level: ConcentrationLevel;
 }

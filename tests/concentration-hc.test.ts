@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { concentrationIndex, employerStockWeight, hhi, sectorExposure, whatIfAllocate } from '../shared/engine/concentration';
+import { concentrationIndex, employerStockWeight, hhi, portfolioRisk, sectorExposure, whatIfAllocate } from '../shared/engine/concentration';
 import { humanCapital } from '../shared/engine/humanCapital';
 import type { Holding } from '../shared/types/domain';
 import { demoState } from './fixtures';
@@ -53,6 +53,25 @@ describe('concentration (B4)', () => {
     expect(r.projected.worstCase).toBeLessThanOrEqual(r.projected.expected);
     expect(r.explain.length).toBeGreaterThan(0);
     expect(whatIfAllocate(state, input)).toEqual(r);
+  });
+});
+
+describe('trang Danh mục: portfolioRisk + nguồn tiền của what-if', () => {
+  it('đầu tư + tài sản khác = tổng tài sản; điểm 0..100', () => {
+    const r = portfolioRisk(demoState(), { occupationSector: 'technology', annualIncome: 300 * M });
+    expect(r.netWorth.invested + r.netWorth.other).toBe(r.netWorth.totalAssets);
+    expect(r.allocation.reduce((s, a) => s + a.pct, 0)).toBeCloseTo(1);
+    expect(r.score).toBeGreaterThanOrEqual(0);
+    expect(r.score).toBeLessThanOrEqual(100);
+    expect(r.exposure.some((e) => e.sector === 'technology')).toBe(true);
+  });
+
+  it('lấy tiền chờ đầu tư trước, quỹ dự phòng giữ nguyên nếu đủ', () => {
+    const base = demoState();
+    const state = { ...base, holdings: [...base.holdings, h('free', 30 * M, { category: 'cash', inPortfolio: true })] };
+    const r = whatIfAllocate(state, { assetType: 'fund', sector: 'other', diversified: true, amount: 20 * M, holdingMonths: 60 });
+    expect(r.funding).toEqual({ fromPortfolioCash: 20 * M, fromEmergency: 0, newMoney: 0 });
+    expect(r.deltas.runwayMonths).toBe(0);
   });
 });
 

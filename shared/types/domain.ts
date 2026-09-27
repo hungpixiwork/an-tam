@@ -34,6 +34,8 @@ export interface Holding {
   sector?: Sector;
   /** Cổ phiếu của chính công ty đang làm (cổ phiếu thưởng) — β = 1 với ngành nghề hiện tại. */
   isEmployerStock?: boolean;
+  /** Thuộc danh mục đầu tư (false = tài sản khác: quỹ dự phòng, tài khoản chi tiêu, nhà, xe). Bỏ trống → suy theo loại. */
+  inPortfolio?: boolean;
 }
 
 export interface Goal {

@@ -76,15 +76,19 @@ async function profile() {
 }
 
 /* ───────── 3. Tài sản & nợ (tài sản ròng 520 triệu) ───────── */
+// Danh mục đầu tư 320tr (cổ phiếu 45% · quỹ 25% · trái phiếu 15% · tiền mặt 10% · vàng 5%), nặng ngành công nghệ;
+// tài sản khác 250tr (quỹ dự phòng, tài khoản chi tiêu, góp vốn nhà, xe).
 const HOLDINGS = [
-  { name: 'Tiết kiệm ngân hàng (quỹ dự phòng)', category: 'cash', value: 84 * M },
-  { name: 'Tài khoản thanh toán', category: 'cash', value: 16 * M },
-  { name: 'Chứng chỉ quỹ mở', category: 'fund', value: 136 * M },
-  { name: 'Cổ phiếu công ty (thưởng)', category: 'stock', value: 112 * M },
-  { name: 'Cổ phiếu khác', category: 'stock', value: 32 * M },
-  { name: 'Trái phiếu doanh nghiệp', category: 'bond', value: 40 * M },
-  { name: 'Vàng SJC', category: 'other', value: 90 * M, volatility: 'low' },
-  { name: 'Xe máy & đồ giá trị', category: 'other', value: 60 * M },
+  { name: 'Cổ phiếu công ty (thưởng)', category: 'stock', value: 112 * M, sector: 'technology', isEmployerStock: true, inPortfolio: true },
+  { name: 'Cổ phiếu FPT & CMG', category: 'stock', value: 32 * M, sector: 'technology', inPortfolio: true },
+  { name: 'Quỹ ETF VN30', category: 'fund', value: 80 * M, sector: 'finance', inPortfolio: true },
+  { name: 'Trái phiếu doanh nghiệp tiêu dùng', category: 'bond', value: 48 * M, sector: 'consumer', inPortfolio: true },
+  { name: 'Tiền chờ đầu tư', category: 'cash', value: 32 * M, sector: 'other', inPortfolio: true },
+  { name: 'Vàng SJC', category: 'other', value: 16 * M, volatility: 'low', sector: 'other', inPortfolio: true },
+  { name: 'Tiết kiệm ngân hàng (quỹ dự phòng)', category: 'cash', value: 84 * M, inPortfolio: false },
+  { name: 'Tài khoản thanh toán', category: 'cash', value: 16 * M, inPortfolio: false },
+  { name: 'Góp vốn mua nhà cùng bố mẹ', category: 'other', value: 90 * M, sector: 'real_estate', inPortfolio: false },
+  { name: 'Xe máy & đồ giá trị', category: 'other', value: 60 * M, inPortfolio: false },
 ];
 const LIABILITIES = [{ name: 'Vay mua xe máy & laptop', kind: 'consumer', balance: 50 * M, monthlyPayment: 2_500 * K, rateBp: 1100 }];
 
@@ -221,7 +225,7 @@ async function billsAndBudget() {
 
 /* ───────── 6. Tăng thu nhập, thời gian, kỹ năng ───────── */
 async function earn() {
-  await put('/earn', { currentIncome: 22 * M, targetIncome: 28_600 * K, targetMonths: 6, occupation: 'Chuyên viên phân tích dữ liệu', hoursPerWeek: 5, focusSkill: 'AI/No-code' });
+  await put('/earn', { currentIncome: 22 * M, targetIncome: 28_600 * K, targetMonths: 6, occupation: 'Chuyên viên phân tích dữ liệu', hoursPerWeek: 5, focusSkill: 'AI/No-code', sector: 'technology' });
   await put('/earn/time', {
     allocations: [
       { category: 'sleep', hours: 38 },

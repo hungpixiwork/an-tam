@@ -15,6 +15,8 @@ const incomeProfileSchema = z.object({
   occupation: z.string().trim().max(100).default(''),
   hoursPerWeek: z.number().int().min(0).max(80).default(0),
   focusSkill: z.string().trim().max(100).default(''),
+  /** Ngành đang làm (rủi ro tập trung — trang Danh mục). Bỏ trống → giữ giá trị cũ. */
+  sector: z.enum(['technology', 'finance', 'real_estate', 'manufacturing', 'consumer', 'healthcare', 'education_public', 'other']).nullable().optional(),
 });
 
 const activitySchema = z.object({
@@ -70,9 +72,10 @@ export const earn = new Hono<AppEnv>()
     const data = c.req.valid('json');
     
     await c.env.DB.prepare(`
-      INSERT INTO income_profiles (user_id, current_income, target_income, target_months, occupation, hours_per_week, focus_skill)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO income_profiles (user_id, current_income, target_income, target_months, occupation, hours_per_week, focus_skill, sector)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET
+        sector = CASE WHEN ? THEN excluded.sector ELSE income_profiles.sector END,
         current_income = excluded.current_income,
         target_income = excluded.target_income,
         target_months = excluded.target_months,
@@ -80,7 +83,7 @@ export const earn = new Hono<AppEnv>()
         hours_per_week = excluded.hours_per_week,
         focus_skill = excluded.focus_skill
     `)
-      .bind(userId, data.currentIncome, data.targetIncome, data.targetMonths, data.occupation, data.hoursPerWeek, data.focusSkill)
+      .bind(userId, data.currentIncome, data.targetIncome, data.targetMonths, data.occupation, data.hoursPerWeek, data.focusSkill, data.sector ?? null, data.sector !== undefined ? 1 : 0)
       .run();
       
     return ok(c, data);
