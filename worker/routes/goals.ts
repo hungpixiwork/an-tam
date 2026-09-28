@@ -22,13 +22,13 @@ export const goalSchema = z.object({
 });
 export type GoalInput = z.infer<typeof goalSchema>;
 
-export const insertGoal = (db: D1Database, userId: string, g: GoalInput) =>
+export const insertGoal = (db: D1Database, userId: string, g: GoalInput, id: string = crypto.randomUUID()) =>
   db
     .prepare(
       `INSERT INTO goals (id, user_id, kind, title, target_amount, current_amount, target_month, monthly_contribution, priority, icon, horizon, order_idx)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(order_idx), 0) + 1 FROM goals WHERE user_id = ?))`,
     )
-    .bind(crypto.randomUUID(), userId, g.kind, g.title, g.targetAmount, g.currentAmount, g.targetMonth, g.monthlyContribution, g.priority, g.icon ?? null, g.horizon ?? null, userId);
+    .bind(id, userId, g.kind, g.title, g.targetAmount, g.currentAmount, g.targetMonth, g.monthlyContribution, g.priority, g.icon ?? null, g.horizon ?? null, userId);
 
 const goalAudit = (action: 'create' | 'update' | 'delete', summary: string, id: string | null) =>
   ({ agent: 'goal', action: `goal.${action}`, entityType: 'goal', entityId: id, summary, dataLabel: 'Thu nhập, mục tiêu (đã ẩn danh)' });

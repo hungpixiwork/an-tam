@@ -31,6 +31,7 @@ import { lifeChoices } from './routes/lifeChoices';
 import { allocation } from './routes/allocation';
 import { portfolioRisk } from './routes/portfolioRisk';
 import { agent, agents } from './routes/agent';
+import { actions } from './routes/actions';
 import { audit } from './routes/audit';
 import { integrations } from './routes/integrations';
 import { webhooks } from './routes/webhooks';
@@ -116,6 +117,10 @@ app.get('/api/version', (c) =>
 app.use('/api/*', requireAuth);
 // Lượt chạy agent tốn AI: đếm theo người dùng
 app.use('/api/agent/runs', rateLimit('RL_AI', (c) => c.get('userId')));
+// Lệnh ghi / tính nặng: chặn lạm dụng theo người dùng
+app.use('/api/actions/apply', rateLimit('RL_AI', (c) => c.get('userId')));
+app.use('/api/simulations/run', rateLimit('RL_AI', (c) => c.get('userId')));
+app.use('/api/desk/:symbol/run', rateLimit('RL_AI', (c) => c.get('userId')));
 app.route('/api/onboarding', onboarding);
 app.route('/api/profile', profile);
 app.route('/api/holdings', holdings);
@@ -145,6 +150,7 @@ app.route('/api/life-choices', lifeChoices);
 app.route('/api/allocation', allocation);
 app.route('/api/agents', agents);
 app.route('/api/agent', agent);
+app.route('/api/actions', actions);
 app.route('/api/audit', audit);
 app.route('/api/market', market);
 app.route('/api/alert-rules', alertRules);

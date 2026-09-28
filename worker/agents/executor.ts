@@ -16,6 +16,7 @@ import { loadIntegration } from '../integrations/tokens';
 import { pushApproved, syncInfo } from '../integrations/google/sync';
 import { getAccessToken } from '../integrations/tokens';
 import { lifeChoiceInsertStatements } from '../routes/lifeChoices';
+import { insertGoal } from '../routes/goals';
 import { userPlan } from '../lib/usage';
 import { PLANS, PLAN_LABEL } from '../../shared/plans';
 
@@ -98,6 +99,58 @@ async function prepare(env: Env, userId: string, row: Row, type: ActionType): Pr
         refresh: `Mục tiêu "${p.goalTitle}": để dành ${formatVndFull(p.monthlyAfter)}/tháng.`,
       };
     }
+    case 'safety.set_target': {
+      const p = payload as ReturnType<typeof ACTION_TYPES['safety.set_target']['schema']['parse']>;
+      const goalId = p.goalId ?? crypto.randomUUID();
+      const current = p.goalId ? null : (await db.prepare(
+        "SELECT COALESCE(SUM(value), 0) AS v FROM holdings WHERE user_id = ? AND category = 'cash'",
+      ).bind(userId).first<{ v: number }>())?.v ?? 0;
+      return {
+        statements: [
+          db.prepare('UPDATE financial_profiles SET emergency_target_months = ? WHERE user_id = ?').bind(p.months, userId),
+          p.goalId
+            ? db.prepare('UPDATE goals SET target_amount = ?, monthly_contribution = ?, target_month = ? WHERE id = ? AND user_id = ?')
+              .bind(p.targetAmount, p.monthly, p.targetMonth, p.goalId, userId)
+            : insertGoal(db, userId, {
+              kind: 'emergency', title: 'Quỹ dự phòng', targetAmount: p.targetAmount, currentAmount: current ?? 0, targetMonth: p.targetMonth,
+              monthlyContribution: p.monthly, priority: 1, icon: 'umbrella', horizon: 'short',
+            }, goalId),
+        ],
+        result: { goalId, created: !p.goalId, months: p.months },
+        summary: `Đặt quỹ dự phòng ${p.months} tháng chi tiêu`,
+        refresh: `Quỹ dự phòng: mục tiêu ${p.months} tháng (${formatVndFull(p.targetAmount)}), để dành ${formatVndFull(p.monthly)}/tháng.`,
+      };
+    }
+    case 'holding.rebalance': {
+      const p = payload as ReturnType<typeof ACTION_TYPES['holding.rebalance']['schema']['parse']>;
+      const from = await db.prepare('SELECT value FROM holdings WHERE id = ? AND user_id = ?').bind(p.fromId, userId).first<{ value: number }>();
+      const to = await db.prepare('SELECT value FROM holdings WHERE id = ? AND user_id = ?').bind(p.toId, userId).first<{ value: number }>();
+      if (!from || !to) throw new Error('Khoản tài sản không còn tồn tại');
+      if (from.value < p.amount) throw new Error('Giá trị hiện tại nhỏ hơn số tiền cần chuyển');
+      return {
+        statements: [
+          db.prepare('UPDATE holdings SET value = value - ? WHERE id = ? AND user_id = ?').bind(p.amount, p.fromId, userId),
+          db.prepare('UPDATE holdings SET value = value + ? WHERE id = ? AND user_id = ?').bind(p.amount, p.toId, userId),
+        ],
+        result: { fromId: p.fromId, toId: p.toId, amount: p.amount },
+        summary: `Chuyển ${formatVndFull(p.amount)} từ ${p.fromName} sang ${p.toName}`,
+        refresh: `Giảm tài sản tập trung: ${p.fromName} −${formatVndFull(p.amount)}, ${p.toName} +${formatVndFull(p.amount)}.`,
+      };
+    }
+    case 'earn.set_target': {
+      const p = payload as ReturnType<typeof ACTION_TYPES['earn.set_target']['schema']['parse']>;
+      return {
+        statements: [
+          db.prepare(
+            `INSERT INTO income_profiles (user_id, target_income, target_months) VALUES (?, ?, ?)
+             ON CONFLICT(user_id) DO UPDATE SET target_income = excluded.target_income, target_months = excluded.target_months`,
+          ).bind(userId, p.target, p.months),
+        ],
+        result: { target: p.target, months: p.months },
+        summary: `Đặt mục tiêu thu nhập ${formatVndFull(p.target)}/tháng`,
+        refresh: `Mục tiêu thu nhập: ${formatVndFull(p.target)}/tháng trong ${p.months} tháng.`,
+      };
+    }
     case 'reminder.create': {
       const p = payload as ReturnType<typeof ACTION_TYPES['reminder.create']['schema']['parse']>;
       const [h, m] = p.time.split(':').map(Number);
@@ -136,12 +189,13 @@ async function prepare(env: Env, userId: string, row: Row, type: ActionType): Pr
           // Việc mới là việc "hôm nay" của Agent; các việc cũ rời khỏi danh sách hôm nay
           db.prepare('UPDATE life_choice_tasks SET today = 0 WHERE choice_id = ?').bind(p.choiceId),
           ...p.tasks.map((t, i) =>
-            db.prepare('INSERT INTO life_choice_tasks (id, choice_id, title, detail, priority, category, today, order_idx) VALUES (?, ?, ?, ?, ?, ?, 1, ?)')
-              .bind(ids[i], p.choiceId, t.title, t.detail, t.priority, t.category, next + i),
+            db.prepare('INSERT INTO life_choice_tasks (id, choice_id, title, detail, priority, category, today, order_idx, link, action_json) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)')
+              .bind(ids[i], p.choiceId, t.title, t.detail, t.priority, t.category, next + i, t.link ?? null, t.action ? JSON.stringify(t.action) : null),
           ),
         ],
         result: { choiceId: p.choiceId, taskIds: ids, startMonth: p.startAfter },
         summary: `Cập nhật kế hoạch "${p.choiceTitle}": ${ids.length} việc mới${p.startAfter ? `, bắt đầu ${p.startAfter}` : ''}`,
+        refresh: `Lựa chọn "${p.choiceTitle}": ${ids.length ? `${ids.length} việc mới` : 'cập nhật'}${p.startAfter ? `, bắt đầu T${Number(p.startAfter.slice(5))}/${p.startAfter.slice(0, 4)}` : ''}.`,
       };
     }
     case 'alert_rule.create': {
@@ -234,6 +288,88 @@ export async function approveAndExecute(env: Env, userId: string, id: string, ap
     await finishRun(db, userId, row.run_id);
     return { id, status: 'failed', error: message };
   }
+}
+
+/* ───────── Hoàn tác ───────── */
+
+/** Chỉ hoàn tác được trong 10 phút sau khi áp dụng (sau đó dữ liệu có thể đã đổi tiếp). */
+export const UNDO_WINDOW_MS = 10 * 60_000;
+
+/** Lệnh đưa dữ liệu về như trước, dựa trên giá trị "trước" lưu trong payload + kết quả thực thi. */
+function undoStatements(db: D1Database, userId: string, id: string, type: ActionType, payload: unknown, result: Record<string, unknown>): { statements: D1PreparedStatement[]; summary: string } {
+  const p = ACTION_TYPES[type].schema.parse(payload) as Record<string, any>;
+  switch (type) {
+    case 'safety.set_target':
+      return {
+        statements: [
+          db.prepare('UPDATE financial_profiles SET emergency_target_months = ? WHERE user_id = ?').bind(p.monthsBefore, userId),
+          result.created
+            ? db.prepare('DELETE FROM goals WHERE id = ? AND user_id = ?').bind(result.goalId, userId)
+            : db.prepare('UPDATE goals SET target_amount = ?, monthly_contribution = ?, target_month = ? WHERE id = ? AND user_id = ?')
+              .bind(p.targetBefore, p.monthlyBefore, p.targetMonthBefore, p.goalId, userId),
+        ],
+        summary: `Hoàn tác quỹ dự phòng về ${p.monthsBefore} tháng`,
+      };
+    case 'goal.update_progress':
+      return { statements: [db.prepare('UPDATE goals SET monthly_contribution = ? WHERE id = ? AND user_id = ?').bind(p.monthlyBefore, p.goalId, userId)], summary: `Hoàn tác mức để dành "${p.goalTitle}"` };
+    case 'budget.set':
+      return {
+        statements: [p.limitBefore === null
+          ? db.prepare("DELETE FROM budgets WHERE user_id = ? AND month = ? AND category = 'all'").bind(userId, p.month)
+          : db.prepare("UPDATE budgets SET limit_amount = ? WHERE user_id = ? AND month = ? AND category = 'all'").bind(p.limitBefore, userId, p.month)],
+        summary: `Hoàn tác ngân sách tháng ${p.month}`,
+      };
+    case 'holding.rebalance':
+      return {
+        statements: [
+          db.prepare('UPDATE holdings SET value = value + ? WHERE id = ? AND user_id = ?').bind(p.amount, p.fromId, userId),
+          db.prepare('UPDATE holdings SET value = MAX(0, value - ?) WHERE id = ? AND user_id = ?').bind(p.amount, p.toId, userId),
+        ],
+        summary: `Hoàn tác chuyển ${formatVndFull(p.amount)} từ ${p.fromName}`,
+      };
+    case 'earn.set_target':
+      return { statements: [db.prepare('UPDATE income_profiles SET target_income = ?, target_months = ? WHERE user_id = ?').bind(p.targetBefore, p.monthsBefore, userId)], summary: 'Hoàn tác mục tiêu thu nhập' };
+    case 'reminder.create':
+    case 'calendar.create_events':
+      if (result.google) throw new ApiError(409, 'undo_unavailable', 'Sự kiện đã lên Google Calendar — hãy xóa trên Google Calendar');
+      return { statements: [db.prepare('DELETE FROM calendar_events WHERE action_id = ? AND user_id = ?').bind(id, userId)], summary: 'Hoàn tác lịch đã thêm' };
+    case 'alert_rule.create':
+      return { statements: [db.prepare('DELETE FROM alert_rules WHERE id = ? AND user_id = ?').bind(result.ruleId, userId)], summary: `Hoàn tác cảnh báo ${p.label}` };
+    case 'life_choice.update_plan': {
+      const ids = (result.taskIds as string[] | undefined) ?? [];
+      return {
+        statements: [
+          ...ids.map((taskId) => db.prepare('DELETE FROM life_choice_tasks WHERE id = ? AND choice_id = ?').bind(taskId, p.choiceId)),
+          ...(p.startAfter ? [db.prepare('UPDATE life_choice_options SET start_month = ? WHERE id = ? AND choice_id = ?').bind(p.startBefore, p.optionId, p.choiceId)] : []),
+        ],
+        summary: `Hoàn tác cập nhật kế hoạch "${p.choiceTitle}"`,
+      };
+    }
+    default:
+      throw new ApiError(409, 'undo_unavailable', 'Hành động này không hoàn tác được');
+  }
+}
+
+/** Hoàn tác một hành động đã áp dụng (một lần, trong UNDO_WINDOW_MS). Ghi audit trong cùng batch. */
+export async function undoAction(env: Env, userId: string, id: string): Promise<{ id: string; undone: true }> {
+  const db = env.DB;
+  const row = await db.prepare('SELECT id, run_id, agent, type, title, payload_json, result_json, status, executed_at, undone_at FROM agent_actions WHERE id = ? AND user_id = ?')
+    .bind(id, userId).first<Row & { result_json: string | null; executed_at: string | null; undone_at: string | null }>();
+  if (!row) throw notFound('Không tìm thấy hành động');
+  if (row.status !== 'done' || row.undone_at) throw new ApiError(409, 'undo_unavailable', 'Hành động này không còn hoàn tác được');
+  if (!row.executed_at || Date.now() - Date.parse(row.executed_at) > UNDO_WINDOW_MS) throw new ApiError(409, 'undo_expired', 'Đã quá thời gian hoàn tác');
+  if (!isActionType(row.type)) throw new ApiError(409, 'undo_unavailable', 'Hành động này không hoàn tác được');
+  const { statements, summary } = undoStatements(db, userId, id, row.type, JSON.parse(row.payload_json), row.result_json ? JSON.parse(row.result_json) : {});
+  const now = new Date().toISOString();
+  // Hai lần bấm đồng thời: chỉ một request đổi được undone_at, request kia dừng ở đây
+  const claim = await db.prepare('UPDATE agent_actions SET undone_at = ?, updated_at = ? WHERE id = ? AND user_id = ? AND undone_at IS NULL').bind(now, now, id, userId).run();
+  if (!claim.meta.changes) throw new ApiError(409, 'undo_unavailable', 'Hành động này đã được hoàn tác');
+  await batchWithAudit(db, statements, {
+    userId, actor: 'user', agent: row.agent ?? 'planner', action: 'action.undo', entityType: 'agent_action', entityId: id, actionId: id, runId: row.run_id,
+    summaryMasked: maskSummary(summary), status: 'completed', approver: 'user',
+  }, { salt: env.AUDIT_HASH_SALT });
+  await afterChange(db, userId, { title: 'Đã hoàn tác', detail: summary });
+  return { id, undone: true };
 }
 
 /** Mọi hành động của lượt chạy đã được quyết → lượt chạy hoàn tất. */

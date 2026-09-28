@@ -86,7 +86,47 @@ export const lifeChoicePlanPayload = z.object({
     detail: z.string().max(160).default(''),
     category: z.enum(['finance', 'career', 'time']),
     priority: z.enum(['high', 'mid', 'low']),
+    /** Đường dẫn tới trang liên quan + hành động 1 chạm đi kèm việc này. */
+    link: z.string().max(120).optional(),
+    action: z.object({ type: z.string().max(40), payload: z.unknown() }).optional(),
   })).max(6),
+  reason: z.string().max(300),
+});
+
+const month = z.string().regex(/^\d{4}-\d{2}$/);
+
+/** Đặt mục tiêu quỹ dự phòng N tháng chi tiêu (tạo mục tiêu nếu chưa có). Giữ giá trị cũ để hoàn tác. */
+export const safetyTargetPayload = z.object({
+  months: z.number().int().min(3).max(24),
+  monthsBefore: z.number().int().min(0).max(36),
+  goalId: z.string().nullable(),
+  targetAmount: money,
+  targetBefore: money.nullable(),
+  monthly: money,
+  monthlyBefore: money.nullable(),
+  targetMonth: month,
+  targetMonthBefore: month.nullable(),
+  reason: z.string().max(300),
+});
+
+/** Ghi nhận đã chuyển một phần tài sản tập trung (cổ phiếu công ty / cùng ngành) sang khoản an toàn hơn. */
+export const holdingRebalancePayload = z.object({
+  fromId: z.string().min(1),
+  fromName: z.string().max(80),
+  toId: z.string().min(1),
+  toName: z.string().max(80),
+  amount: money.min(1),
+  fromBefore: money,
+  toBefore: money,
+  reason: z.string().max(300),
+});
+
+/** Mục tiêu thu nhập (Tăng thu nhập): thêm nguồn làm thêm. */
+export const earnTargetPayload = z.object({
+  targetBefore: money,
+  target: money,
+  monthsBefore: z.number().int().min(1).max(120),
+  months: z.number().int().min(1).max(120),
   reason: z.string().max(300),
 });
 
@@ -166,6 +206,26 @@ export const ACTION_TYPES = {
       lines: [...p.tasks.map((t) => `+ ${t.title}`), p.reason],
     }),
   }),
+  'safety.set_target': def({
+    agent: 'goal', integration: 'local', risk: 'mid', schema: safetyTargetPayload,
+    preview: (p) => ({
+      before: p.targetBefore === null ? null : `${p.monthsBefore} tháng · ${vnd(p.targetBefore)}`,
+      after: `${p.months} tháng · ${vnd(p.targetAmount)}`,
+      lines: [`Để dành ${vnd(p.monthly)}/tháng tới T${Number(p.targetMonth.slice(5))}/${p.targetMonth.slice(0, 4)}`, p.reason],
+    }),
+  }),
+  'holding.rebalance': def({
+    agent: 'cashflow', integration: 'local', risk: 'mid', schema: holdingRebalancePayload,
+    preview: (p) => ({
+      before: `${p.fromName}: ${vnd(p.fromBefore)}`,
+      after: `${p.fromName}: ${vnd(p.fromBefore - p.amount)} · ${p.toName}: ${vnd(p.toBefore + p.amount)}`,
+      lines: [`Chuyển ${vnd(p.amount)} sang ${p.toName}`, 'Chỉ ghi nhận việc bạn đã làm, An Tâm không tự mua bán', p.reason],
+    }),
+  }),
+  'earn.set_target': def({
+    agent: 'skill', integration: 'local', risk: 'low', schema: earnTargetPayload,
+    preview: (p) => ({ before: `${vnd(p.targetBefore)}/tháng`, after: `${vnd(p.target)}/tháng trong ${p.months} tháng`, lines: [p.reason] }),
+  }),
   'alert_rule.create': def({
     agent: 'planner', integration: 'local', risk: 'low', schema: alertRulePayload,
     preview: (p) => ({ after: `Báo khi ${p.label} ${p.direction === 'down' ? 'giảm' : 'tăng'} từ ${pctText(p.thresholdPct)} trở lên`, lines: ['Chỉ báo tin, không tự mua bán'] }),
@@ -177,6 +237,26 @@ export const ACTION_TYPES = {
 } as const;
 
 export type ActionType = keyof typeof ACTION_TYPES;
+
+/** Trang CRUD nơi kết quả của hành động hiện ra (nút "Mở trang"). */
+export const ACTION_LINK: Partial<Record<ActionType, string>> = {
+  'safety.set_target': '/quy-an-toan?focus=reserve',
+  'goal.update_progress': '/quy-an-toan',
+  'budget.set': '/thu-chi?modal=budget',
+  'holding.rebalance': '/danh-muc?focus=employer',
+  'earn.set_target': '/tang-thu-nhap?focus=side',
+  'reminder.create': '/lich-ai',
+  'calendar.create_events': '/lich-ai',
+  'alert_rule.create': '/danh-muc',
+  'life_choice.update_plan': '/lua-chon',
+  'life_choice.create': '/lua-chon',
+};
+
+/** Loại được áp dụng 1 chạm (người dùng bấm, có xem trước + hoàn tác), không cần lượt Agent. */
+export const DIRECT_ACTIONS: readonly ActionType[] = [
+  'safety.set_target', 'goal.update_progress', 'budget.set', 'holding.rebalance', 'earn.set_target',
+  'reminder.create', 'calendar.create_events', 'alert_rule.create', 'life_choice.update_plan',
+];
 export const isActionType = (t: string): t is ActionType => t in ACTION_TYPES;
 
 /** Kiểm tra payload theo schema của loại hành động; lỗi → throw (không lưu / không chạy). */

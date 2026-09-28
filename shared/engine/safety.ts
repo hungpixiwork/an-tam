@@ -51,6 +51,19 @@ export function safetyPlans(state: UserState): [SafetyPlan, SafetyPlan] {
   return [p6, p12];
 }
 
+/**
+ * Kế hoạch quỹ dự phòng N tháng bất kỳ (3..24), cùng cách tính với safetyPlans:
+ * đạt trong 6 tháng nếu kham được, không thì theo tốc độ để dành hiện tại.
+ */
+export function reservePlan(state: UserState, months: number): { targetAmount: number; gap: number; monthly: number; duration: number } {
+  const targetAmount = Math.round(months * state.profile.monthlyExpense);
+  const gap = Math.max(0, targetAmount - emergencyAmount(state));
+  if (gap === 0) return { targetAmount, gap, monthly: 0, duration: 0 };
+  const pace = Math.max(savingsCapacity(state), 1);
+  const duration = Math.max(DEFAULT_PLAN_MONTHS, Math.ceil(gap / pace));
+  return { targetAmount, gap, monthly: roundUp(gap / duration), duration };
+}
+
 /** Ý tưởng để dành thêm từ chi tiêu tháng gần nhất + mục tiêu thu nhập. */
 export function savingIdeas(recent: Transaction[], income: IncomeProfile | null): SavingIdea[] {
   const expenses = recent.filter((t) => t.kind === 'expense');
