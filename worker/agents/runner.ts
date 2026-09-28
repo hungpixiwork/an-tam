@@ -16,6 +16,7 @@ import { addDays, weekStartOf } from '../../shared/engine/scheduler';
 import { PLANS } from '../../shared/plans';
 import { classifyLLM, narrateReply } from './llm';
 import { loadUserState } from '../lib/state';
+import { loadSignals } from '../routes/signals';
 import { userPlan } from '../lib/usage';
 import { loadBills, loadEventsBetween } from '../routes/calendar';
 import { syncInfo } from '../integrations/google/sync';
@@ -98,7 +99,8 @@ async function buildPlan(
     steps.push({ agent: 'planner', kind: 'plan', title: 'Phân tích dữ liệu cá nhân', detail: 'Đọc thu chi, tài sản, mục tiêu (đã ẩn số liệu)' });
   }
   if (want('life_decision') && params.life && state) {
-    const p = planLifeDecision(state, params.life, { budgetLimit: ctx.budgetLimit, lastMonthExpense: ctx.lastMonthExpense, maskedPrompt });
+    const signals = await loadSignals(env.DB, userId, state);
+    const p = planLifeDecision(state, params.life, { budgetLimit: ctx.budgetLimit, lastMonthExpense: ctx.lastMonthExpense, maskedPrompt, signals });
     steps.push(...p.steps);
     actions.push(...p.actions);
     replies.push(p.reply);

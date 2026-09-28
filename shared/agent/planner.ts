@@ -3,7 +3,7 @@
 
 import type { ActionIntegration, ActionRisk, AgentStepKind } from '../types/api/agent';
 import type { Transaction, UserState } from '../types/domain';
-import type { LifeChoiceEvaluation, LifeChoiceKind, LifeChoiceOptionInput } from '../types/api';
+import type { FinancialSignals, LifeChoiceEvaluation, LifeChoiceKind, LifeChoiceOptionInput } from '../types/api';
 import { evaluateLifeChoice, FEASIBILITY_WEIGHTS } from '../engine/lifeChoice';
 import { allocateSavings } from '../engine/allocation';
 import { addMonths } from '../engine/month';
@@ -264,13 +264,13 @@ export function lifeOption(state: UserState, life: LifeParams, title: string): L
   };
 }
 
-export interface LifeDecisionContext { budgetLimit: number | null; lastMonthExpense: number; maskedPrompt: string }
+export interface LifeDecisionContext { budgetLimit: number | null; lastMonthExpense: number; maskedPrompt: string; signals?: FinancialSignals }
 
 export function planLifeDecision(state: UserState, life: LifeParams, ctx: LifeDecisionContext): SpecialPlan & { evaluation: LifeChoiceEvaluation } {
   const kind = LIFE_KIND[life.kind];
   const title = lifeTitle(ctx.maskedPrompt, life.kind);
   const option = lifeOption(state, life, title);
-  const ev = evaluateLifeChoice(state, option, { kind, incomeUpliftPct: 0, prereqsDone: 0, prereqsTotal: 0 });
+  const ev = evaluateLifeChoice(state, option, { kind, incomeUpliftPct: 0, prereqsDone: 0, prereqsTotal: 0, signals: ctx.signals });
   const dur = option.durationMonths;
   const label = `${title.charAt(0).toLowerCase()}${title.slice(1)} ${dur} tháng`;
   const affordable = ev.funding.shortfall === 0;
@@ -341,6 +341,8 @@ export function planLifeDecision(state: UserState, life: LifeParams, ctx: LifeDe
     ...(delayed.length ? [{ agent: 'goal' as const, kind: 'note' as const, title: `${delayed.length} mục tiêu có thể lùi`, detail: `Khoảng ${paused} tháng` }] : []),
     { agent: 'planner', kind: 'propose', title: 'Đề xuất bước tiếp theo', detail: `${actions.length} hành động chờ phê duyệt` },
   ];
+  // Căn cứ (sổ thu chi thật, kịch bản xấu) — có khi đã gộp dữ liệu tài chính
+  if (ev.basis) parts.push(ev.basis);
   return { steps, actions, reply: parts.join(' '), evaluation: ev };
 }
 
