@@ -2,12 +2,16 @@
 // Hàm thuần — mọi con số đến từ engine có sẵn (scheduler, budget, goals), không tự bịa.
 
 import type { ActionIntegration, ActionRisk, AgentStepKind } from '../types/api/agent';
-import type { Transaction } from '../types/domain';
+import type { Transaction, UserState } from '../types/domain';
+import type { LifeChoiceEvaluation, LifeChoiceKind, LifeChoiceOptionInput } from '../types/api';
+import { evaluateLifeChoice, FEASIBILITY_WEIGHTS } from '../engine/lifeChoice';
+import { allocateSavings } from '../engine/allocation';
+import { addMonths } from '../engine/month';
 import { addDays, planTasks, tasksFromState, weekdayIndex, type BillDue, type BusyEvent, type Proposal, type SchedTask } from '../engine/scheduler';
 import { spendingAdvice } from '../engine/budget';
 import { categoryOf } from '../engine/ledger';
 import { formatVndFull } from '../format';
-import { fold, type Intent } from './intent';
+import { fold, type AlertParams, type Intent, type LifeKind, type LifeParams } from './intent';
 import { ACTION_TYPES, validateAction, type ActionType } from './actions';
 import { AGENT_KEYS, type AgentKey } from './tools';
 
@@ -59,6 +63,9 @@ const NEGATE: Record<Intent, RegExp> = {
   learn_skill: /(khong|bo|dung)\s+(nhac |lich )?hoc/,
   follow_up_clients: /(khong|bo|dung)\s+(gui )?(email|mail|khach)/,
   review_goals: /(khong|bo|dung)\s+(doi |sua )?muc tieu/,
+  life_decision: /(khong|bo|dung)\s+(luu )?(phuong an|ke hoach nay)/,
+  set_alert: /(khong|bo|dung)\s+(dat )?canh bao/,
+  ask_desk: /$^/,
 };
 
 export function applyNote(intents: Intent[], note?: string): Intent[] {
@@ -211,4 +218,178 @@ export function planRun(ctx: PlannerContext, rawIntents: Intent[]): PlanResult {
     ...notes,
   );
   return { agents, intents, steps, actions };
+}
+
+/* ───────── Quyết định lớn / cảnh báo giá / hỏi về một mã ─────────
+   Mọi con số từ engine (evaluateLifeChoice, allocateSavings). Nhật ký (steps) không ghi số tiền;
+   câu trả lời (reply) và bản xem trước hành động mới có số. */
+
+export interface SpecialPlan { steps: StepDraft[]; actions: ActionDraft[]; reply: string }
+
+const LIFE_KIND: Record<LifeKind, LifeChoiceKind> = { study: 'study', startup: 'startup', sabbatical: 'sabbatical', career_switch: 'switch', other: 'custom' };
+const DEFAULT_MONTHS: Record<LifeKind, number> = { study: 24, startup: 12, sabbatical: 6, career_switch: 6, other: 12 };
+/** Phần trăm thu nhập còn giữ khi người dùng không nói rõ. */
+const DEFAULT_INCOME_PCT: Record<LifeKind, number> = { study: 0, startup: 0, sabbatical: 0, career_switch: 80, other: 0 };
+const LIFE_LABEL: Record<LifeKind, string> = { study: 'đi học', startup: 'khởi nghiệp', sabbatical: 'nghỉ ngơi', career_switch: 'đổi nghề', other: 'thực hiện kế hoạch' };
+/** Chuẩn bị trong bao nhiêu tháng trước khi bắt đầu (để tính số cần để dành thêm mỗi tháng). */
+export const LIFE_PREP_MONTHS = 12;
+
+const ceil100k = (n: number) => Math.ceil(Math.max(0, n) / 100_000) * 100_000;
+const decText = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
+const pctText = (n: number) => `${decText(n)}%`;
+
+/** Tên phương án ngắn từ câu hỏi đã che: "Học thạc sĩ", "Du học", "Khởi nghiệp"… */
+export function lifeTitle(maskedPrompt: string, kind: LifeKind): string {
+  const t = fold(maskedPrompt);
+  if (/du hoc/.test(t)) return 'Du học';
+  if (/\bmba\b/.test(t)) return 'Học MBA';
+  if (/thac si/.test(t)) return 'Học thạc sĩ';
+  if (/tien si/.test(t)) return 'Học tiến sĩ';
+  return { study: 'Đi học', startup: 'Khởi nghiệp', sabbatical: 'Nghỉ ngơi', career_switch: 'Đổi nghề', other: 'Kế hoạch mới' }[kind];
+}
+
+/** Tham số rút từ câu hỏi → phương án đầu vào của engine. */
+export function lifeOption(state: UserState, life: LifeParams, title: string): LifeChoiceOptionInput {
+  const dur = Math.min(120, Math.max(1, Math.round(life.durationMonths ?? DEFAULT_MONTHS[life.kind])));
+  const pct = Math.min(100, Math.max(0, life.incomeDuringPct ?? DEFAULT_INCOME_PCT[life.kind]));
+  const income = Math.max(0, state.profile.monthlyIncome);
+  return {
+    title: `${title} ${dur} tháng`,
+    description: 'Do An Tâm AI tạo từ câu hỏi của bạn',
+    cost: Math.max(0, Math.round(life.oneTimeCost ?? 0)),
+    otherCost: Math.max(0, Math.round((life.monthlyCost ?? 0) * dur)),
+    durationMonths: dur,
+    monthsWithoutIncome: pct <= 0 ? dur : 0,
+    monthlyIncomeDelta: pct <= 0 ? 0 : -Math.round((income * (1 - pct / 100)) / 1000) * 1000,
+  };
+}
+
+export interface LifeDecisionContext { budgetLimit: number | null; lastMonthExpense: number; maskedPrompt: string }
+
+export function planLifeDecision(state: UserState, life: LifeParams, ctx: LifeDecisionContext): SpecialPlan & { evaluation: LifeChoiceEvaluation } {
+  const kind = LIFE_KIND[life.kind];
+  const title = lifeTitle(ctx.maskedPrompt, life.kind);
+  const option = lifeOption(state, life, title);
+  const ev = evaluateLifeChoice(state, option, { kind, incomeUpliftPct: 0, prereqsDone: 0, prereqsTotal: 0 });
+  const dur = option.durationMonths;
+  const label = `${title.charAt(0).toLowerCase()}${title.slice(1)} ${dur} tháng`;
+  const affordable = ev.funding.shortfall === 0;
+
+  // Mục tiêu bị lùi: phần góp cho mục tiêu không đủ trong thời gian thực hiện → tạm dừng tương ứng
+  const goalsRatio = Math.min(1, Math.max(0, ev.parts.goals / FEASIBILITY_WEIGHTS.goals));
+  const paused = Math.round(dur * (1 - goalsRatio));
+  const delayed = paused > 0
+    ? [...state.goals].filter((g) => g.kind !== 'education' && g.monthlyContribution > 0 && g.currentAmount < g.targetAmount).sort((a, b) => a.priority - b.priority).slice(0, 2)
+    : [];
+
+  // Số cần để dành thêm: phần thiếu + phần để quỹ dự phòng vẫn đủ sau khi thực hiện, chia cho thời gian chuẩn bị
+  const E = Math.max(0, state.profile.monthlyExpense);
+  const targetMonths = state.profile.emergencyTargetMonths || 6;
+  const leftAfter = Math.max(0, ev.funding.liquid - Math.max(0, ev.costs.total - ev.funding.incomeCover));
+  const need = ev.funding.shortfall + Math.max(0, targetMonths * E - leftAfter);
+  const extra = ceil100k(need / LIFE_PREP_MONTHS);
+  const savings = allocateSavings(state);
+  const free = round100k(Math.max(0, savings.unallocated));
+  // Bớt chi tối đa 15% ngân sách hiện tại — không đề xuất cắt chi quá sức
+  const current = ctx.budgetLimit ?? ctx.lastMonthExpense;
+  const cut = Math.min(Math.max(0, extra - free), round100k(Math.max(0, current) * 0.15));
+  const reachable = Math.min(extra, free + cut);
+  // Không đủ trong 12 tháng → với mức để dành hiện tại cần bao lâu
+  const capacity = Math.max(0, savings.capacity);
+  const prepMonths = reachable < extra && capacity > 0 ? Math.ceil(need / capacity) : null;
+
+  const parts = [
+    affordable
+      ? `Bạn kham nổi kế hoạch ${label}: tổng chi khoảng ${vnd(ev.costs.total)}, tiền dùng được ngay ${vnd(ev.funding.liquid)} đủ trả.`
+      : `Bạn chưa kham nổi kế hoạch ${label}: tổng chi khoảng ${vnd(ev.costs.total)}, còn thiếu ${vnd(ev.funding.shortfall)}.`,
+    `Sau khi thực hiện, quỹ còn đủ sống ${decText(ev.monthsAfter)} tháng (hiện ${decText(ev.monthsBefore)} tháng).`,
+    delayed.length
+      ? `Mục tiêu ${delayed.map((g) => `"${g.title}"`).join(' và ')} lùi khoảng ${paused} tháng.`
+      : 'Các mục tiêu khác vẫn giữ tiến độ.',
+    extra <= 0
+      ? 'Không cần để dành thêm.'
+      : `Cần để dành thêm ${vnd(extra)}/tháng trong ${LIFE_PREP_MONTHS} tháng để bắt đầu mà vẫn giữ quỹ dự phòng ${targetMonths} tháng${
+        reachable >= extra ? (cut > 0 ? '.' : ', phần tiền dư chưa chia hiện đủ cho khoản này.')
+          : prepMonths ? `; với mức để dành hiện tại ${vnd(round100k(capacity))}/tháng thì cần khoảng ${prepMonths} tháng chuẩn bị.` : '.'}`,
+  ];
+
+  const actions: ActionDraft[] = [];
+  const add = (type: ActionType, t: string, payload: unknown) => {
+    const d = ACTION_TYPES[type];
+    actions.push({ type, agent: d.agent, title: t, payload: validateAction(type, payload), integration: d.integration === 'google_calendar_or_local' ? 'local' : d.integration, risk: d.risk });
+  };
+  add('life_choice.create', `Lưu phương án "${option.title}" để theo dõi`, {
+    title, kind, option,
+    reason: `Điểm khả thi ${ev.feasibility}/100, ${affordable ? 'kham nổi' : 'chưa kham nổi'} với dữ liệu hiện tại.`,
+  });
+  if (reachable > 0) {
+    const dates = Array.from({ length: 6 }, (_, i) => `${addMonths(state.today, i + 1)}-05`);
+    add('reminder.create', `Nhắc để dành ${vnd(reachable)} mỗi tháng`, { title: `Để dành ${vnd(reachable)} cho kế hoạch ${LIFE_LABEL[life.kind]}`.slice(0, 80), time: '08:00', dates, category: 'finance' });
+    if (cut > 0 && current > 0) {
+      const month = addMonths(state.today, 1);
+      add('budget.set', `Giảm ngân sách tháng ${month.slice(5)}/${month.slice(0, 4)} để chuẩn bị kế hoạch`, {
+        month, limitBefore: ctx.budgetLimit, limit: Math.max(100_000, round100k(current - cut)), saving: cut,
+        reason: `Bớt chi ${vnd(cut)}/tháng để chuẩn bị ${LIFE_LABEL[life.kind]}.`,
+      });
+    }
+  }
+
+  const steps: StepDraft[] = [
+    { agent: 'planner', kind: 'plan', title: 'Hiểu câu hỏi: quyết định lớn', detail: label },
+    { agent: 'goal', kind: 'note', title: 'Chấm điểm phương án bằng dữ liệu thật', detail: `Điểm khả thi ${ev.feasibility}/100` },
+    { agent: 'cashflow', kind: 'note', title: affordable ? 'Tiền dùng được ngay đủ trả' : 'Tiền dùng được ngay chưa đủ', detail: `Quỹ còn đủ sống ${decText(ev.monthsAfter)} tháng sau khi thực hiện` },
+    ...(delayed.length ? [{ agent: 'goal' as const, kind: 'note' as const, title: `${delayed.length} mục tiêu có thể lùi`, detail: `Khoảng ${paused} tháng` }] : []),
+    { agent: 'planner', kind: 'propose', title: 'Đề xuất bước tiếp theo', detail: `${actions.length} hành động chờ phê duyệt` },
+  ];
+  return { steps, actions, reply: parts.join(' '), evaluation: ev };
+}
+
+export const symbolLabel = (symbol: string) => (symbol === 'SJC' ? 'vàng SJC' : symbol === 'VNINDEX' ? 'VN-Index' : symbol);
+
+/** Cảnh báo giá: 1 hành động chờ duyệt; đã đủ số cảnh báo của gói → chỉ trả lời, không đề xuất. */
+export function planAlert(alert: AlertParams, limit: { count: number | null; max: number }): SpecialPlan {
+  const label = symbolLabel(alert.symbol);
+  const verb = alert.direction === 'down' ? 'giảm' : 'tăng';
+  const what = `${label} ${verb} từ ${pctText(alert.thresholdPct)} trở lên trong ngày`;
+  if (limit.count !== null && limit.count >= limit.max) {
+    return {
+      steps: [{ agent: 'planner', kind: 'note', title: 'Đã đủ số cảnh báo giá của gói', detail: `Tối đa ${limit.max} cảnh báo` }],
+      actions: [],
+      reply: `Bạn đã đặt đủ ${limit.max} cảnh báo giá của gói hiện tại. Xóa bớt một cảnh báo hoặc nâng lên Gói Plus để được báo khi ${what}.`,
+    };
+  }
+  const d = ACTION_TYPES['alert_rule.create'];
+  const payload = validateAction('alert_rule.create', { symbol: alert.symbol, label, direction: alert.direction, thresholdPct: alert.thresholdPct });
+  return {
+    steps: [
+      { agent: 'planner', kind: 'plan', title: 'Hiểu câu hỏi: đặt cảnh báo giá', detail: label },
+      { agent: 'planner', kind: 'propose', title: 'Đề xuất cảnh báo giá', detail: '1 hành động chờ phê duyệt' },
+    ],
+    actions: [{ type: 'alert_rule.create', agent: d.agent, title: `Bật cảnh báo khi ${label} ${verb}`, payload, integration: 'local', risk: d.risk }],
+    reply: `An Tâm sẽ báo bạn khi ${what}. Bấm duyệt để bật cảnh báo.`,
+  };
+}
+
+/** Hỏi về một mã: ghi chú ảnh hưởng tới tài sản đang giữ (tất định), không khuyên mua / bán. */
+export function planDesk(state: UserState, symbol: string | null): SpecialPlan {
+  const steps: StepDraft[] = [{ agent: 'planner', kind: 'plan', title: 'Hiểu câu hỏi: hỏi về một mã', detail: symbol ? symbolLabel(symbol) : 'Chưa rõ mã' }];
+  if (!symbol) return { steps, actions: [], reply: 'Bạn muốn hỏi về mã nào? Ví dụ: "có nên bán vàng không" hoặc "FPT giảm có sao không".' };
+  const total = state.holdings.reduce((s, h) => s + Math.max(0, h.value), 0);
+  const match = state.holdings.filter((h) => {
+    const sym = (h as { symbol?: string | null }).symbol;
+    if (sym) return sym.toUpperCase() === symbol;
+    const n = fold(h.name);
+    if (symbol === 'SJC') return /\bvang\b|\bsjc\b/.test(n);
+    if (symbol === 'VNINDEX') return h.category === 'stock' || h.category === 'fund';
+    return new RegExp(`\\b${symbol.toLowerCase()}\\b`).test(n);
+  });
+  const held = match.reduce((s, h) => s + Math.max(0, h.value), 0);
+  const label = symbolLabel(symbol);
+  steps.push({ agent: 'cashflow', kind: 'note', title: 'Đo ảnh hưởng tới tài sản đang giữ', detail: held > 0 ? `${match.length} khoản liên quan` : 'Không có khoản liên quan' });
+  steps.push({ agent: 'planner', kind: 'note', title: 'Bàn đầu tư sẽ phân tích mã này' });
+  const share = total > 0 ? (held / total) * 100 : 0;
+  const reply = held > 0
+    ? `Bạn đang giữ khoảng ${vnd(held)} liên quan tới ${label}, chiếm ${pctText(share)} tổng tài sản. Nếu ${label} giảm 10%, tài sản của bạn giảm khoảng ${vnd(Math.round(held * 0.1))}. An Tâm không khuyên mua hay bán, chỉ giúp bạn thấy mức ảnh hưởng tới quỹ dự phòng và mục tiêu.`
+    : `Bạn chưa có khoản nào gắn với ${label} trong danh sách tài sản, nên biến động của mã này không ảnh hưởng trực tiếp tới tiền của bạn.`;
+  return { steps, actions: [], reply };
 }
