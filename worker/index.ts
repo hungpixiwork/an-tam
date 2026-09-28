@@ -44,6 +44,10 @@ import { consumeJobs } from './jobs/handlers';
 import { refreshMarket } from './market/refresh';
 import { marketAlertUserIds, runMarketAlertsForAll } from './market/alerts';
 import { PAGE } from './jobs/monitor';
+import { desk } from './desk/routes';
+
+// Workflow bàn đầu tư (wrangler.jsonc → workflows)
+export { DeskWorkflow } from './desk/workflow';
 
 const app = new Hono<AppEnv>();
 
@@ -138,6 +142,7 @@ app.route('/api/agent', agent);
 app.route('/api/audit', audit);
 app.route('/api/market', market);
 app.route('/api/alert-rules', alertRules);
+app.route('/api/desk', desk);
 app.route('/api/integrations', integrations);
 app.route('/api/plan', plan);
 app.route('/api/signals', signals);
