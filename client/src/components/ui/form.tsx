@@ -191,3 +191,52 @@ export function Modal({ title, onClose, children, className }: { title: string; 
     document.body,
   );
 }
+
+/* ───────── Thanh trượt có nhãn ───────── */
+
+export interface RangeFieldProps {
+  label: ReactNode;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (v: number) => void;
+  /** Giá trị hiển thị bên phải nhãn (vd "70%", "12 tháng"). */
+  format: (v: number) => string;
+  minLabel?: string;
+  maxLabel?: string;
+  color?: string;
+  className?: string;
+}
+
+/** Nhãn + giá trị bên phải, thanh trượt tô màu theo phần đã chọn, nhãn đầu/cuối bên dưới (mockup Mô phỏng). */
+export function RangeField({ label, value, min, max, step = 1, onChange, format, minLabel, maxLabel, color = '#2F7BEA', className }: RangeFieldProps) {
+  const id = useId();
+  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+  return (
+    <div className={cx('min-w-0', className)}>
+      <div className="flex items-baseline justify-between gap-2">
+        <label htmlFor={id} className="text-[12.5px] text-ink">{label}</label>
+        <output htmlFor={id} className="text-[14px] font-bold tabular-nums text-ink">{format(value)}</output>
+      </div>
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-valuetext={format(value)}
+        className="range-slider mt-1.5 w-full"
+        style={{ background: `linear-gradient(to right, ${color} ${pct}%, #E3E9F0 ${pct}%)` }}
+      />
+      {(minLabel || maxLabel) && (
+        <div className="mt-0.5 flex justify-between text-[11px] text-ink-mute">
+          <span>{minLabel}</span>
+          <span>{maxLabel}</span>
+        </div>
+      )}
+    </div>
+  );
+}

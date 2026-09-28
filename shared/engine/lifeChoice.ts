@@ -16,6 +16,7 @@ import { humanCapital, presentValueIncome, RISK_FREE } from './humanCapital';
 import type { FinancialSignals } from '../types/api/signals';
 import { formatVnd } from '../format';
 import { addMonths, monthsBetween } from './month';
+import { mainGoal } from './goals';
 
 export interface LifeChoiceReadiness {
   /** Quỹ dự phòng tối thiểu nên có trước khi bắt đầu = số tháng an toàn mục tiêu × chi tiêu tháng. */
@@ -132,10 +133,12 @@ export function previewLifeChoice(
   const planned = option.startMonth ? Math.max(0, monthsBetween(state.today, option.startMonth)) : null;
   const startAfterMonths = planned !== null ? planned + assumptions.preparationDelayMonths
     : prepare === null ? null : prepare + assumptions.preparationDelayMonths;
-  // Mục tiêu mua nhà lùi vì tiền phải bỏ ra cho phương án (tích lũy lại bằng tiền dư mỗi tháng)
-  const home = state.goals.find((g) => g.kind === 'home');
+  // Mục tiêu lớn chính lùi vì tiền phải bỏ ra cho phương án (tích lũy lại bằng tiền dư mỗi tháng)
+  const home = mainGoal(state);
   const drain = Math.max(0, evaluation.costs.total - evaluation.funding.incomeCover);
-  const homeDelayMonths = home && monthlySave > 0 ? Math.ceil(drain / monthlySave) : null;
+  // Tích lũy lại bằng phần dư với thu nhập sau khi hoàn thành
+  const saveAfter = Math.max(0, Math.round(state.profile.monthlyIncome * (1 + uplift / 100)) - state.profile.monthlyExpense);
+  const homeDelayMonths = home && saveAfter > 0 ? Math.ceil(drain / saveAfter) : null;
   return {
     mode, optionId, evaluation,
     expectedMonthlyIncome: Math.max(0, Math.round(state.profile.monthlyIncome * (1 + uplift / 100))),

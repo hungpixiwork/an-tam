@@ -9,7 +9,7 @@ const messages: Record<string, string> = {
   "nav.goals": "人生目标",
   "nav.goals.title": "人生重大目标",
   "nav.simulation": "压力测试",
-  "nav.simulation.title": "未来压力测试与模拟",
+  "nav.simulation.title": "双重冲击模拟",
   "nav.simulation.result": "模拟测算结果",
   "nav.habits": "风险偏好",
   "nav.habits.title": "财务习惯与风险偏好",

@@ -20,8 +20,9 @@ import workspace from './workspace';
 import audit from './audit';
 import portfolio from './portfolio';
 import onboarding from './onboarding';
+import simulation from './simulation';
 
-export const namespaces = { app, nav, topbar, sidebar, auth, locale, home, common, category, spending, ledger, earn, error, overview, safety, calendar, choices, workspace, audit, portfolio, onboarding } as const;
+export const namespaces = { app, nav, topbar, sidebar, auth, locale, home, common, category, spending, ledger, earn, error, overview, safety, calendar, choices, workspace, audit, portfolio, onboarding, simulation } as const;
 
 const messages: Record<string, string> = Object.assign({}, ...Object.values(namespaces));
 

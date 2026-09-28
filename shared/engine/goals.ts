@@ -104,6 +104,12 @@ export function goalInsights(state: UserState): GoalInsight[] {
   });
 }
 
+/** Mục tiêu lớn chính để đo độ lùi: mua nhà nếu có, không thì mục tiêu có số tiền lớn nhất (trừ quỹ dự phòng). */
+export function mainGoal(state: UserState): Goal | undefined {
+  return state.goals.find((g) => g.kind === 'home')
+    ?? [...state.goals].filter((g) => g.kind !== 'emergency').sort((a, b) => b.targetAmount - a.targetAmount)[0];
+}
+
 /** Mục tiêu lớn gần nhất (không tính quỹ dự phòng) — quyết định khẩu vị rủi ro khuyến nghị. */
 export function nearestMajorGoal(state: UserState): Goal | undefined {
   return [...state.goals]

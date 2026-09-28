@@ -18,7 +18,7 @@ export const NAV: NavItem[] = [
   { key: 'earn', to: '/tang-thu-nhap', label: 'Tăng thu nhập', title: 'Tăng thu nhập & phát triển kỹ năng', icon: TrendingUp },
   { key: 'choices', to: '/lua-chon', label: 'Mục tiêu & Lựa chọn', title: 'Lựa chọn cuộc đời', icon: Target },
   { key: 'calendar', to: '/lich-ai', label: 'Lịch AI', title: 'Lịch AI & kế hoạch tự động', icon: CalendarDays },
-  { key: 'simulation', to: '/mo-phong', label: 'Mô phỏng', title: 'Mô phỏng tương lai', icon: ChartColumn },
+  { key: 'simulation', to: '/mo-phong', label: 'Mô phỏng', title: 'Mô phỏng cú sốc kép', icon: ChartColumn },
   { key: 'portfolio', to: '/danh-muc', label: 'Danh mục', title: 'Danh mục & rủi ro tập trung', icon: PieChart },
   { key: 'workspace', to: '/ai-workspace', label: 'AI Workspace', title: 'AI Workspace · MCP · Agents', icon: Bot },
   { key: 'audit', to: '/nhat-ky-ai', label: 'Nhật ký AI', title: 'Nhật ký AI, kiểm toán & quyền riêng tư', icon: FileText },

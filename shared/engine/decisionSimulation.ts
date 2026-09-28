@@ -9,8 +9,8 @@ import type {
   DecisionGoalTile, DecisionMode, DecisionRange, DecisionScenario, DecisionShock, DecisionShockParams,
   DecisionSimulationResult, DecisionStep,
 } from '../types/api/decision';
-import { evaluateLifeChoice, liquidAssets, type EvaluateContext } from './lifeChoice';
-import { expectedCompletion } from './goals';
+import { DEFAULT_CUT_PCT, evaluateLifeChoice, liquidAssets, type EvaluateContext } from './lifeChoice';
+import { expectedCompletion, mainGoal } from './goals';
 import { addMonths, monthsBetween } from './month';
 import { peaceScore, savingsCapacity } from './peace';
 import { MARKET_BETA } from './simulate';
@@ -42,6 +42,8 @@ const CONCENTRATION_CAP = 0.1;
 /** Khi lấp lại phần thiếu, giả định chỉ dồn được 60% tiền dư (40% vẫn góp cho mục tiêu khác) → cận trên của khoảng. */
 const SLOW_SAVE_SHARE = 0.6;
 const MAX_DROP = 0.95;
+/** Trợ cấp thất nghiệp (Luật Việc làm): 60% lương, tối thiểu 3 tháng — chỉ khi đang đi làm mà mất việc. */
+const UNEMPLOYMENT_BENEFIT = { share: 0.6, months: 3 } as const;
 
 export interface DecisionIncomeExtras {
   /** Thưởng năm (VND) — lấy từ hồ sơ thu nhập. */
@@ -82,6 +84,8 @@ interface Timeline {
   delta: number;
   upfront: number;
   uplift: number;
+  /** Chi tiêu tháng trong thời gian thực hiện (đã cắt phần chi linh hoạt như evaluateLifeChoice). */
+  choiceExpense: number;
 }
 
 interface Projection {
@@ -104,19 +108,31 @@ function project(state: UserState, t: Timeline, extras: DecisionIncomeExtras, sh
   const bonusKeep = shock ? 1 - clamp((shock.bonusCutPct / 100) * f.income, 0, 1) : 1;
   const esopKeep = shock ? 1 - clamp((shock.esopCutPct / 100) * f.income, 0, 1) : 1;
 
+  // Đã nghỉ việc để thực hiện lựa chọn → cú sốc nghề nghiệp là tìm việc lại chậm hơn sau khi xong;
+  // vẫn đi làm (bán thời gian) hoặc đang chuẩn bị → mất việc ngay từ những tháng có lương đầu tiên.
+  const lossAfterChoice = t.noIncome > 0;
+  let benefitLeft: number = UNEMPLOYMENT_BENEFIT.months;
+
   let cash = liquidAssets(state);
   const path = [cash - assetLoss];
   const income: number[] = [0];
   for (let m = 1; m <= HORIZON_MONTHS; m++) {
     const k = m - t.start; // tháng thứ k của lựa chọn (≤ 0 = đang chuẩn bị, vẫn đi làm)
     const inChoice = k >= 1 && k <= t.duration;
-    let pay = !inChoice ? (k > t.duration ? salary * (1 + t.uplift / 100) : salary) : k <= t.noIncome ? 0 : Math.max(0, salary + t.delta);
+    const after = k > t.duration;
+    let pay = !inChoice ? (after ? salary * (1 + t.uplift / 100) : salary) : k <= t.noIncome ? 0 : Math.max(0, salary + t.delta);
     // Thưởng / cổ phiếu thưởng chỉ có khi đang làm công việc chính (không tính lúc đang thực hiện lựa chọn)
     let extra = inChoice ? 0 : bonusM * (m <= 12 ? bonusKeep : 1) + esopM * (m <= 12 ? esopKeep : 1);
-    // Mất lương rơi vào những tháng đáng lẽ có lương đầu tiên
-    if (pay > 0 && lostLeft > 0) { pay = 0; extra = 0; lostLeft--; }
+    if (pay > 0 && lostLeft > 0 && (!lossAfterChoice || after)) {
+      // Bị cho nghỉ khi đang làm công việc cũ → có trợ cấp thất nghiệp vài tháng đầu
+      const employedBefore = !after && !inChoice;
+      pay = employedBefore && benefitLeft > 0 ? salary * UNEMPLOYMENT_BENEFIT.share : 0;
+      if (employedBefore && benefitLeft > 0) benefitLeft--;
+      extra = 0;
+      lostLeft--;
+    }
     const monthIncome = Math.round(pay + extra);
-    cash += monthIncome - E - (k === 1 ? t.upfront : 0);
+    cash += monthIncome - (inChoice ? t.choiceExpense : E) - (k === 1 ? t.upfront : 0);
     const recovered = assetLoss * f.recovery * (m / HORIZON_MONTHS);
     path.push(Math.round(cash - assetLoss + recovered));
     income.push(monthIncome);
@@ -172,7 +188,10 @@ export function analyzeDecisionSimulation(
 ): DecisionSimulationResult {
   const E = Math.max(1, state.profile.monthlyExpense);
   const duration = Math.max(1, Math.round(option.durationMonths));
+  const sig = choice.evaluate.signals;
+  const cut = Math.min(1, Math.max(0, option.cutPct ?? DEFAULT_CUT_PCT));
   const timeline: Timeline = {
+    choiceExpense: sig ? Math.round(sig.expense.fixed + sig.expense.flexible * (1 - cut)) : state.profile.monthlyExpense,
     start: option.startMonth ? clamp(monthsBetween(state.today, option.startMonth), 0, HORIZON_MONTHS) : 0,
     duration,
     noIncome: clamp(Math.round(option.monthsWithoutIncome), 0, duration),
@@ -188,21 +207,25 @@ export function analyzeDecisionSimulation(
     return [mode, summarize(state, mode, p, baseProj)];
   })) as Record<DecisionMode, DecisionScenario>;
   const selected = scenarios[input.mode];
-  const surplus = Math.max(0, savingsCapacity(state));
+  // Sức tích lũy mỗi tháng: tiền dư + thưởng/cổ phiếu thưởng bình quân (trước) và với thu nhập sau khi hoàn thành (sau)
+  const extrasM = (Math.max(0, extras.bonusAnnual) + Math.max(0, extras.esopAnnual)) / 12;
+  const surplus = Math.max(0, savingsCapacity(state) + extrasM);
+  const surplusAfter = Math.max(0, state.profile.monthlyIncome * (1 + choice.incomeUpliftPct / 100) + extrasM - state.profile.monthlyExpense);
 
   // Quỹ dự phòng: số tháng an toàn còn lại so với mục tiêu của người dùng
   const targetMonths = state.profile.emergencyTargetMonths || 6;
   const extraMonths = Math.max(0, Math.ceil(targetMonths - selected.monthsSafe));
 
-  // Mục tiêu mua nhà: phần tiền mất đi sau 24 tháng phải tích lũy lại trước khi góp tiếp
-  const home = state.goals.find((g) => g.kind === 'home');
+  // Mục tiêu lớn chính: phần tiền mất đi sau 24 tháng phải tích lũy lại trước khi góp tiếp.
+  // Nhanh = dồn toàn bộ tiền dư; chậm = chỉ giữ mức góp hiện tại cho mục tiêu này.
+  const goal = mainGoal(state);
   const lost24 = Math.max(0, baseline.path[HORIZON_MONTHS] - selected.path[HORIZON_MONTHS]);
-  let homeDelay: DecisionSimulationResult['impact']['homeDelay'] = null;
-  if (home) {
-    const min = surplus > 0 ? Math.ceil(lost24 / surplus) : HORIZON_MONTHS;
-    const max = home.monthlyContribution > 0 ? Math.max(min, Math.ceil(lost24 / home.monthlyContribution)) : min;
-    const before = expectedCompletion(home, state);
-    homeDelay = { min, max, goalTitle: home.title, before, after: before ? addMonths(before, max) : null };
+  let goalDelay: DecisionSimulationResult['impact']['goalDelay'] = null;
+  if (goal) {
+    const range = refillRange(lost24, surplusAfter);
+    const { min, max } = range;
+    const before = expectedCompletion(goal, state);
+    goalDelay = { min, max, goalTitle: goal.title, before, after: before ? addMonths(before, max) : null };
   }
 
   // Lựa chọn: phải lấp lại phần quỹ bị hụt ở thời điểm eo hẹp nhất trước khi bắt đầu
@@ -224,7 +247,7 @@ export function analyzeDecisionSimulation(
   const startMonth = addMonths(state.today, timeline.start);
 
   const goals: DecisionGoalTile[] = [];
-  if (homeDelay) goals.push({ key: 'home', title: homeDelay.goalTitle, before: homeDelay.before, after: homeDelay.after, delta: { min: homeDelay.min, max: homeDelay.max } });
+  if (goalDelay) goals.push({ key: 'goal', title: goalDelay.goalTitle, before: goalDelay.before, after: goalDelay.after, delta: { min: goalDelay.min, max: goalDelay.max } });
   goals.push({ key: 'reserve', title: 'reserve', before: baseline.monthsSafe, after: selected.monthsSafe, delta: round1(selected.monthsSafe - baseline.monthsSafe) });
   goals.push({ key: 'choice', title: choice.title, before: startMonth, after: addMonths(startMonth, delayStart.max), delta: delayStart });
   goals.push({ key: 'cashflow', title: 'cashflow', before: incomeBefore, after: incomeAfter, delta: incomeBefore > 0 ? Math.round(((incomeAfter - incomeBefore) / incomeBefore) * 100) : null });
@@ -244,7 +267,7 @@ export function analyzeDecisionSimulation(
     impact: {
       monthsSafe: { before: baseline.monthsSafe, after: selected.monthsSafe },
       reserve: { targetMonths, extraMonths, extraAmount: extraMonths * E },
-      homeDelay,
+      goalDelay,
       safety: { before: baseline.safetyScore, after: selected.safetyScore },
     },
     goals,
@@ -262,6 +285,8 @@ export function analyzeDecisionSimulation(
     steps: steps.slice(0, 4),
     concentration: { amount: concentrated, share: Math.round(share * 1000) / 1000 },
     basis: 'Ước tính tất định theo từng tháng từ thu nhập, thưởng, chi tiêu, tài sản và phương án bạn nhập. '
+      + 'Số tháng mất thu nhập = số tháng × xác suất; đã nghỉ việc để thực hiện lựa chọn thì tính là tìm việc lại chậm hơn sau khi xong, '
+      + 'đang đi làm mà mất việc thì có trợ cấp thất nghiệp 60% lương trong 3 tháng. '
       + 'Bull nhẹ hơn 40% và tài sản hồi 80% sau 24 tháng; Bear nặng hơn 40% và chưa hồi. Không phải dự báo thị trường.',
   };
 }

@@ -4,8 +4,8 @@ import type { SimulationReport } from '@shared/engine/analysis';
 import { formatDuration, formatPct, formatVnd } from '@shared/format';
 import { HeroLakeCity } from '@/components/pixel';
 import { ButtonLink, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, Rich, cx, type Tone } from '@/components/ui';
-import { useRun } from '@/lib/queries';
-import { SavedDecisionResult } from './DecisionSimulationPage';
+import { isDecisionResult, useRun } from '@/lib/queries';
+import { SavedDecisionResult } from './SavedDecisionResult';
 
 export default function SimulationResultPage() {
   const { runId = '' } = useParams();
@@ -22,7 +22,7 @@ export default function SimulationResultPage() {
         </div>
       </div>
     );
-  if (data.decision) return <SavedDecisionResult analysis={data.decision} />;
+  if (isDecisionResult(data)) return <SavedDecisionResult r={data} createdAt={data.createdAt} />;
   return <Result report={data} />;
 }
 

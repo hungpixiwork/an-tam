@@ -13,8 +13,8 @@ import { HeroLakeCity } from '@/components/pixel';
 import { Bot, Target } from 'lucide-react';
 import { Button, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, Select, cx, type Tone } from '@/components/ui';
 import { NeedData } from '@/components/NeedData';
-import { usePresets, useRunSimulation, useSimulationPreview, type Preset } from '@/lib/queries';
-import DecisionSimulationPage from './DecisionSimulationPage';
+import { useLifeChoices, usePresets, useRunSimulation, useSimulationPreview, type Preset } from '@/lib/queries';
+import DoubleShockPage from './DoubleShockPage';
 
 /* ───────── Cấu hình slider ───────── */
 
@@ -56,12 +56,19 @@ function useDebounced<T>(value: T, ms: number): T {
   return v;
 }
 
+/** /mo-phong: có lựa chọn cuộc đời (?choiceId= hoặc lựa chọn đang ghim) → Mô phỏng cú sốc kép; ?preset= hoặc chưa có lựa chọn → mô phỏng chung. */
 export default function SimulationPage() {
-  const [search] = useSearchParams();
-  const choiceId = search.get('choiceId');
+  const [search, setSearch] = useSearchParams();
+  const choices = useLifeChoices();
   const requestedMode = search.get('mode');
   const mode = requestedMode === 'bull' || requestedMode === 'bear' ? requestedMode : 'base';
-  if (choiceId) return <DecisionSimulationPage key={choiceId} choiceId={choiceId} initialMode={mode} />;
+  if (search.get('preset')) return <LegacySimulationPage />;
+  if (choices.isPending) return <PageSkeleton />;
+  const choiceId = search.get('choiceId') ?? choices.data?.[0]?.id;
+  if (choiceId) {
+    const change = (id: string) => setSearch((p) => { p.set('choiceId', id); return p; });
+    return <DoubleShockPage key={choiceId} choiceId={choiceId} initialMode={mode} onChangeChoice={change} />;
+  }
   return <LegacySimulationPage />;
 }
 
@@ -72,7 +79,7 @@ function LegacySimulationPage() {
   if (presets.error) return <ErrorState error={presets.error} onRetry={() => presets.refetch()} />;
   // Khởi tạo từ ?preset= (mặc định "Năm khó khăn")
   const slug = search.get('preset') ?? 'nam-kho-khan';
-  const initial = presets.data.find((p) => p.slug === slug)?.params ?? DEFAULT_PARAMS;
+  const initial = presets.data.presets.find((p) => p.slug === slug)?.params ?? DEFAULT_PARAMS;
   return (
     <NeedData
       anyOf={['holdings', 'goals']}
@@ -80,7 +87,7 @@ function LegacySimulationPage() {
       title="Bạn sẽ làm gì nếu...?"
       body="Thị trường giảm, lạm phát tăng hay mất thu nhập? Thêm tài sản hoặc mục tiêu trước để chạy mô phỏng và xem tác động."
     >
-      <Simulator key={slug} presets={presets.data} initial={initial} />
+      <Simulator key={slug} presets={presets.data.presets} initial={initial} />
     </NeedData>
   );
 }

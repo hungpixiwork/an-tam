@@ -259,7 +259,7 @@ async function billsAndBudget() {
 
 /* ───────── 6. Tăng thu nhập, thời gian, kỹ năng ───────── */
 async function earn() {
-  await put('/earn', { currentIncome: 22 * M, targetIncome: 28_600 * K, targetMonths: 6, occupation: 'Chuyên viên phân tích dữ liệu', hoursPerWeek: 5, focusSkill: 'AI/No-code', sector: 'technology', iscoCode: '2511' });
+  await put('/earn', { currentIncome: 22 * M, targetIncome: 28_600 * K, targetMonths: 6, occupation: 'Chuyên viên phân tích dữ liệu', hoursPerWeek: 5, focusSkill: 'AI/No-code', sector: 'technology', iscoCode: '2511', bonusAnnual: 60 * M, esopAnnual: 40 * M });
   await put('/earn/time', {
     allocations: [
       { category: 'sleep', hours: 38 },
@@ -360,7 +360,7 @@ async function lifeChoices() {
     description:
       'Bạn đang cân nhắc tạm dừng công việc hiện tại trong 12 tháng để theo chương trình thạc sĩ, nhằm nâng cao chuyên môn và mở rộng cơ hội nghề nghiệp trong tương lai.',
     icon: 'graduation-cap',
-    cost: 300 * M,
+    cost: 120 * M,
     incomeUpliftPct: 30,
     steps: ['Tìm hiểu', 'Chuẩn bị tài chính', 'Ứng tuyển', 'Bắt đầu học'],
     currentStep: 2,
@@ -369,9 +369,44 @@ async function lifeChoices() {
   // Điều kiện đã xong: 4 điều kiện tick tay (+ "quỹ ≥ 12 tháng" tự kiểm tra) → 5/6; còn thiếu nguồn thu nhập phụ
   const detail = await get(`/life-choices/${id}`);
   for (const p of detail.prereqs) if (!p.autoKey && !p.title.startsWith('Có nguồn thu nhập phụ')) await patch(`/life-choices/${id}/prereqs/${p.id}`, { done: true });
-  // Việc cần làm: số tiền cụ thể theo tình huống
-  const [first] = detail.tasks;
-  if (first) await patch(`/life-choices/${id}/tasks/${first.id}`, { detail: 'Bổ sung thêm 4 tháng chi phí sinh hoạt (~80.000.000đ) trong 6 tháng tới.' });
+  // Bắt đầu sau 6 tháng chuẩn bị (mô phỏng cú sốc kép đặt lựa chọn đúng mốc này)
+  const option = detail.options.find((o) => o.selected) ?? detail.options[0];
+  await patch(`/life-choices/${id}/options/${option.id}`, { startMonth: addMonths(today.slice(0, 7), 6) });
+  // Kế hoạch liên hoàn: 3 nhóm × 5 việc (thay việc mẫu) + 5 việc Agent đề xuất cho tuần này
+  for (const t of detail.tasks) await del(`/life-choices/${id}/tasks/${t.id}`);
+  for (const [category, title, done, isToday = false] of CHOICE_TASKS) {
+    const { id: taskId } = await post(`/life-choices/${id}/tasks`, { title, category, today: isToday, priority: category === 'finance' ? 'high' : 'mid' });
+    if (done) await patch(`/life-choices/${id}/tasks/${taskId}`, { done: true });
+  }
+}
+
+/** [nhóm, việc, đã xong, việc hôm nay] */
+const CHOICE_TASKS = [
+  ['finance', 'Tích thêm 180 triệu quỹ học tập', true],
+  ['finance', 'Giảm 20% chi tiêu không thiết yếu', true],
+  ['finance', 'Xây dựng nguồn thu nhập phụ 5–10 triệu/tháng', true],
+  ['finance', 'Chuẩn bị quỹ dự phòng 3 tháng sau tốt nghiệp', false],
+  ['finance', 'Rà soát các khoản đầu tư hiện có', false],
+  ['career', 'Hoàn thiện hồ sơ và đăng ký chương trình học', true],
+  ['career', 'Trao đổi với công ty hiện tại về lộ trình nghỉ việc', true],
+  ['career', 'Nâng cấp kỹ năng tiếng Anh (IELTS/TOEFL)', true],
+  ['career', 'Kết nối người hướng dẫn và mạng lưới ngành học', false],
+  ['career', 'Tìm cơ hội thực tập/bán thời gian trong thời gian học', false],
+  ['time', 'Lập lịch học tập và các mốc quan trọng', true],
+  ['time', 'Duy trì sức khỏe (thể dục, nghỉ ngơi)', true],
+  ['time', 'Dành thời gian cho gia đình và các mối quan hệ', true],
+  ['time', 'Phân bổ thời gian cho thu nhập phụ (10h/tuần)', false],
+  ['time', 'Duy trì hoạt động cá nhân (đọc sách, kỹ năng mềm)', false],
+  ['career', 'Nghiên cứu và so sánh 3 trường thạc sĩ phù hợp', true, true],
+  ['finance', 'Lập kế hoạch tích lũy 180 triệu (chi tiết theo tháng)', false, true],
+  ['career', 'Đăng ký kỳ thi tiếng Anh (IELTS/TOEFL)', false, true],
+  ['career', 'Trao đổi với quản lý về kế hoạch nghỉ việc', false, true],
+  ['time', 'Chạy mô phỏng cú sốc kép cho tình huống này', false, true],
+];
+
+/* ───────── 8c. Một lần mô phỏng cú sốc kép đã lưu (trang Mô phỏng → Xem kết quả đã lưu) ───────── */
+async function decisionRun() {
+  await post('/simulations/run', { mode: 'base', shock: 'industry' });
 }
 
 /* ───────── 8b. Lựa chọn: học thạc sĩ ở Thâm Quyến (chi phí tính bằng CNY, đổi theo tỷ giá thật) ───────── */
@@ -545,6 +580,7 @@ const steps = [
   ['Lịch AI cả tuần', calendar],
   ['Lựa chọn cuộc đời', lifeChoices],
   ['Lựa chọn: thạc sĩ ở Thâm Quyến', lifeChoiceShenzhen],
+  ['Mô phỏng cú sốc kép đã lưu', decisionRun],
   ['Kỹ năng & kế hoạch học', skills],
   ['AI Workspace: lượt agent chờ duyệt', workspace],
   ['Hiện lại đề xuất đã ẩn', () => del('/overview/suggestions/dismissals')],

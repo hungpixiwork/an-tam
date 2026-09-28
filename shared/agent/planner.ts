@@ -363,7 +363,7 @@ export function planDecision(r: DecisionSimulationResult, startBefore: string | 
   const steps: StepDraft[] = [
     { agent: 'planner', kind: 'plan', title: 'Nạp lựa chọn và dữ liệu tài chính', detail: `${r.choiceTitle} · ${r.optionTitle}` },
     { agent: 'cashflow', kind: 'note', title: 'Chạy mô phỏng cú sốc kép 24 tháng', detail: `Khung ${MODE_LABEL[r.mode]}: số tháng an toàn ${decText(r.impact.monthsSafe.before)} → ${decText(r.impact.monthsSafe.after)}` },
-    { agent: 'goal', kind: 'note', title: 'Đo tác động lên mục tiêu', detail: r.impact.homeDelay ? `${r.impact.homeDelay.goalTitle} lùi ${r.impact.homeDelay.min}–${r.impact.homeDelay.max} tháng` : 'Chưa có mục tiêu mua nhà' },
+    { agent: 'goal', kind: 'note', title: 'Đo tác động lên mục tiêu', detail: r.impact.goalDelay ? `${r.impact.goalDelay.goalTitle} lùi ${r.impact.goalDelay.min}–${r.impact.goalDelay.max} tháng` : 'Chưa có mục tiêu lớn' },
   ];
   const tasks: { title: string; detail: string; category: 'finance' | 'career' | 'time'; priority: 'high' | 'mid' | 'low' }[] = [];
   let startAfter: string | null = null;
@@ -381,7 +381,7 @@ export function planDecision(r: DecisionSimulationResult, startBefore: string | 
     `Với cú sốc kép (khung ${MODE_LABEL[r.mode]}), số tháng an toàn của bạn giảm từ ${decText(r.impact.monthsSafe.before)} xuống ${decText(r.impact.monthsSafe.after)} tháng`
       + `${s.shortfallMonth ? `, có thể hết tiền dùng được từ tháng thứ ${s.shortfallMonth}` : ''}.`,
     `Mức độ an toàn ${r.impact.safety.before} → ${r.impact.safety.after}/100; điểm khả thi của "${r.choiceTitle}" ${r.choiceImpact.feasibilityBefore} → ${r.choiceImpact.feasibilityAfter}.`,
-    r.impact.homeDelay ? `Mục tiêu "${r.impact.homeDelay.goalTitle}" có thể lùi ${r.impact.homeDelay.min}–${r.impact.homeDelay.max} tháng.` : '',
+    r.impact.goalDelay ? `Mục tiêu "${r.impact.goalDelay.goalTitle}" có thể lùi ${r.impact.goalDelay.min}–${r.impact.goalDelay.max} tháng.` : '',
     tasks.length ? `An Tâm đề xuất ${tasks.length} việc để kế hoạch bền hơn — bạn duyệt thì mới cập nhật.` : 'Kế hoạch hiện tại vẫn chịu được cú sốc này, chưa cần thay đổi.',
   ].filter(Boolean).join(' ');
   const actions: ActionDraft[] = [];

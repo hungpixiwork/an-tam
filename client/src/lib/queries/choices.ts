@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { DecisionMode, LifeChoice, LifeChoiceDetail, LifeChoiceInput, LifeChoiceOptionInput, LifeChoicePreview, LifeChoiceTaskPriority, LifeChoiceTemplate } from '@shared/types/api';
+import type { DecisionMode, LifeChoice, LifeChoiceDetail, LifeChoiceInput, LifeChoiceOptionInput, LifeChoicePreview, LifeChoiceTaskCategory, LifeChoiceTaskPriority, LifeChoiceTemplate } from '@shared/types/api';
 import { api } from '../api';
 
 /* ───────── 06 · Lựa chọn cuộc đời ───────── */
@@ -48,7 +48,7 @@ export const useTogglePrereq = (choiceId: string) =>
   useChoiceMutation(({ id, done }: { id: string; done: boolean }) => api.patch<null>(`/life-choices/${choiceId}/prereqs/${id}`, { done }));
 
 export const useAddChoiceTask = (choiceId: string) =>
-  useChoiceMutation((v: { title: string; detail?: string; priority: LifeChoiceTaskPriority }) => api.post<{ id: string }>(`/life-choices/${choiceId}/tasks`, v));
+  useChoiceMutation((v: { title: string; detail?: string; priority: LifeChoiceTaskPriority; category?: LifeChoiceTaskCategory; today?: boolean }) => api.post<{ id: string }>(`/life-choices/${choiceId}/tasks`, v));
 
 export const useToggleChoiceTask = (choiceId: string) =>
   useChoiceMutation(({ id, done }: { id: string; done: boolean }) => api.patch<null>(`/life-choices/${choiceId}/tasks/${id}`, { done }));

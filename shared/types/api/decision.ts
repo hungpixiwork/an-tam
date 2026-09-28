@@ -57,9 +57,9 @@ export interface DecisionScenario {
 export interface DecisionRange { min: number; max: number }
 
 export interface DecisionGoalTile {
-  key: 'home' | 'reserve' | 'choice' | 'cashflow';
+  key: 'goal' | 'reserve' | 'choice' | 'cashflow';
   title: string;
-  /** Trước → sau: tháng 'YYYY-MM' (home/choice), số tháng (reserve) hoặc VND/tháng (cashflow). */
+  /** Trước → sau: tháng 'YYYY-MM' (goal/choice), số tháng (reserve) hoặc VND/tháng (cashflow). */
   before: string | number | null;
   after: string | number | null;
   /** Mức thay đổi: số tháng (khoảng) hoặc % (cashflow). */
@@ -87,7 +87,8 @@ export interface DecisionSimulationResult {
   impact: {
     monthsSafe: { before: number; after: number };
     reserve: { targetMonths: number; extraMonths: number; extraAmount: number };
-    homeDelay: (DecisionRange & { goalTitle: string; before: string | null; after: string | null }) | null;
+    /** Mục tiêu lớn chính (mua nhà nếu có) lùi bao lâu. */
+    goalDelay: (DecisionRange & { goalTitle: string; before: string | null; after: string | null }) | null;
     safety: { before: number; after: number };
   };
   goals: DecisionGoalTile[];

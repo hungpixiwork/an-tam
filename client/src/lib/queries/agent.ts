@@ -2,11 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AgentActionView, AgentInfo, AgentRunView, ApproveBatchResult } from '@shared/types/api';
 import { api } from '../api';
 import { FINANCE_KEYS } from './keys';
+import type { DecisionRequest } from './simulation';
 
 /* ───────── 08 · AI Workspace ───────── */
 
 const idemKey = () => ({ 'Idempotency-Key': `web-${crypto.randomUUID()}` });
-const AGENT_KEYS = [['agents'], ['agent-run'], ['agent-actions'], ['calendar'], ['budgets'], ...FINANCE_KEYS];
+const AGENT_KEYS = [['agents'], ['agent-run'], ['agent-actions'], ['calendar'], ['budgets'], ['life-choices'], ...FINANCE_KEYS];
 
 const useRefreshAgents = () => {
   const qc = useQueryClient();
@@ -32,6 +33,15 @@ export interface StartRunResponse { runId: string; status: 'running' }
 export function useStartRun() {
   const refresh = useRefreshAgents();
   return useMutation({ mutationFn: (prompt: string) => api.post<StartRunResponse>('/agent/runs', { prompt }), onSuccess: refresh });
+}
+
+/** Nút "Cập nhật lại kế hoạch" ở trang Mô phỏng: Agent chạy đúng mô phỏng này rồi đề xuất việc chờ duyệt. */
+export function useStartDecisionRun() {
+  const refresh = useRefreshAgents();
+  return useMutation({
+    mutationFn: ({ prompt, decision }: { prompt: string; decision: DecisionRequest }) => api.post<StartRunResponse>('/agent/runs', { prompt, decision }),
+    onSuccess: refresh,
+  });
 }
 
 export function useApproveBatch() {

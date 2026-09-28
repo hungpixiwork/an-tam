@@ -9,7 +9,7 @@ const messages: Record<string, string> = {
   "nav.goals": "Mục tiêu",
   "nav.goals.title": "Mục tiêu cuộc sống",
   "nav.simulation": "Mô phỏng",
-  "nav.simulation.title": "Mô phỏng tương lai",
+  "nav.simulation.title": "Mô phỏng cú sốc kép",
   "nav.simulation.result": "Kết quả mô phỏng",
   "nav.habits": "Kiểm tra thói quen",
   "nav.habits.title": "Kiểm tra thói quen",

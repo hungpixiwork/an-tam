@@ -175,7 +175,7 @@ export interface LifeChoicePreview {
   startMonth: string | null;
   /** Số tháng cần chuẩn bị (đủ quỹ dự phòng + đủ tiền cho phương án). */
   prepareMonths: number | null;
-  /** Mục tiêu mua nhà lùi bao nhiêu tháng vì phương án. */
+  /** Mục tiêu lớn chính (mua nhà nếu có) lùi bao nhiêu tháng vì phương án. */
   goalImpactMonths: number | null;
   goalTitle: string | null;
   conditions: LifeChoiceCondition[];
