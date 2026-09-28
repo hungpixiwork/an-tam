@@ -13,6 +13,14 @@ export function describeAction(t: T, a: SuggestedAction): ActionDiff | null {
   const p = a.payload as Record<string, unknown>;
   switch (a.type) {
     case 'safety.set_target':
+      // Mục tiêu giữ nguyên, chỉ đổi mức để dành mỗi tháng → hiện đúng phần thay đổi
+      if (p.targetBefore != null && num(p.targetBefore) === num(p.targetAmount) && num(p.months) === num(p.monthsBefore)) {
+        return {
+          before: t('action.per_month', { amount: formatVnd(num(p.monthlyBefore)) }),
+          after: t('action.per_month', { amount: formatVnd(num(p.monthly)) }),
+          line: t('action.reserve', { months: num(p.months), amount: formatVnd(num(p.targetAmount)) }) + ` · ${monthShort(p.targetMonth)}`,
+        };
+      }
       return {
         before: p.targetBefore == null ? t('action.not_set') : t('action.reserve', { months: num(p.monthsBefore), amount: formatVnd(num(p.targetBefore)) }),
         after: t('action.reserve', { months: num(p.months), amount: formatVnd(num(p.targetAmount)) }),
