@@ -2,6 +2,8 @@
 // - lifeChoiceReadiness: mức sẵn sàng tài chính (thẻ ở Tổng quan).
 // - evaluateLifeChoice: điểm khả thi 0..100 của một phương án =
 //     40 số tháng an toàn còn lại + 30 giữ được mục tiêu khác + 20 giá trị nghề nghiệp + 10 điều kiện tiên quyết.
+// Có hồ sơ tài chính gộp (signals.ts) → chi phí sống lấy từ chi cố định + chi linh hoạt đã cắt, thu nhập bấp bênh trừ điểm an toàn,
+// kịch bản xấu tất định (mất thu nhập 3 tháng + tài sản đầu tư −20%), không dùng mô phỏng ngẫu nhiên.
 // Mọi con số là ƯỚC TÍNH từ dữ liệu người dùng nhập — không phải lời khuyên đầu tư.
 
 import type { UserState } from '../types/domain';
@@ -10,6 +12,8 @@ import type {
 } from '../types/api';
 import { emergencyAmount, savingsCapacity } from './peace';
 import { humanCapital, presentValueIncome, RISK_FREE } from './humanCapital';
+import type { FinancialSignals } from '../types/api/signals';
+import { formatVnd } from '../format';
 
 export interface LifeChoiceReadiness {
   /** Quỹ dự phòng tối thiểu nên có trước khi bắt đầu = số tháng an toàn mục tiêu × chi tiêu tháng. */
@@ -58,7 +62,22 @@ export interface EvaluateContext {
   incomeUpliftPct: number;
   prereqsDone: number;
   prereqsTotal: number;
+  /** Hồ sơ tài chính gộp từ dữ liệu thật (signals.ts). Không có → tính như cũ theo chi tiêu tháng. */
+  signals?: FinancialSignals;
 }
+
+/** Phần chi linh hoạt mặc định cắt được trong thời gian thực hiện phương án. */
+export const DEFAULT_CUT_PCT = 0.15;
+/** Thu nhập bấp bênh → điểm an toàn chỉ còn 75% (trừ 25% số điểm an toàn). */
+export const UNSTABLE_SAFETY_CUT = 0.25;
+/** Kịch bản xấu tất định (thay cho mô phỏng ngẫu nhiên): mất thu nhập 3 tháng + tài sản đầu tư giảm 20%. */
+export const WORST_CASE = { incomeLossMonths: 3, riskyDropPct: 20 } as const;
+
+/** Phần tiền dùng được ngay nằm ở tài sản có giá lên xuống (cổ phiếu, quỹ, vàng/khác) — không tính tiền mặt, trái phiếu. */
+const riskyLiquid = (state: UserState): number =>
+  state.holdings
+    .filter((h) => h.category !== 'cash' && h.category !== 'bond' && (h.inPortfolio === true || (h.inPortfolio === undefined && h.category !== 'other')))
+    .reduce((s, h) => s + h.value, 0);
 
 const OPPORTUNITIES: Record<LifeChoiceKind, string[]> = {
   study: ['promotion', 'network', 'skills', 'international'],
@@ -79,14 +98,18 @@ export function evaluateLifeChoice(state: UserState, option: LifeChoiceOptionInp
   const noIncome = Math.min(dur, Math.max(0, Math.round(option.monthsWithoutIncome)));
   const working = dur - noIncome;
   const incomeWorking = Math.max(0, I + option.monthlyIncomeDelta);
+  // Chi phí sống trong thời gian thực hiện: có hồ sơ thật → chi cố định + chi linh hoạt đã cắt; không có → chi tiêu tháng
+  const sig = ctx.signals;
+  const cutPct = clamp01(option.cutPct ?? DEFAULT_CUT_PCT);
+  const Ec = sig ? Math.round(sig.expense.fixed + sig.expense.flexible * (1 - cutPct)) : E;
 
   // Chi phí: học phí + sinh hoạt phí phải tự bỏ tiền (tháng không đủ thu nhập) + chi phí khác
-  const living = Math.round(noIncome * E + working * Math.max(0, E - incomeWorking));
+  const living = Math.round(noIncome * Ec + working * Math.max(0, Ec - incomeWorking));
   const tuition = Math.max(0, option.cost);
   const other = Math.max(0, option.otherCost);
   const total = tuition + living + other;
   // Tháng vẫn đi làm mà dư tiền → bù vào chi phí
-  const incomeCover = Math.round(working * Math.max(0, incomeWorking - E));
+  const incomeCover = Math.round(working * Math.max(0, incomeWorking - Ec));
   const drain = Math.max(0, total - incomeCover);
 
   const liquid = liquidAssets(state);
@@ -96,11 +119,13 @@ export function evaluateLifeChoice(state: UserState, option: LifeChoiceOptionInp
 
   // 1) An toàn (40): số tháng còn lại so với mục tiêu quỹ dự phòng của người dùng
   const targetMonths = state.profile.emergencyTargetMonths || 6;
-  const safety = FEASIBILITY_WEIGHTS.safety * clamp01(monthsAfter / targetMonths);
+  //    Thu nhập bấp bênh (theo sổ thật) → trừ UNSTABLE_SAFETY_CUT số điểm an toàn
+  const unstable = sig?.income.stability === 'bap_benh';
+  const safety = FEASIBILITY_WEIGHTS.safety * clamp01(monthsAfter / targetMonths) * (unstable ? 1 - UNSTABLE_SAFETY_CUT : 1);
 
   // 2) Giữ mục tiêu (30): phần dư mỗi tháng trong thời gian thực hiện có đủ góp cho các mục tiêu khác không
   const contributions = state.goals.filter((g) => g.kind !== 'education').reduce((s, g) => s + g.monthlyContribution, 0);
-  const monthlyFree = (working * incomeWorking - dur * E) / dur;
+  const monthlyFree = (working * incomeWorking - dur * Ec) / dur;
   const goalsRatio = shortfall > 0 ? 0 : contributions > 0 ? clamp01(monthlyFree / contributions) : monthlyFree >= 0 ? 1 : 0;
   const goals = FEASIBILITY_WEIGHTS.goals * goalsRatio;
 
@@ -147,6 +172,13 @@ export function evaluateLifeChoice(state: UserState, option: LifeChoiceOptionInp
           ? { key: 'prereqs', params: { n: pending } }
           : { key: 'ready' };
 
+  // Kịch bản xấu tất định, sau khi đã làm phương án: tài sản có giá lên xuống giảm 20% (trên phần còn lại)
+  // và mất thu nhập 3 tháng (phải tự trả chi phí sống đã cắt).
+  const left = liquid - drain;
+  const drop = Math.min(Math.max(0, left), riskyLiquid(state) * (WORST_CASE.riskyDropPct / 100));
+  const worstLeft = left - drop - WORST_CASE.incomeLossMonths * Ec;
+  const worstCase = { survives: worstLeft >= 0, monthsCovered: round1(monthsCovered(state, Math.max(0, worstLeft))) };
+
   return {
     feasibility,
     parts: { safety: Math.round(safety), goals: Math.round(goals), career: Math.round(career), prereqs: Math.round(prereqs) },
@@ -162,7 +194,29 @@ export function evaluateLifeChoice(state: UserState, option: LifeChoiceOptionInp
     risks: risks.slice(0, 4),
     verdict,
     unlock,
+    worstCase,
+    ...(sig ? { basis: lifeChoiceBasis(sig, cutPct, worstCase, worstLeft) } : {}),
   };
+}
+
+/** Số tháng sổ thật tối thiểu để bỏ nhãn "ước lượng" (khớp mức 'vua' trong signals.ts). */
+const ESTIMATE_MONTHS = 2;
+
+/** Câu nói rõ căn cứ của kết luận, bằng tiếng Việt dễ hiểu. */
+function lifeChoiceBasis(sig: FinancialSignals, cutPct: number, worst: { survives: boolean; monthsCovered: number }, worstLeft: number): string {
+  const n = sig.income.monthsOfData;
+  const from = n > 0 ? `Dựa trên ${n} tháng sổ thu chi thật` : 'Dựa trên số bạn tự nhập';
+  const parts = [
+    `${from}: chi cố định ${formatVnd(sig.expense.fixed)}/tháng, chi linh hoạt ${formatVnd(sig.expense.flexible)}/tháng (đã tính cắt ${Math.round(cutPct * 100)}%), tiền dùng được ngay ${formatVnd(sig.liquid.amount)}.`,
+  ];
+  if (sig.income.stability === 'bap_benh') parts.push('Thu nhập các tháng lên xuống nhiều nên điểm an toàn bị trừ bớt.');
+  parts.push(
+    worst.survives
+      ? `Nếu mất thu nhập ${WORST_CASE.incomeLossMonths} tháng và tài sản đầu tư giảm ${WORST_CASE.riskyDropPct}%, bạn vẫn còn tiền đủ sống ${String(worst.monthsCovered).replace('.', ',')} tháng.`
+      : `Nếu mất thu nhập ${WORST_CASE.incomeLossMonths} tháng và tài sản đầu tư giảm ${WORST_CASE.riskyDropPct}%, tiền dùng được ngay sẽ thiếu khoảng ${formatVnd(-worstLeft)}.`,
+  );
+  if (sig.confidence.level === 'thap') parts.push(`Số còn ước lượng — ghi thêm ${Math.max(1, ESTIMATE_MONTHS - n)} tháng sổ thu chi để chắc hơn.`);
+  return parts.join(' ');
 }
 
 /** Điều kiện tự kiểm tra từ dữ liệu tài chính (auto_key). */

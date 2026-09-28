@@ -53,6 +53,8 @@ export interface LifeChoiceOptionInput {
   monthsWithoutIncome: number;
   /** Thu nhập thay đổi bao nhiêu mỗi tháng trong những tháng vẫn đi làm (vd làm bán thời gian: −3,5 triệu). */
   monthlyIncomeDelta: number;
+  /** Phần chi linh hoạt định cắt trong thời gian thực hiện (0..1, mặc định 0,15). */
+  cutPct?: number;
 }
 
 export interface LifeChoiceOption extends LifeChoiceOptionInput {
@@ -106,6 +108,10 @@ export interface LifeChoiceEvaluation {
   risks: TextKey[];
   verdict: LifeChoiceVerdict;
   unlock: TextKey;
+  /** Kịch bản xấu (tất định): mất thu nhập 3 tháng + tài sản đầu tư giảm 20%, sau khi đã làm phương án. */
+  worstCase?: { survives: boolean; monthsCovered: number };
+  /** Câu nói rõ căn cứ của kết luận (số từ sổ thu chi thật hay còn ước lượng). */
+  basis?: string;
 }
 
 export interface LifeChoiceOptionView extends LifeChoiceOption {

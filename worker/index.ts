@@ -36,6 +36,7 @@ import { integrations } from './routes/integrations';
 import { webhooks } from './routes/webhooks';
 import { health, APP_VERSION, BUILD_TIME } from './routes/health';
 import { plan } from './routes/plan';
+import { signals } from './routes/signals';
 import { runMonitor } from './jobs/monitor';
 import { consumeJobs } from './jobs/handlers';
 import { refreshMarket } from './market/refresh';
@@ -133,6 +134,7 @@ app.route('/api/agent', agent);
 app.route('/api/audit', audit);
 app.route('/api/integrations', integrations);
 app.route('/api/plan', plan);
+app.route('/api/signals', signals);
 app.route('/api', settings);
 app.route('/api', common);
 

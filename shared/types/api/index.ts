@@ -13,3 +13,4 @@ export * from './calendar';
 export * from './lifeChoices';
 export * from './safety';
 export * from './allocation';
+export * from './signals';
