@@ -56,6 +56,8 @@ export interface LifeChoiceOptionInput {
   monthlyIncomeDelta: number;
   /** Phần chi linh hoạt định cắt trong thời gian thực hiện (0..1, mặc định 0,15). */
   cutPct?: number;
+  /** Tháng dự định bắt đầu 'YYYY-MM' (bỏ trống = khi chuẩn bị xong). */
+  startMonth?: string | null;
 }
 
 export interface LifeChoiceOption extends LifeChoiceOptionInput {
@@ -74,13 +76,27 @@ export interface LifeChoicePrereq {
 }
 
 export type LifeChoiceTaskPriority = 'high' | 'mid' | 'low';
+/** Nhóm của "Kế hoạch liên hoàn": tài chính / công việc / quỹ thời gian. */
+export type LifeChoiceTaskCategory = 'finance' | 'career' | 'time';
 
 export interface LifeChoiceTask {
   id: string;
   title: string;
   detail: string;
   priority: LifeChoiceTaskPriority;
+  category: LifeChoiceTaskCategory;
+  /** Việc Agent đề xuất làm trong hôm nay / tuần này. */
+  today: boolean;
   done: boolean;
+}
+
+/** "Điều kiện để khả thi": 4 ô có tiến độ. */
+export interface LifeChoiceCondition {
+  key: 'fund' | 'side_income' | 'prepare' | 'safety';
+  need: number;
+  have: number;
+  /** 0..1 */
+  progress: number;
 }
 
 export interface TextKey {
@@ -140,7 +156,7 @@ export interface LifeChoiceTemplate {
   steps: string[];
   options: LifeChoiceOptionInput[];
   prereqs: { title: string; autoKey?: string }[];
-  tasks: { title: string; detail: string; priority: LifeChoiceTaskPriority }[];
+  tasks: { title: string; detail: string; priority: LifeChoiceTaskPriority; category?: LifeChoiceTaskCategory }[];
 }
 
 export interface LifeChoiceCompare {
@@ -155,7 +171,14 @@ export interface LifeChoicePreview {
   evaluation: LifeChoiceEvaluation;
   expectedMonthlyIncome: number;
   startAfterMonths: number | null;
+  /** Tháng bắt đầu dự kiến 'YYYY-MM'. */
+  startMonth: string | null;
+  /** Số tháng cần chuẩn bị (đủ quỹ dự phòng + đủ tiền cho phương án). */
+  prepareMonths: number | null;
+  /** Mục tiêu mua nhà lùi bao nhiêu tháng vì phương án. */
   goalImpactMonths: number | null;
+  goalTitle: string | null;
+  conditions: LifeChoiceCondition[];
   assumptions: { costFactor: number; upliftFactor: number; preparationDelayMonths: number };
   basis: string;
 }

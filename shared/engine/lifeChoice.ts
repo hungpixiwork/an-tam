@@ -8,13 +8,14 @@
 
 import type { UserState } from '../types/domain';
 import type {
-  LifeChoiceEvaluation, LifeChoiceKind, LifeChoiceOptionInput, LifeChoicePreview, LifeChoiceVerdict, TextKey,
+  LifeChoiceCondition, LifeChoiceEvaluation, LifeChoiceKind, LifeChoiceOptionInput, LifeChoicePreview, LifeChoiceVerdict, TextKey,
 } from '../types/api';
 import type { DecisionMode } from '../types/api/decision';
-import { emergencyAmount, savingsCapacity } from './peace';
+import { emergencyAmount, peaceScore, savingsCapacity } from './peace';
 import { humanCapital, presentValueIncome, RISK_FREE } from './humanCapital';
 import type { FinancialSignals } from '../types/api/signals';
 import { formatVnd } from '../format';
+import { addMonths, monthsBetween } from './month';
 
 export interface LifeChoiceReadiness {
   /** Quỹ dự phòng tối thiểu nên có trước khi bắt đầu = số tháng an toàn mục tiêu × chi tiêu tháng. */
@@ -81,8 +82,39 @@ export const CHOICE_SCENARIOS: Record<DecisionMode, LifeChoicePreview['assumptio
   bear: { costFactor: 1.15, upliftFactor: 0.75, preparationDelayMonths: 3 },
 };
 
+/** Dữ liệu thêm cho "Điều kiện để khả thi" (lấy từ sổ thu chi và ngày tạo lựa chọn). */
+export interface ChoiceProgressExtras {
+  /** Thu nhập làm thêm trung bình tháng (3 tháng gần nhất). */
+  sideIncome: number;
+  /** Số tháng đã chuẩn bị (từ lúc tạo lựa chọn). */
+  elapsedMonths: number;
+}
+
+const roundMillion = (x: number) => Math.round(x / 1_000_000) * 1_000_000;
+const progressOf = (have: number, need: number) => (need <= 0 ? 1 : clamp01(have / need));
+
+/** 4 điều kiện để khả thi: tiền cho phương án (ngoài quỹ dự phòng), thu nhập phụ, thời gian chuẩn bị, mức độ an toàn. */
+export function choiceConditions(
+  state: UserState, option: LifeChoiceOptionInput, ev: LifeChoiceEvaluation, prepareMonths: number | null, extras: ChoiceProgressExtras,
+): LifeChoiceCondition[] {
+  const reserve = lifeChoiceReadiness(state).requiredReserve;
+  const fundNeed = Math.max(0, ev.costs.total - ev.funding.incomeCover);
+  const fundHave = Math.min(fundNeed, Math.max(0, liquidAssets(state) - reserve));
+  // Thu nhập phụ cần có = phần chi sống phải tự bỏ tiền mỗi tháng trong thời gian thực hiện
+  const sideNeed = roundMillion(ev.costs.living / Math.max(1, option.durationMonths));
+  const prepNeed = extras.elapsedMonths + (prepareMonths ?? 0);
+  const safety = peaceScore(state).score;
+  return [
+    { key: 'fund', need: fundNeed, have: fundHave, progress: progressOf(fundHave, fundNeed) },
+    { key: 'side_income', need: sideNeed, have: Math.max(0, extras.sideIncome), progress: progressOf(extras.sideIncome, sideNeed) },
+    { key: 'prepare', need: prepNeed, have: extras.elapsedMonths, progress: progressOf(extras.elapsedMonths, prepNeed) },
+    { key: 'safety', need: 100, have: safety, progress: safety / 100 },
+  ];
+}
+
 export function previewLifeChoice(
-  state: UserState, optionId: string, option: LifeChoiceOptionInput, ctx: EvaluateContext, mode: DecisionMode,
+  state: UserState, optionId: string, option: LifeChoiceOptionInput & { startMonth?: string | null }, ctx: EvaluateContext, mode: DecisionMode,
+  extras: ChoiceProgressExtras = { sideIncome: 0, elapsedMonths: 0 },
 ): LifeChoicePreview {
   const assumptions = CHOICE_SCENARIOS[mode];
   const adjusted = {
@@ -93,15 +125,26 @@ export function previewLifeChoice(
   const uplift = ctx.incomeUpliftPct * assumptions.upliftFactor;
   const evaluation = evaluateLifeChoice(state, adjusted, { ...ctx, incomeUpliftPct: uplift });
   const monthlySave = Math.max(0, savingsCapacity(state));
-  const prepare = evaluation.funding.shortfall > 0
-    ? monthlySave > 0 ? Math.ceil(evaluation.funding.shortfall / monthlySave) : null
-    : 0;
-  const startAfterMonths = prepare === null ? null : prepare + assumptions.preparationDelayMonths;
+  // Thời gian chuẩn bị: đủ quỹ dự phòng mục tiêu VÀ đủ tiền trả phần thiếu của phương án
+  const reserve = lifeChoiceReadiness(state).monthsNeeded;
+  const funding = evaluation.funding.shortfall > 0 ? (monthlySave > 0 ? Math.ceil(evaluation.funding.shortfall / monthlySave) : null) : 0;
+  const prepare = reserve === null || funding === null ? null : Math.max(reserve, funding);
+  const planned = option.startMonth ? Math.max(0, monthsBetween(state.today, option.startMonth)) : null;
+  const startAfterMonths = planned !== null ? planned + assumptions.preparationDelayMonths
+    : prepare === null ? null : prepare + assumptions.preparationDelayMonths;
+  // Mục tiêu mua nhà lùi vì tiền phải bỏ ra cho phương án (tích lũy lại bằng tiền dư mỗi tháng)
+  const home = state.goals.find((g) => g.kind === 'home');
+  const drain = Math.max(0, evaluation.costs.total - evaluation.funding.incomeCover);
+  const homeDelayMonths = home && monthlySave > 0 ? Math.ceil(drain / monthlySave) : null;
   return {
     mode, optionId, evaluation,
     expectedMonthlyIncome: Math.max(0, Math.round(state.profile.monthlyIncome * (1 + uplift / 100))),
     startAfterMonths,
-    goalImpactMonths: prepare,
+    startMonth: startAfterMonths === null ? null : addMonths(state.today, startAfterMonths),
+    prepareMonths: prepare,
+    goalImpactMonths: homeDelayMonths,
+    goalTitle: home?.title ?? null,
+    conditions: choiceConditions(state, adjusted, evaluation, prepare, extras),
     assumptions,
     basis: 'Kịch bản là phép thử độ nhạy từ chi phí và mức tăng thu nhập bạn nhập; không phải dự báo thị trường.',
   };

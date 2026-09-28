@@ -5,7 +5,7 @@ import { emergencyAmount, emergencyMonths, savingsCapacity, peaceScore } from '.
 import { portfolioStats, totalValue } from './portfolio';
 
 /** Mức nhạy của từng loại tài sản với biến động thị trường cổ phiếu. */
-const MARKET_BETA: Record<AssetCategory, number> = { stock: 1, fund: 0.8, other: 0.4, bond: 0.1, cash: 0 };
+export const MARKET_BETA: Record<AssetCategory, number> = { stock: 1, fund: 0.8, other: 0.4, bond: 0.1, cash: 0 };
 /** Thời gian đáo hạn bình quân của trái phiếu (năm) — lãi suất tăng 1% → trái phiếu giảm ~4%. */
 const BOND_DURATION = 4;
 /** Lạm phát nền đã tính sẵn trong chi tiêu hiện tại. */

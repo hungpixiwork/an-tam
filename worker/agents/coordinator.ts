@@ -41,6 +41,17 @@ export class UserCoordinatorAgent extends Agent<Env> {
   }
 }
 
+/** Lệnh gốc của một lượt chạy (giải mã) — dùng khi "Yêu cầu điều chỉnh" để giữ số tiền thật. */
+export async function originalRunInput(env: Env, userId: string, runId: string): Promise<RunInput | null> {
+  const row = await env.DB.prepare('SELECT input_enc FROM agent_runs WHERE id = ? AND user_id = ?').bind(runId, userId).first<{ input_enc: string | null }>();
+  if (!row?.input_enc || !env.TOKEN_ENC_KEY) return null;
+  try {
+    return JSON.parse(await decryptToken(env.TOKEN_ENC_KEY, row.input_enc, { userId, provider: `agent-run:${runId}` })) as RunInput;
+  } catch {
+    return null;
+  }
+}
+
 /** Mã hóa trước khi ghi D1; response chỉ trả runId, UI poll D1. */
 export async function submitAgentRun(env: Env, userId: string, input: RunInput): Promise<string> {
   if (!env.USER_COORDINATOR || !env.TOKEN_ENC_KEY) {
@@ -54,7 +65,7 @@ export async function submitAgentRun(env: Env, userId: string, input: RunInput):
     console.error('UserCoordinatorAgent.encryptRun', { runId, error });
     throw new ApiError(503, 'agent_unavailable', 'AI Workspace chưa được cấu hình, vui lòng thử lại sau');
   }
-  await createRun(env.DB, userId, input, runId);
+  await createRun(env.DB, userId, input, runId, encryptedInput);
   try {
     const agent = await getAgentByName(env.USER_COORDINATOR, userId);
     await agent.enqueueRun({ userId, runId, encryptedInput });

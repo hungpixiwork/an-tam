@@ -16,9 +16,13 @@ import { ApiError, notFound, ok } from '../lib/http';
 import { body, money } from '../lib/validate';
 import { loadUserState } from '../lib/state';
 import { loadSignals } from './signals';
+import { addMonths, monthsBetween } from '../../shared/engine/month';
 
 const KINDS = ['study', 'care', 'startup', 'switch', 'sabbatical', 'custom'] as const;
 const TEMPLATE_KEYS = ['study', 'care', 'startup', 'switch', 'sabbatical'] as const;
+const TASK_CATEGORIES = ['finance', 'career', 'time'] as const;
+/** Danh mục thu nhập tính là "làm thêm" (sổ thu chi). */
+const SIDE_INCOME_CATEGORIES = ['freelance', 'business'];
 
 const choiceSchema = z
   .object({
@@ -59,6 +63,7 @@ const optionSchema = z
     monthsWithoutIncome: z.number().int().min(0).max(120).default(0),
     monthlyIncomeDelta: z.number().int().min(-10_000_000_000).max(10_000_000_000).default(0),
     cutPct: z.number().min(0).max(0.9).optional(),
+    startMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Tháng không hợp lệ').nullable().optional(),
   })
   .refine((o) => o.monthsWithoutIncome <= o.durationMonths, { message: 'Số tháng không có thu nhập vượt quá thời gian thực hiện', path: ['monthsWithoutIncome'] });
 
@@ -71,6 +76,8 @@ const optionPatchSchema = z.object({
   durationMonths: z.number().int().min(1).max(120).optional(),
   monthsWithoutIncome: z.number().int().min(0).max(120).optional(),
   monthlyIncomeDelta: z.number().int().optional(),
+  cutPct: z.number().min(0).max(0.9).optional(),
+  startMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Tháng không hợp lệ').nullable().optional(),
 });
 
 const prereqSchema = z.object({ title: z.string().trim().min(2, 'Nội dung quá ngắn').max(120), done: z.boolean().default(false) });
@@ -79,11 +86,15 @@ const taskSchema = z.object({
   title: z.string().trim().min(2, 'Tên việc quá ngắn').max(80),
   detail: z.string().trim().max(160).default(''),
   priority: z.enum(['high', 'mid', 'low']).default('mid'),
+  category: z.enum(TASK_CATEGORIES).default('finance'),
+  today: z.boolean().default(false),
 });
 const taskPatchSchema = z.object({
   title: z.string().trim().min(2).max(80).optional(),
   detail: z.string().trim().max(160).optional(),
   priority: z.enum(['high', 'mid', 'low']).optional(),
+  category: z.enum(TASK_CATEGORIES).optional(),
+  today: z.boolean().optional(),
   done: z.boolean().optional(),
 });
 
@@ -106,7 +117,7 @@ const compareSchema = z.union([
   }),
 ]);
 
-interface Row {
+export interface Row {
   id: string; title: string; description: string; icon: string; cost: number;
   steps_json: string; current_step: number; pinned: number; status: LifeChoice['status'];
   kind: LifeChoiceKind; outcome: string; income_uplift_pct: number;
@@ -114,9 +125,13 @@ interface Row {
 interface OptionRow {
   id: string; title: string; description: string; cost: number; other_cost: number; duration_months: number;
   months_without_income: number; monthly_income_delta: number; selected: number;
+  cut_pct: number | null; start_month: string | null;
 }
 interface PrereqRow { id: string; title: string; done: number; auto_key: string | null }
-interface TaskRow { id: string; title: string; detail: string; priority: LifeChoiceTask['priority']; done: number }
+interface TaskRow {
+  id: string; title: string; detail: string; priority: LifeChoiceTask['priority']; done: number;
+  category: LifeChoiceTask['category']; today: number;
+}
 
 const toChoice = (r: Row): LifeChoice => {
   let steps: string[] = [];
@@ -135,9 +150,11 @@ const toChoice = (r: Row): LifeChoice => {
 const toOptionInput = (o: OptionRow): LifeChoiceOptionInput => ({
   title: o.title, description: o.description, cost: o.cost, otherCost: o.other_cost, durationMonths: o.duration_months,
   monthsWithoutIncome: o.months_without_income, monthlyIncomeDelta: o.monthly_income_delta,
+  ...(o.cut_pct !== null && o.cut_pct !== undefined ? { cutPct: o.cut_pct } : {}),
+  startMonth: o.start_month ?? null,
 });
 
-const SELECT = 'SELECT id, title, description, icon, cost, steps_json, current_step, pinned, status, kind, outcome, income_uplift_pct FROM life_choices';
+export const SELECT = 'SELECT id, title, description, icon, cost, steps_json, current_step, pinned, status, kind, outcome, income_uplift_pct FROM life_choices';
 
 /** Lựa chọn được ghim (hoặc lựa chọn đang theo đuổi mới nhất) để hiện ở Tổng quan. */
 export async function loadPinnedLifeChoice(db: D1Database, userId: string): Promise<LifeChoice | null> {
@@ -145,7 +162,7 @@ export async function loadPinnedLifeChoice(db: D1Database, userId: string): Prom
   return row ? toChoice(row) : null;
 }
 
-async function ownChoice(db: D1Database, id: string, userId: string): Promise<Row> {
+export async function ownChoice(db: D1Database, id: string, userId: string): Promise<Row> {
   const row = await db.prepare(`${SELECT} WHERE id = ? AND user_id = ?`).bind(id, userId).first<Row>();
   if (!row) throw notFound('Không tìm thấy lựa chọn');
   return row;
@@ -159,11 +176,11 @@ const toPrereqs = (rows: PrereqRow[], state: UserState): LifeChoicePrereq[] =>
     return { id: p.id, title: p.title, done: a.done, autoKey: p.auto_key, params: a.params };
   });
 
-async function loadDetail(db: D1Database, row: Row, userId: string, cached?: { state: Awaited<ReturnType<typeof loadUserState>>; signals: FinancialSignals }): Promise<LifeChoiceDetail> {
+export async function loadDetail(db: D1Database, row: Row, userId: string, cached?: { state: Awaited<ReturnType<typeof loadUserState>>; signals: FinancialSignals }): Promise<LifeChoiceDetail> {
   const [options, prereqs, tasks] = await db.batch([
     db.prepare('SELECT * FROM life_choice_options WHERE choice_id = ? ORDER BY order_idx, rowid').bind(row.id),
     db.prepare('SELECT id, title, done, auto_key FROM life_choice_prereqs WHERE choice_id = ? ORDER BY order_idx, rowid').bind(row.id),
-    db.prepare('SELECT id, title, detail, priority, done FROM life_choice_tasks WHERE choice_id = ? ORDER BY order_idx, rowid').bind(row.id),
+    db.prepare('SELECT id, title, detail, priority, done, category, today FROM life_choice_tasks WHERE choice_id = ? ORDER BY order_idx, rowid').bind(row.id),
   ]);
   const state = cached?.state ?? await loadUserState(db, userId);
   const choice = toChoice(row);
@@ -181,16 +198,21 @@ async function loadDetail(db: D1Database, row: Row, userId: string, cached?: { s
     monthlyExpense: state.profile.monthlyExpense,
     options: opts,
     prereqs: pre,
-    tasks: (tasks.results as unknown as TaskRow[]).map((t) => ({ id: t.id, title: t.title, detail: t.detail, priority: t.priority, done: t.done === 1 })),
+    tasks: (tasks.results as unknown as TaskRow[]).map((t) => ({
+      id: t.id, title: t.title, detail: t.detail, priority: t.priority, category: t.category ?? 'finance', today: t.today === 1, done: t.done === 1,
+    })),
     recommendedOptionId: best?.id ?? null,
   };
 }
 
 const insertOption = (db: D1Database, choiceId: string, o: LifeChoiceOptionInput, idx: number, selected: boolean) =>
   db.prepare(
-    `INSERT INTO life_choice_options (id, choice_id, title, description, cost, other_cost, duration_months, months_without_income, monthly_income_delta, selected, order_idx)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(crypto.randomUUID(), choiceId, o.title, o.description ?? '', o.cost, o.otherCost, o.durationMonths, o.monthsWithoutIncome, o.monthlyIncomeDelta, selected ? 1 : 0, idx);
+    `INSERT INTO life_choice_options (id, choice_id, title, description, cost, other_cost, duration_months, months_without_income, monthly_income_delta, selected, order_idx, cut_pct, start_month)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(), choiceId, o.title, o.description ?? '', o.cost, o.otherCost, o.durationMonths, o.monthsWithoutIncome, o.monthlyIncomeDelta,
+    selected ? 1 : 0, idx, o.cutPct ?? null, o.startMonth ?? null,
+  );
 
 export interface NewLifeChoice {
   title: string; description?: string; icon?: string; cost?: number; steps?: string[]; currentStep?: number; pinned?: boolean;
@@ -222,10 +244,23 @@ export function lifeChoiceInsertStatements(db: D1Database, userId: string, id: s
       stmts.push(db.prepare('INSERT INTO life_choice_prereqs (id, choice_id, title, auto_key, order_idx) VALUES (?, ?, ?, ?, ?)').bind(crypto.randomUUID(), id, p.title, p.autoKey ?? null, i)),
     );
     tpl.tasks.forEach((t, i) =>
-      stmts.push(db.prepare('INSERT INTO life_choice_tasks (id, choice_id, title, detail, priority, order_idx) VALUES (?, ?, ?, ?, ?, ?)').bind(crypto.randomUUID(), id, t.title, t.detail, t.priority, i)),
+      stmts.push(db.prepare('INSERT INTO life_choice_tasks (id, choice_id, title, detail, priority, category, order_idx) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(crypto.randomUUID(), id, t.title, t.detail, t.priority, t.category ?? 'finance', i)),
     );
   }
   return stmts;
+}
+
+/** Thu nhập làm thêm trung bình 3 tháng gần nhất + số tháng đã chuẩn bị từ lúc tạo lựa chọn. */
+async function choiceProgress(db: D1Database, userId: string, choiceId: string, today: string) {
+  const [side, created] = await db.batch([
+    db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM transactions
+      WHERE user_id = ? AND kind = 'income' AND category IN (${SIDE_INCOME_CATEGORIES.map(() => '?').join(', ')}) AND occurred_on >= ? AND occurred_on < ?`)
+      .bind(userId, ...SIDE_INCOME_CATEGORIES, `${addMonths(today, -3)}-01`, `${today}-01`),
+    db.prepare('SELECT substr(created_at, 1, 7) AS month FROM life_choices WHERE id = ?').bind(choiceId),
+  ]);
+  const total = Number((side.results[0] as { total?: number } | undefined)?.total ?? 0);
+  const month = (created.results[0] as { month?: string } | undefined)?.month;
+  return { sideIncome: Math.round(total / 3), elapsedMonths: month ? Math.max(0, monthsBetween(month, today)) : 0 };
 }
 
 const nextIdx = async (db: D1Database, table: string, choiceId: string) =>
@@ -292,7 +327,7 @@ export const lifeChoices = new Hono<AppEnv>()
       kind: detail.kind, incomeUpliftPct: detail.incomeUpliftPct,
       prereqsDone: detail.prereqs.filter((p) => p.done).length,
       prereqsTotal: detail.prereqs.length, signals,
-    }, mode.data));
+    }, mode.data, await choiceProgress(db, userId, row.id, state.today)));
   })
   .get('/:id', async (c) => {
     const db = c.env.DB;
@@ -347,6 +382,7 @@ export const lifeChoices = new Hono<AppEnv>()
     const cols: Record<string, unknown> = {
       title: v.title, description: v.description, cost: v.cost, other_cost: v.otherCost, duration_months: v.durationMonths,
       months_without_income: v.monthsWithoutIncome, monthly_income_delta: v.monthlyIncomeDelta, selected: v.selected ? 1 : undefined,
+      cut_pct: v.cutPct, start_month: v.startMonth,
     };
     const entries = Object.entries(cols).filter(([, x]) => x !== undefined);
     const stmts = [];
@@ -400,8 +436,8 @@ export const lifeChoices = new Hono<AppEnv>()
     const id = c.req.param('id');
     await ownChoice(db, id, c.get('userId'));
     const tid = crypto.randomUUID();
-    await db.prepare('INSERT INTO life_choice_tasks (id, choice_id, title, detail, priority, order_idx) VALUES (?, ?, ?, ?, ?, ?)')
-      .bind(tid, id, v.title, v.detail, v.priority, await nextIdx(db, 'life_choice_tasks', id)).run();
+    await db.prepare('INSERT INTO life_choice_tasks (id, choice_id, title, detail, priority, category, today, order_idx) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(tid, id, v.title, v.detail, v.priority, v.category, v.today ? 1 : 0, await nextIdx(db, 'life_choice_tasks', id)).run();
     return ok(c, { id: tid }, 201);
   })
   .patch('/:id/tasks/:taskId', body(taskPatchSchema), async (c) => {
@@ -409,7 +445,10 @@ export const lifeChoices = new Hono<AppEnv>()
     const db = c.env.DB;
     const id = c.req.param('id');
     await ownChoice(db, id, c.get('userId'));
-    const cols: Record<string, unknown> = { title: v.title, detail: v.detail, priority: v.priority, done: v.done === undefined ? undefined : v.done ? 1 : 0 };
+    const cols: Record<string, unknown> = {
+      title: v.title, detail: v.detail, priority: v.priority, category: v.category,
+      today: v.today === undefined ? undefined : v.today ? 1 : 0, done: v.done === undefined ? undefined : v.done ? 1 : 0,
+    };
     const entries = Object.entries(cols).filter(([, x]) => x !== undefined);
     if (!entries.length) return ok(c, null);
     const res = await db.prepare(`UPDATE life_choice_tasks SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ? AND choice_id = ?`).bind(...entries.map(([, x]) => x), c.req.param('taskId'), id).run();

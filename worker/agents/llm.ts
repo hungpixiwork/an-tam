@@ -20,7 +20,8 @@ follow_up_clients = khách hàng, làm thêm; review_goals = mục tiêu tài ch
 life_decision = quyết định lớn (nghỉ việc đi học, du học, khởi nghiệp, nghỉ ngơi dài, đổi nghề) → "life": {"kind": ${LIFE_KINDS.map((k) => `"${k}"`).join('|')},
   "durationRef"?: "DUR_n", "oneTimeCostRef"?: "AMT_n" (học phí/vốn một lần), "monthlyCostRef"?: "AMT_n" (chi mỗi tháng), "incomeDuringRef"?: "PCT_n" (phần lương còn giữ)};
 set_alert = nhờ báo khi giá thay đổi → "alert": {"symbol": "SJC" nếu vàng, "VNINDEX" nếu thị trường, hoặc mã viết hoa, "direction": "down"|"up", "thresholdRef"?: "PCT_n"};
-ask_desk = hỏi có nên mua/bán/giữ một mã, mã giảm có sao không → "desk": {"symbol": ...}. Không giải thích.`;
+ask_desk = hỏi có nên mua/bán/giữ một mã, mã giảm có sao không → "desk": {"symbol": ...};
+simulate_decision = thử cú sốc (mất việc, ngành suy giảm, thị trường giảm) lên lựa chọn đã có, cập nhật lại kế hoạch lựa chọn. Không giải thích.`;
 
 export const llmAvailable = (env: Env) => !!env.AI && env.INTENT_PROVIDER === 'workers-ai';
 

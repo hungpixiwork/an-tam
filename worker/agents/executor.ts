@@ -124,6 +124,26 @@ async function prepare(env: Env, userId: string, row: Row, type: ActionType): Pr
         summary: `Lưu phương án "${p.option.title}" vào Lựa chọn cuộc đời`,
       };
     }
+    case 'life_choice.update_plan': {
+      const p = payload as ReturnType<typeof ACTION_TYPES['life_choice.update_plan']['schema']['parse']>;
+      const own = await db.prepare('SELECT id FROM life_choices WHERE id = ? AND user_id = ?').bind(p.choiceId, userId).first();
+      if (!own) throw new Error('Không tìm thấy lựa chọn');
+      const next = (await db.prepare('SELECT COALESCE(MAX(order_idx), -1) + 1 AS n FROM life_choice_tasks WHERE choice_id = ?').bind(p.choiceId).first<{ n: number }>())?.n ?? 0;
+      const ids = p.tasks.map(() => crypto.randomUUID());
+      return {
+        statements: [
+          ...(p.startAfter ? [db.prepare('UPDATE life_choice_options SET start_month = ? WHERE id = ? AND choice_id = ?').bind(p.startAfter, p.optionId, p.choiceId)] : []),
+          // Việc mới là việc "hôm nay" của Agent; các việc cũ rời khỏi danh sách hôm nay
+          db.prepare('UPDATE life_choice_tasks SET today = 0 WHERE choice_id = ?').bind(p.choiceId),
+          ...p.tasks.map((t, i) =>
+            db.prepare('INSERT INTO life_choice_tasks (id, choice_id, title, detail, priority, category, today, order_idx) VALUES (?, ?, ?, ?, ?, ?, 1, ?)')
+              .bind(ids[i], p.choiceId, t.title, t.detail, t.priority, t.category, next + i),
+          ),
+        ],
+        result: { choiceId: p.choiceId, taskIds: ids, startMonth: p.startAfter },
+        summary: `Cập nhật kế hoạch "${p.choiceTitle}": ${ids.length} việc mới${p.startAfter ? `, bắt đầu ${p.startAfter}` : ''}`,
+      };
+    }
     case 'alert_rule.create': {
       const p = payload as ReturnType<typeof ACTION_TYPES['alert_rule.create']['schema']['parse']>;
       let count: number;

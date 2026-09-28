@@ -11,8 +11,14 @@ import { body, dateString } from '../lib/validate';
 import { idempotent } from '../lib/idempotency';
 import { latestRunId, listActions, loadRunView } from '../agents/runner';
 import { approveAndExecute, decline } from '../agents/executor';
+import { decisionRequestSchema } from './simulations';
 
-const runSchema = z.object({ prompt: z.string().trim().min(3, 'Vui lòng nhập yêu cầu').max(500), weekStart: dateString.optional() });
+const runSchema = z.object({
+  prompt: z.string().trim().min(3, 'Vui lòng nhập yêu cầu').max(500),
+  weekStart: dateString.optional(),
+  /** Từ trang Mô phỏng: chạy đúng mô phỏng cú sốc kép này rồi đề xuất cập nhật kế hoạch. */
+  decision: decisionRequestSchema.optional(),
+});
 const noteSchema = z.object({ note: z.string().trim().max(300).default('') });
 const batchSchema = z.object({ ids: z.array(z.string().min(1)).min(1).max(20) });
 const STATUSES = ['pending', 'approved', 'executing', 'done', 'rejected', 'changes_requested', 'failed', 'expired'];
@@ -46,10 +52,10 @@ export const agents = new Hono<AppEnv>().get('/', async (c) => {
 
 export const agent = new Hono<AppEnv>()
   .post('/runs', body(runSchema), async (c) => {
-    const { prompt, weekStart } = c.req.valid('json');
+    const { prompt, weekStart, decision } = c.req.valid('json');
     const userId = c.get('userId');
     const { submitAgentRun } = await import('../agents/coordinator');
-    const runId = await submitAgentRun(c.env, userId, { prompt, weekStart });
+    const runId = await submitAgentRun(c.env, userId, { prompt, weekStart, decision });
     return ok(c, { runId, status: 'running' as const }, 202);
   })
   .get('/runs/latest', async (c) => {
@@ -95,8 +101,12 @@ export const agent = new Hono<AppEnv>()
     for (const r of results) await decline(c.env, userId, r.id, 'changes_requested', note);
     const run = await db.prepare('SELECT prompt_masked FROM agent_runs WHERE id = ? AND user_id = ?').bind(row.run_id, userId).first<{ prompt_masked: string }>();
     if (!run) throw notFound('Không tìm thấy lượt chạy');
-    const base = run.prompt_masked.split(' · Điều chỉnh: ')[0];
-    const { submitAgentRun } = await import('../agents/coordinator');
-    const runId = await submitAgentRun(c.env, userId, { prompt: base, note: note || undefined });
+    const { submitAgentRun, originalRunInput } = await import('../agents/coordinator');
+    // Ưu tiên lệnh gốc đã mã hóa (còn số tiền thật); lượt cũ chưa có thì dùng bản đã che như trước
+    const original = await originalRunInput(c.env, userId, row.run_id);
+    const input = original
+      ? { prompt: original.prompt, weekStart: original.weekStart, decision: original.decision, note: note || undefined }
+      : { prompt: run.prompt_masked.split(' · Điều chỉnh: ')[0], note: note || undefined };
+    const runId = await submitAgentRun(c.env, userId, input);
     return ok(c, { runId });
   });

@@ -4,6 +4,7 @@
 import type { ActionIntegration, ActionRisk, AgentStepKind } from '../types/api/agent';
 import type { Transaction, UserState } from '../types/domain';
 import type { FinancialSignals, LifeChoiceEvaluation, LifeChoiceKind, LifeChoiceOptionInput } from '../types/api';
+import type { DecisionSimulationResult } from '../types/api/decision';
 import { evaluateLifeChoice, FEASIBILITY_WEIGHTS } from '../engine/lifeChoice';
 import { allocateSavings } from '../engine/allocation';
 import { addMonths } from '../engine/month';
@@ -66,6 +67,7 @@ const NEGATE: Record<Intent, RegExp> = {
   life_decision: /(khong|bo|dung)\s+(luu )?(phuong an|ke hoach nay)/,
   set_alert: /(khong|bo|dung)\s+(dat )?canh bao/,
   ask_desk: /$^/,
+  simulate_decision: /(khong|bo|dung)\s+(cap nhat|lui|doi)\s+(ke hoach|thoi diem|ngay bat dau)/,
 };
 
 export function applyNote(intents: Intent[], note?: string): Intent[] {
@@ -349,6 +351,55 @@ export function planLifeDecision(state: UserState, life: LifeParams, ctx: LifeDe
 export const symbolLabel = (symbol: string) => (symbol === 'SJC' ? 'vàng SJC' : symbol === 'VNINDEX' ? 'VN-Index' : symbol);
 
 /** Cảnh báo giá: 1 hành động chờ duyệt; đã đủ số cảnh báo của gói → chỉ trả lời, không đề xuất. */
+const MODE_LABEL = { bull: 'lạc quan', base: 'cơ sở', bear: 'thận trọng' } as const;
+const monthLabel = (m: string) => `T${Number(m.slice(5))}/${m.slice(0, 4)}`;
+
+/**
+ * Sau mô phỏng cú sốc kép: đọc kết quả engine → câu trả lời + 1 hành động chờ duyệt cập nhật kế hoạch của lựa chọn
+ * (lùi tháng bắt đầu, thêm việc theo nhóm tài chính / công việc / quỹ thời gian). Số liệu lấy nguyên từ engine.
+ */
+export function planDecision(r: DecisionSimulationResult, startBefore: string | null, today: string): SpecialPlan {
+  const s = r.selected;
+  const steps: StepDraft[] = [
+    { agent: 'planner', kind: 'plan', title: 'Nạp lựa chọn và dữ liệu tài chính', detail: `${r.choiceTitle} · ${r.optionTitle}` },
+    { agent: 'cashflow', kind: 'note', title: 'Chạy mô phỏng cú sốc kép 24 tháng', detail: `Khung ${MODE_LABEL[r.mode]}: số tháng an toàn ${decText(r.impact.monthsSafe.before)} → ${decText(r.impact.monthsSafe.after)}` },
+    { agent: 'goal', kind: 'note', title: 'Đo tác động lên mục tiêu', detail: r.impact.homeDelay ? `${r.impact.homeDelay.goalTitle} lùi ${r.impact.homeDelay.min}–${r.impact.homeDelay.max} tháng` : 'Chưa có mục tiêu mua nhà' },
+  ];
+  const tasks: { title: string; detail: string; category: 'finance' | 'career' | 'time'; priority: 'high' | 'mid' | 'low' }[] = [];
+  let startAfter: string | null = null;
+  for (const st of r.steps) {
+    const p = st.params;
+    if (st.key === 'reduce_concentration') tasks.push({ title: `Giảm tài sản cùng ngành đang làm khoảng ${vnd(p.amount)}`, detail: `Đang chiếm ${p.sharePct}% tiền dùng được, nên giữ dưới ${p.capPct}%.`, category: 'finance', priority: 'high' });
+    if (st.key === 'raise_reserve') tasks.push({ title: `Nâng quỹ dự phòng lên ${p.to} tháng chi phí`, detail: `Cần thêm khoảng ${vnd(p.amount)}.`, category: 'finance', priority: 'high' });
+    if (st.key === 'side_income') tasks.push({ title: `Tạo nguồn làm thêm ${vnd(p.amount)}/tháng`, detail: 'Bù phần thu nhập có thể mất khi có cú sốc.', category: 'career', priority: 'mid' });
+    if (st.key === 'delay_start') {
+      startAfter = addMonths(startBefore ?? today, p.max);
+      tasks.push({ title: `Dời lịch bắt đầu sang ${monthLabel(startAfter)}`, detail: `Lùi ${p.min}–${p.max} tháng để tích lũy lại quỹ.`, category: 'time', priority: 'mid' });
+    }
+  }
+  const reply = [
+    `Với cú sốc kép (khung ${MODE_LABEL[r.mode]}), số tháng an toàn của bạn giảm từ ${decText(r.impact.monthsSafe.before)} xuống ${decText(r.impact.monthsSafe.after)} tháng`
+      + `${s.shortfallMonth ? `, có thể hết tiền dùng được từ tháng thứ ${s.shortfallMonth}` : ''}.`,
+    `Mức độ an toàn ${r.impact.safety.before} → ${r.impact.safety.after}/100; điểm khả thi của "${r.choiceTitle}" ${r.choiceImpact.feasibilityBefore} → ${r.choiceImpact.feasibilityAfter}.`,
+    r.impact.homeDelay ? `Mục tiêu "${r.impact.homeDelay.goalTitle}" có thể lùi ${r.impact.homeDelay.min}–${r.impact.homeDelay.max} tháng.` : '',
+    tasks.length ? `An Tâm đề xuất ${tasks.length} việc để kế hoạch bền hơn — bạn duyệt thì mới cập nhật.` : 'Kế hoạch hiện tại vẫn chịu được cú sốc này, chưa cần thay đổi.',
+  ].filter(Boolean).join(' ');
+  const actions: ActionDraft[] = [];
+  if (tasks.length) {
+    const d = ACTION_TYPES['life_choice.update_plan'];
+    actions.push({
+      type: 'life_choice.update_plan', agent: d.agent, integration: 'local', risk: d.risk,
+      title: `Cập nhật kế hoạch "${r.choiceTitle}" sau mô phỏng`,
+      payload: validateAction('life_choice.update_plan', {
+        choiceId: r.choiceId, optionId: r.optionId, choiceTitle: r.choiceTitle.slice(0, 80), startBefore, startAfter, tasks: tasks.slice(0, 6),
+        reason: `Số tháng an toàn còn ${decText(r.impact.monthsSafe.after)} tháng khi có cú sốc (khung ${MODE_LABEL[r.mode]}).`,
+      }),
+    });
+    steps.push({ agent: 'goal', kind: 'propose', title: 'Đề xuất cập nhật kế hoạch', detail: `${tasks.length} việc${startAfter ? `, bắt đầu ${monthLabel(startAfter)}` : ''}` });
+  }
+  return { steps, actions, reply };
+}
+
 export function planAlert(alert: AlertParams, limit: { count: number | null; max: number }): SpecialPlan {
   const label = symbolLabel(alert.symbol);
   const verb = alert.direction === 'down' ? 'giảm' : 'tăng';

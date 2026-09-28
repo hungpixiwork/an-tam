@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { restoreValue, type PlaceholderMap } from './sanitize';
 
-export const INTENTS = ['plan_week', 'save_more', 'learn_skill', 'follow_up_clients', 'review_goals', 'life_decision', 'set_alert', 'ask_desk'] as const;
+export const INTENTS = ['plan_week', 'save_more', 'learn_skill', 'follow_up_clients', 'review_goals', 'life_decision', 'set_alert', 'ask_desk', 'simulate_decision'] as const;
 export type Intent = (typeof INTENTS)[number];
 /** Ý định cũ (kế hoạch tuần) — do planRun xử lý. */
 export const WEEK_INTENTS = ['plan_week', 'save_more', 'learn_skill', 'follow_up_clients', 'review_goals'] as const satisfies readonly Intent[];
@@ -56,6 +56,7 @@ const RULES: Record<Intent, RegExp> = {
   review_goals: /muc tieu|tien do|\bgoal|quy du phong|mba/,
   life_decision: /nghi viec|nghi lam|bo viec|di hoc|du hoc|thac si|tien si|\bmba\b|khoi nghiep|startup|mo cong ty|kinh doanh rieng|nghi ngoi|sabbatical|gap year|doi nghe|chuyen nghe|chuyen nganh|chuyen viec|doi viec/,
   set_alert: /\b(bao|canh bao|nhac)( cho)? (toi|minh|em|anh|chi|tui)? ?khi\b|\bcanh bao\b.*\b(giam|tang|do|xanh)\b|^khi .*\b(giam|tang|do|xanh)\b|\balert\b/,
+  simulate_decision: /cu soc|mo phong|neu (bi |toi |minh )?mat viec|cap nhat (lai )?ke hoach (o |cho )?lua chon|stress test/,
   ask_desk: /co nen (ban|mua|giu|chot)|nen (ban|mua|giu) .* khong|(giam|tang|sap|lao doc).*co sao khong|co sao khong|co anh huong|anh huong gi/,
 };
 
@@ -125,7 +126,9 @@ export function parseParamsRules(maskedPrompt: string, map: PlaceholderMap, inte
 /** Luật: mọi ý định khớp từ khóa. Không khớp gì → lập kế hoạch tuần (mặc định an toàn, chỉ đề xuất). */
 export function parseIntentRules(maskedPrompt: string): Intent[] {
   const t = fold(maskedPrompt);
-  let special: Intent[] = (['set_alert', 'ask_desk', 'life_decision'] as const).filter((i) => RULES[i].test(t));
+  let special: Intent[] = (['set_alert', 'ask_desk', 'simulate_decision', 'life_decision'] as const).filter((i) => RULES[i].test(t));
+  // Mô phỏng cú sốc cho lựa chọn đã có — không tạo lựa chọn mới
+  if (special.includes('simulate_decision')) special = special.filter((i) => i !== 'life_decision');
   // Câu về cảnh báo giá / hỏi về một mã không phải quyết định lớn — tránh lẫn hai loại
   if (special.includes('set_alert') || special.includes('ask_desk')) special = special.filter((i) => i !== 'life_decision');
   if (special.length) {

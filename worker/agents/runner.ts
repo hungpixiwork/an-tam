@@ -8,7 +8,7 @@ import {
   fold, mergeIntents, mergeParams, paramsFromLLM, parseIntentRules, parseParamsRules, type Intent, type IntentParams, type IntentResult,
 } from '../../shared/agent/intent';
 import {
-  planAlert, planDesk, planLifeDecision, planRun, type ActionDraft, type PlannerContext, type PlanResult, type StepDraft,
+  planAlert, planDecision, planDesk, planLifeDecision, planRun, type ActionDraft, type PlannerContext, type PlanResult, type StepDraft,
 } from '../../shared/agent/planner';
 import { previewAction } from '../../shared/agent/actions';
 import { TOOL_KEYS } from '../../shared/agent/tools';
@@ -21,13 +21,18 @@ import { userPlan } from '../lib/usage';
 import { loadBills, loadEventsBetween } from '../routes/calendar';
 import { syncInfo } from '../integrations/google/sync';
 import { batchWithAudit, maskSummary } from '../lib/audit';
-import { notFound } from '../lib/http';
+import { ApiError, notFound } from '../lib/http';
+import { runDecisionSimulation, type DecisionRequest } from '../lib/decision';
 import { coordinateRoles } from './roles';
 
 export const ACTION_TTL_MS = 24 * 3_600_000;
 const vnNow = () => new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 16);
 
-export interface RunInput { prompt: string; source?: AgentRunSource; weekStart?: string; note?: string }
+export interface RunInput {
+  prompt: string; source?: AgentRunSource; weekStart?: string; note?: string;
+  /** Bối cảnh có cấu trúc từ trang Mô phỏng (nút "Cập nhật lại kế hoạch") — không cần đoán từ câu chữ. */
+  decision?: DecisionRequest;
+}
 
 async function loadContext(env: Env, userId: string, weekStart: string, note?: string): Promise<PlannerContext> {
   const db = env.DB;
@@ -74,11 +79,12 @@ export type DeskHook = (symbol: string) => Promise<{ reply?: string; steps?: Ste
 export interface RunHooks { deskHook?: DeskHook }
 
 const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
-const SPECIAL = new Set<Intent>(['life_decision', 'set_alert', 'ask_desk']);
+const SPECIAL = new Set<Intent>(['life_decision', 'set_alert', 'ask_desk', 'simulate_decision']);
 
 /** Ghép kế hoạch tuần (ý định cũ) với quyết định lớn / cảnh báo giá / hỏi về mã. */
 async function buildPlan(
   env: Env, userId: string, ctx: PlannerContext, intent: IntentResult, params: IntentParams, maskedPrompt: string, hooks: RunHooks,
+  decision?: DecisionRequest,
 ): Promise<PlanResult & { reply: string }> {
   const want = (i: Intent) => intent.intents.includes(i);
   const week = intent.intents.filter((i) => !SPECIAL.has(i));
@@ -106,6 +112,21 @@ async function buildPlan(
     actions.push(...p.actions);
     replies.push(p.reply);
   }
+  if (want('simulate_decision')) {
+    const req: DecisionRequest = decision ?? { mode: 'base', shock: /mat viec/.test(fold(maskedPrompt)) ? 'job_loss' : /thi truong|chung khoan/.test(fold(maskedPrompt)) ? 'market' : 'industry' };
+    try {
+      const r = await runDecisionSimulation(env.DB, userId, req);
+      const opt = await env.DB.prepare('SELECT start_month FROM life_choice_options WHERE id = ?').bind(r.optionId).first<{ start_month: string | null }>();
+      const p = planDecision(r, opt?.start_month ?? null, ctx.now.slice(0, 7));
+      steps.push(...p.steps);
+      actions.push(...p.actions);
+      replies.push(p.reply);
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err;
+      steps.push({ agent: 'planner', kind: 'note', title: 'Chưa mô phỏng được', detail: err.message });
+      replies.push(`${err.message}. Hãy tạo một lựa chọn ở trang Lựa chọn cuộc đời trước.`);
+    }
+  }
   if (want('set_alert') && params.alert) {
     const { plan } = await userPlan(env.DB, userId);
     const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM alert_rules WHERE user_id = ?').bind(userId).first<{ n: number }>()
@@ -129,13 +150,13 @@ async function buildPlan(
 }
 
 /** D1 là nguồn chính; chỉ tạo lượt chạy sau khi payload hàng đợi đã được mã hóa. */
-export async function createRun(db: D1Database, userId: string, input: RunInput, runId = crypto.randomUUID()): Promise<string> {
+export async function createRun(db: D1Database, userId: string, input: RunInput, runId = crypto.randomUUID(), inputEnc: string | null = null): Promise<string> {
   const masked = sanitizePrompt(input.prompt);
   const note = input.note ? sanitizePrompt(input.note) : undefined;
   const now = new Date().toISOString();
   await db.batch([
-    db.prepare('INSERT INTO agent_runs (id, user_id, source, prompt_masked, agents_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(runId, userId, input.source ?? 'user', note ? `${masked} · Điều chỉnh: ${note}` : masked, '["planner"]', 'running', now, now),
+    db.prepare('INSERT INTO agent_runs (id, user_id, source, prompt_masked, agents_json, status, created_at, updated_at, input_enc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(runId, userId, input.source ?? 'user', note ? `${masked} · Điều chỉnh: ${note}` : masked, '["planner"]', 'running', now, now, inputEnc),
     db.prepare("INSERT INTO agent_steps (id, run_id, user_id, idx, agent, kind, title, detail_masked, status, started_at, finished_at) VALUES (?, ?, ?, 0, 'planner', 'plan', 'Đã nhận yêu cầu của bạn', ?, 'done', ?, ?)")
       .bind(crypto.randomUUID(), runId, userId, note ? `"${masked}" · Điều chỉnh: ${note}` : `"${masked}"`, now, now),
   ]);
@@ -163,11 +184,13 @@ export async function executeRun(env: Env, userId: string, runId: string, input:
   const ph = maskWithPlaceholders(input.prompt);
   const rules = parseIntentRules(note ? `${ph.masked} ${note}` : ph.masked);
   const llm = await classifyLLM(env, ph.masked, userId);
-  const intent: IntentResult = mergeIntents(llm?.intents ?? null, rules);
+  const merged: IntentResult = mergeIntents(llm?.intents ?? null, rules);
+  // Nút từ trang Mô phỏng: chỉ làm đúng việc mô phỏng + cập nhật kế hoạch
+  const intent: IntentResult = input.decision ? { ...merged, intents: ['simulate_decision'] } : merged;
   const params = mergeParams(llm ? paramsFromLLM(llm, ph.map) : null, parseParamsRules(ph.masked, ph.map, intent.intents));
   const weekStart = targetWeek(masked, input.weekStart);
   const ctx = await loadContext(env, userId, weekStart, note);
-  const plan = await buildPlan(env, userId, ctx, intent, params, ph.masked, hooks);
+  const plan = await buildPlan(env, userId, ctx, intent, params, ph.masked, hooks, input.decision);
   const reply = await narrateReply(env, userId, plan.reply);
   const created = new Date();
   const expires = new Date(created.getTime() + ACTION_TTL_MS).toISOString();

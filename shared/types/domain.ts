@@ -133,6 +133,10 @@ export interface IncomeProfile {
   focusSkill: string;
   sector?: Sector | null;
   iscoCode?: string | null;
+  /** Thưởng năm (VND). */
+  bonusAnnual?: number;
+  /** Cổ phiếu thưởng (ESOP) nhận mỗi năm, quy ra VND. */
+  esopAnnual?: number;
 }
 
 export interface ValueActivity {

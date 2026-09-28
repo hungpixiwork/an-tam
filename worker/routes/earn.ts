@@ -22,6 +22,8 @@ const incomeProfileSchema = z.object({
   focusSkill: z.string().trim().max(100).default(''),
   sector: z.enum(SECTORS).nullable().optional(),
   iscoCode: z.string().regex(/^\d{1,4}$/, 'Mã nghề ISCO gồm 1–4 chữ số').nullable().optional(),
+  bonusAnnual: money.min(0).optional(),
+  esopAnnual: money.min(0).optional(),
 });
 
 const activitySchema = z.object({
@@ -85,7 +87,7 @@ export const earn = new Hono<AppEnv>()
   })
   .get('/', async (c) => {
     const userId = c.get('userId');
-    const row = await c.env.DB.prepare('SELECT current_income, target_income, target_months, occupation, hours_per_week, focus_skill FROM income_profiles WHERE user_id = ?')
+    const row = await c.env.DB.prepare('SELECT current_income, target_income, target_months, occupation, hours_per_week, focus_skill, bonus_annual, esop_annual FROM income_profiles WHERE user_id = ?')
       .bind(userId)
       .first<any>();
     
@@ -96,6 +98,8 @@ export const earn = new Hono<AppEnv>()
       occupation: row.occupation,
       hoursPerWeek: row.hours_per_week,
       focusSkill: row.focus_skill,
+      bonusAnnual: row.bonus_annual ?? 0,
+      esopAnnual: row.esop_annual ?? 0,
     } : {
       currentIncome: 0,
       targetIncome: 0,
@@ -122,9 +126,14 @@ export const earn = new Hono<AppEnv>()
         target_months = excluded.target_months,
         occupation = excluded.occupation,
         hours_per_week = excluded.hours_per_week,
-        focus_skill = excluded.focus_skill
+        focus_skill = excluded.focus_skill,
+        bonus_annual = COALESCE(?, income_profiles.bonus_annual),
+        esop_annual = COALESCE(?, income_profiles.esop_annual)
     `)
-      .bind(userId, data.currentIncome, data.targetIncome, data.targetMonths, data.occupation, data.hoursPerWeek, data.focusSkill, data.sector ?? null, data.iscoCode ?? null, data.sector !== undefined ? 1 : 0)
+      .bind(
+        userId, data.currentIncome, data.targetIncome, data.targetMonths, data.occupation, data.hoursPerWeek, data.focusSkill, data.sector ?? null, data.iscoCode ?? null,
+        data.sector !== undefined ? 1 : 0, data.bonusAnnual ?? null, data.esopAnnual ?? null,
+      )
       .run();
       
     return ok(c, data);

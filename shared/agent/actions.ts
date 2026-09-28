@@ -74,6 +74,22 @@ export const lifeChoicePayload = z.object({
   reason: z.string().max(300),
 });
 
+/** Cập nhật kế hoạch của lựa chọn sau mô phỏng cú sốc kép: lùi tháng bắt đầu + thêm việc theo nhóm. */
+export const lifeChoicePlanPayload = z.object({
+  choiceId: z.string().min(1),
+  optionId: z.string().min(1),
+  choiceTitle: z.string().max(80),
+  startBefore: z.string().regex(/^\d{4}-\d{2}$/).nullable(),
+  startAfter: z.string().regex(/^\d{4}-\d{2}$/).nullable(),
+  tasks: z.array(z.object({
+    title: z.string().min(2).max(80),
+    detail: z.string().max(160).default(''),
+    category: z.enum(['finance', 'career', 'time']),
+    priority: z.enum(['high', 'mid', 'low']),
+  })).max(6),
+  reason: z.string().max(300),
+});
+
 /** Luật cảnh báo giá (bảng alert_rules). */
 export const alertRulePayload = z.object({
   symbol: z.string().regex(/^[A-Z][A-Z0-9]{1,9}$/),
@@ -94,6 +110,7 @@ const vnd = (n: number) => formatVndFull(n);
 const hhmm = (s: string) => s.slice(11, 16);
 const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 
+const monthText = (m: string) => `T${Number(m.slice(5))}/${m.slice(0, 4)}`;
 const pctText = (n: number) => `${String(Math.round(n * 10) / 10).replace('.', ',')}%`;
 
 const def = <S extends z.ZodTypeAny>(d: ActionDef<S>) => d;
@@ -139,6 +156,14 @@ export const ACTION_TYPES = {
         p.option.monthsWithoutIncome ? `${p.option.monthsWithoutIncome} tháng không có thu nhập` : p.option.monthlyIncomeDelta < 0 ? `Thu nhập giảm ${vnd(-p.option.monthlyIncomeDelta)}/tháng` : 'Vẫn giữ thu nhập',
         p.reason,
       ],
+    }),
+  }),
+  'life_choice.update_plan': def({
+    agent: 'goal', integration: 'local', risk: 'mid', schema: lifeChoicePlanPayload,
+    preview: (p) => ({
+      before: p.startBefore ? monthText(p.startBefore) : null,
+      after: p.startAfter ? monthText(p.startAfter) : null,
+      lines: [...p.tasks.map((t) => `+ ${t.title}`), p.reason],
     }),
   }),
   'alert_rule.create': def({

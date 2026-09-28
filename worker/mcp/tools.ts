@@ -119,6 +119,17 @@ export const TOOLS: ToolDef[] = [
     run: ({ env, userId }, a) => callRoute(env, userId, '/life-choices/evaluate', a),
   }),
   tool({
+    name: 'simulate_decision',
+    description:
+      "Stress-test the user's saved life choice (default: the pinned one) against a double shock — income disruption (salary, bonus, ESOP) plus asset drops (employer stock, same-sector holdings, wider market) — over 24 months for bull/base/bear. Returns safe months before/after, safety score, home-goal delay range and suggested adjustments. Read-only; money is integer VND.",
+    input: z.object({
+      choiceId: z.string().min(1).optional().describe('Life choice id. Default: pinned choice.'),
+      mode: z.enum(['bull', 'base', 'bear']).optional().describe('Analysis frame. Default base.'),
+      shock: z.enum(['industry', 'job_loss', 'market']).optional().describe('Preset shock. Default industry (income + assets).'),
+    }),
+    run: ({ env, userId }, a) => callRoute(env, userId, '/simulations/preview', { choiceId: a.choiceId, mode: a.mode ?? 'base', shock: a.shock ?? 'industry' }),
+  }),
+  tool({
     name: 'what_if_allocate',
     description:
       "Simulate putting an amount into an asset type and see how the user's concentration risk and safety fund change. Presets: global_etf, vn_etf, tech_stock, bond, gold, real_estate. Money is integer VND. Not investment advice.",
