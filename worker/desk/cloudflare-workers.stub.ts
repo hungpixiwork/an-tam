@@ -5,3 +5,15 @@ export abstract class WorkflowEntrypoint<E = unknown, _T = unknown> {
     this.env = env;
   }
 }
+
+// Agents SDK chỉ cần các base class này khi nạp module trong Node test.
+export class RpcTarget {}
+export class DurableObject<E = unknown> {
+  protected ctx: unknown;
+  protected env: E;
+  constructor(ctx: unknown, env: E) {
+    this.ctx = ctx;
+    this.env = env;
+  }
+}
+export const exports = {};

@@ -50,6 +50,7 @@ import { vnClock } from './market/http';
 
 // Workflow bàn đầu tư (wrangler.jsonc → workflows)
 export { DeskWorkflow } from './desk/workflow';
+export { UserCoordinatorAgent } from './agents/coordinator';
 import { withMcp } from './mcp';
 
 const app = new Hono<AppEnv>();
@@ -98,6 +99,8 @@ app.use('/api/auth/register', rateLimit('RL_AUTH', clientIp));
 app.route('/api/auth', auth);
 app.route('/api/health', health);
 app.route('/api/webhooks', webhooks);
+// Chặn mọi truy cập trực tiếp tới Durable Object; chỉ /api/agent/* qua Hono được dùng.
+app.all('/agents/*', (c) => c.text('Not Found', 404));
 
 // Phiên bản ứng dụng phục vụ chunk-load recovery
 app.get('/api/version', (c) =>

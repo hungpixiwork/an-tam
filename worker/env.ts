@@ -13,6 +13,8 @@ export interface Env {
   RL_AI?: RateLimit;
   /** Workflow bàn đầu tư theo mã (worker/desk/workflow.ts). Thiếu (test) → chạy thẳng. */
   DESK_WORKFLOW?: Workflow<import('./desk/pipeline').DeskParams>;
+  /** Một Durable Object Agent theo user, chỉ gọi qua Hono sau xác thực. */
+  USER_COORDINATOR?: DurableObjectNamespace<import('./agents/coordinator').UserCoordinatorAgent>;
 
   // vars (wrangler.jsonc)
   /** Origin công khai, ví dụ https://antam.example — dùng cho redirect OAuth. */

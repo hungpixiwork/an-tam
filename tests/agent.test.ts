@@ -1,10 +1,12 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { AppEnv } from '../worker/env';
 import { ApiError } from '../worker/lib/http';
 import { agent } from '../worker/routes/agent';
 import { sanitizePrompt } from '../shared/agent/sanitize';
 import { hasSqlite, insertUser, openMigratedD1, type TestD1 } from './helpers/sqlite-d1';
+
+vi.mock('../worker/agents/coordinator', () => ({ submitAgentRun: vi.fn(async () => 'run-queued') }));
 
 describe('sanitizePrompt', () => {
   it('che số tiền, số điện thoại, email và mọi con số', () => {
@@ -54,5 +56,13 @@ describe.skipIf(!hasDb)('duyệt hành động agent (node:sqlite)', () => {
     expect(budgets).toEqual([{ limit_amount: 19_000_000 }]);
     const runs = t.raw.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'budget.set' AND status = 'completed'").get() as { n: number };
     expect(runs.n).toBe(1);
+  });
+
+  it('POST /runs nhận việc bất đồng bộ và trả id để poll', async () => {
+    const res = await app.request('/agent/runs', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: 'Lập kế hoạch tuần tới' }),
+    }, { DB: t.d1 });
+    expect(res.status).toBe(202);
+    expect((await res.json() as { data: unknown }).data).toEqual({ runId: 'run-queued', status: 'running' });
   });
 });

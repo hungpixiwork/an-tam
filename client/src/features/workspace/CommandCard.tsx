@@ -9,6 +9,8 @@ import { AGENT_META, isAgentKey } from './meta';
 function useReply(run: AgentRunView | null) {
   const { t } = useLocale();
   if (!run) return null;
+  if (run.status === 'running') return t('workspace.log.running');
+  if (run.status === 'failed') return run.steps.find((step) => step.kind === 'error')?.title ?? t('workspace.log.failed');
   if (!run.actions.length) return t('workspace.reply.none');
   const parts = run.intents.map((i) => t(`workspace.reply.${i}`));
   const joined = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} ${t('workspace.reply.and')} ${parts[parts.length - 1]}` : parts[0];
