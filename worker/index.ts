@@ -34,11 +34,15 @@ import { agent, agents } from './routes/agent';
 import { audit } from './routes/audit';
 import { integrations } from './routes/integrations';
 import { webhooks } from './routes/webhooks';
+import { market } from './routes/market';
+import { alertRules } from './routes/alertRules';
 import { health, APP_VERSION, BUILD_TIME } from './routes/health';
 import { plan } from './routes/plan';
 import { runMonitor } from './jobs/monitor';
 import { consumeJobs } from './jobs/handlers';
 import { refreshMarket } from './market/refresh';
+import { marketAlertUserIds, runMarketAlertsForAll } from './market/alerts';
+import { PAGE } from './jobs/monitor';
 
 const app = new Hono<AppEnv>();
 
@@ -131,6 +135,8 @@ app.route('/api/allocation', allocation);
 app.route('/api/agents', agents);
 app.route('/api/agent', agent);
 app.route('/api/audit', audit);
+app.route('/api/market', market);
+app.route('/api/alert-rules', alertRules);
 app.route('/api/integrations', integrations);
 app.route('/api/plan', plan);
 app.route('/api', settings);
@@ -145,7 +151,15 @@ const CRON_FREQUENT = '5 * * * *';
 async function runFrequent(env: Env): Promise<void> {
   try {
     await refreshMarket(env);
-    // TODO(wave 2): đẩy 'user.refresh' vào env.JOBS cho người đang giữ mã có giá vừa đổi (updated)
+    // Cảnh báo thị trường: chia theo từng người qua Queue (mỗi thông điệp 1 người); không có Queue thì chạy tuần tự.
+    if (env.JOBS) {
+      const ids = await marketAlertUserIds(env);
+      for (let i = 0; i < ids.length; i += PAGE) {
+        await env.JOBS.sendBatch(ids.slice(i, i + PAGE).map((userId) => ({ body: { type: 'market.alerts', userId } })));
+      }
+    } else {
+      await runMarketAlertsForAll(env);
+    }
   } catch (err) {
     console.error('refreshMarket', err);
   }

@@ -4,6 +4,7 @@
 import type { Env, JobMessage } from '../env';
 import { snapshotStatement } from '../lib/refresh';
 import { loadUserState, syncAlerts } from '../lib/state';
+import { runMarketAlertsForUser } from '../market/alerts';
 
 /** "AI theo dõi" cho một người: chạy engine, mở / đóng cảnh báo, chụp snapshot tháng hiện tại. */
 export async function refreshUser(env: Env, userId: string): Promise<void> {
@@ -19,6 +20,10 @@ export async function handleJob(env: Env, msg: JobMessage): Promise<boolean> {
     case 'user.refresh':
       if (!msg.userId) return false;
       await refreshUser(env, msg.userId);
+      return true;
+    case 'market.alerts':
+      if (!msg.userId) return false;
+      await runMarketAlertsForUser(env, msg.userId);
       return true;
     default:
       return false;

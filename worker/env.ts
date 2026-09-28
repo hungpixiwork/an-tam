@@ -36,7 +36,7 @@ export interface Env {
 }
 
 /** Thông điệp trong Queue an-tam-jobs — worker/jobs/handlers.ts xử lý theo `type`. */
-export interface JobMessage { type: 'user.refresh' | (string & {}); userId?: string }
+export interface JobMessage { type: 'user.refresh' | 'market.alerts' | (string & {}); userId?: string }
 
 export interface Variables {
   userId: string;
