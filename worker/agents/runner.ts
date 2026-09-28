@@ -118,7 +118,8 @@ async function buildPlan(
     const symbol = params.desk?.symbol ?? null;
     const p = planDesk(state, symbol);
     const desk = symbol && hooks.deskHook ? await hooks.deskHook(symbol).catch(() => null) : null;
-    steps.push(...p.steps, ...(desk?.steps ?? []));
+    // Bàn đã chạy → bỏ dòng hẹn "bàn sẽ phân tích" của planner, thay bằng các bước thật của bàn
+    steps.push(...(desk?.steps?.length ? p.steps.filter((s) => s.title !== 'Bàn đầu tư sẽ phân tích mã này') : p.steps), ...(desk?.steps ?? []));
     actions.push(...(desk?.actions ?? []));
     replies.push(desk?.reply ?? p.reply);
   }
