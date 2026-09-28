@@ -11,6 +11,8 @@ export interface Env {
   RL_AUTH?: RateLimit;
   /** Workers Rate Limiting: lượt chạy agent (30 lần / 60 giây theo người dùng). */
   RL_AI?: RateLimit;
+  /** Workflow bàn đầu tư theo mã (worker/desk/workflow.ts). Thiếu (test) → chạy thẳng. */
+  DESK_WORKFLOW?: Workflow<import('./desk/pipeline').DeskParams>;
 
   // vars (wrangler.jsonc)
   /** Origin công khai, ví dụ https://antam.example — dùng cho redirect OAuth. */

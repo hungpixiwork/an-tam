@@ -7,6 +7,7 @@ import { emergencyMonths } from '../../shared/engine/peace';
 import { loadUserState } from '../lib/state';
 import { vnClock } from './http';
 import { loadBreadth, loadHistory, loadQuotes } from './store';
+import { deskAlertNote } from '../desk';
 
 /** Mục tiêu cần ngoại tệ → tỷ giá tăng thì báo. */
 const FX_GOAL = /du học|nước ngoài|định cư|du lịch|thạc sĩ|overseas|abroad/i;
@@ -41,6 +42,9 @@ export async function runMarketAlertsForUser(env: Env, userId: string, now = new
   for (const a of alerts) {
     const log = await db.prepare('INSERT OR IGNORE INTO market_alert_log (user_id, rule_key, day) VALUES (?, ?, ?)').bind(userId, a.ruleKey, today).run();
     if (!log.meta.changes) continue; // đã báo luật này hôm nay
+    // Bàn đầu tư: có kết luận hôm nay cho mã → thêm 1 câu; chưa có → kích hoạt chạy nền cho lần sau
+    const deskLine = await deskAlertNote(env, a.symbol, today);
+    if (deskLine) a.body = `${a.body} ${deskLine}`;
     await db.batch([
       // Cảnh báo cùng luật hôm trước còn mở → đóng để mở cái mới (ai_alerts chỉ cho 1 cảnh báo mở / luật)
       db.prepare("UPDATE ai_alerts SET status = 'resolved', resolved_at = ? WHERE user_id = ? AND rule_key = ? AND status = 'open'").bind(now.toISOString(), userId, a.ruleKey),
