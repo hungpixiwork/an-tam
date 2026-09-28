@@ -1,7 +1,7 @@
 // Lựa chọn cuộc đời (B1) — Tổng quan (lựa chọn ghim) + màn Lựa chọn cuộc đời (/lua-chon).
 
 import type { LifeChoiceReadiness } from '../../engine/lifeChoice';
-import type { DecisionMode } from './decision';
+import type { DecisionMode, SuggestedAction } from './decision';
 
 export type LifeChoiceKind = 'study' | 'care' | 'startup' | 'switch' | 'sabbatical' | 'custom';
 
@@ -88,6 +88,9 @@ export interface LifeChoiceTask {
   /** Việc Agent đề xuất làm trong hôm nay / tuần này. */
   today: boolean;
   done: boolean;
+  /** Trang liên quan + hành động 1 chạm (do Agent gắn sau mô phỏng). */
+  link?: string | null;
+  action?: SuggestedAction | null;
 }
 
 /** "Điều kiện để khả thi": 4 ô có tiến độ. */
@@ -97,6 +100,9 @@ export interface LifeChoiceCondition {
   have: number;
   /** 0..1 */
   progress: number;
+  /** Trang CRUD để cải thiện điều kiện này. */
+  to: string;
+  action?: SuggestedAction;
 }
 
 export interface TextKey {

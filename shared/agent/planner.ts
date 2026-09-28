@@ -365,16 +365,20 @@ export function planDecision(r: DecisionSimulationResult, startBefore: string | 
     { agent: 'cashflow', kind: 'note', title: 'Chạy mô phỏng cú sốc kép 24 tháng', detail: `Khung ${MODE_LABEL[r.mode]}: số tháng an toàn ${decText(r.impact.monthsSafe.before)} → ${decText(r.impact.monthsSafe.after)}` },
     { agent: 'goal', kind: 'note', title: 'Đo tác động lên mục tiêu', detail: r.impact.goalDelay ? `${r.impact.goalDelay.goalTitle} lùi ${r.impact.goalDelay.min}–${r.impact.goalDelay.max} tháng` : 'Chưa có mục tiêu lớn' },
   ];
-  const tasks: { title: string; detail: string; category: 'finance' | 'career' | 'time'; priority: 'high' | 'mid' | 'low' }[] = [];
+  type PlanTask = { title: string; detail: string; category: 'finance' | 'career' | 'time'; priority: 'high' | 'mid' | 'low'; link?: string; action?: { type: string; payload: unknown } };
+  const tasks: PlanTask[] = [];
   let startAfter: string | null = null;
   for (const st of r.steps) {
     const p = st.params;
-    if (st.key === 'reduce_concentration') tasks.push({ title: `Giảm tài sản cùng ngành đang làm khoảng ${vnd(p.amount)}`, detail: `Đang chiếm ${p.sharePct}% tiền dùng được, nên giữ dưới ${p.capPct}%.`, category: 'finance', priority: 'high' });
-    if (st.key === 'raise_reserve') tasks.push({ title: `Nâng quỹ dự phòng lên ${p.to} tháng chi phí`, detail: `Cần thêm khoảng ${vnd(p.amount)}.`, category: 'finance', priority: 'high' });
-    if (st.key === 'side_income') tasks.push({ title: `Tạo nguồn làm thêm ${vnd(p.amount)}/tháng`, detail: 'Bù phần thu nhập có thể mất khi có cú sốc.', category: 'career', priority: 'mid' });
+    // Việc mang theo hành động 1 chạm + trang liên quan của đúng bước đó (áp dụng ngay từ "Agent đồng hành hôm nay")
+    const extra = { link: st.to, ...(st.action && st.key !== 'delay_start' ? { action: st.action } : {}) };
+    if (st.key === 'reduce_concentration') tasks.push({ title: `Giảm tài sản cùng ngành đang làm khoảng ${vnd(p.amount)}`, detail: `Đang chiếm ${p.sharePct}% tiền dùng được, nên giữ dưới ${p.capPct}%.`, category: 'finance', priority: 'high', ...extra });
+    if (st.key === 'raise_reserve') tasks.push({ title: `Nâng quỹ dự phòng lên ${p.to} tháng chi phí`, detail: `Cần thêm khoảng ${vnd(p.amount)}.`, category: 'finance', priority: 'high', ...extra });
+    if (st.key === 'cut_budget') tasks.push({ title: `Đặt ngân sách tháng sau ${vnd(p.amount)}`, detail: `Bớt khoảng ${vnd(p.saving)} để lấp quỹ nhanh hơn.`, category: 'finance', priority: 'mid', ...extra });
+    if (st.key === 'side_income') tasks.push({ title: `Tạo nguồn làm thêm ${vnd(p.amount)}/tháng`, detail: 'Bù phần thu nhập có thể mất khi có cú sốc.', category: 'career', priority: 'mid', ...extra });
     if (st.key === 'delay_start') {
       startAfter = addMonths(startBefore ?? today, p.max);
-      tasks.push({ title: `Dời lịch bắt đầu sang ${monthLabel(startAfter)}`, detail: `Lùi ${p.min}–${p.max} tháng để tích lũy lại quỹ.`, category: 'time', priority: 'mid' });
+      tasks.push({ title: `Dời lịch bắt đầu sang ${monthLabel(startAfter)}`, detail: `Lùi ${p.min}–${p.max} tháng để tích lũy lại quỹ.`, category: 'time', priority: 'mid', link: st.to });
     }
   }
   const reply = [

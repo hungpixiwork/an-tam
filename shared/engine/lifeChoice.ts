@@ -87,6 +87,9 @@ export const CHOICE_SCENARIOS: Record<DecisionMode, LifeChoicePreview['assumptio
 export interface ChoiceProgressExtras {
   /** Thu nhập làm thêm trung bình tháng (3 tháng gần nhất). */
   sideIncome: number;
+  /** Mục tiêu thu nhập đang đặt (trang Tăng thu nhập) — giá trị "trước" khi đặt mục tiêu làm thêm. */
+  targetIncome?: number;
+  targetMonths?: number;
   /** Số tháng đã chuẩn bị (từ lúc tạo lựa chọn). */
   elapsedMonths: number;
 }
@@ -105,11 +108,25 @@ export function choiceConditions(
   const sideNeed = roundMillion(ev.costs.living / Math.max(1, option.durationMonths));
   const prepNeed = extras.elapsedMonths + (prepareMonths ?? 0);
   const safety = peaceScore(state).score;
+  const reason = `Điều kiện để thực hiện "${option.title}".`.slice(0, 300);
+  // Thu nhập phụ chưa đủ → nâng mục tiêu thu nhập ở trang Tăng thu nhập (hoàn tác được)
+  const sideTarget = Math.round(state.profile.monthlyIncome + Math.max(0, sideNeed - extras.sideIncome));
+  const sideAction = sideNeed > extras.sideIncome && sideTarget > (extras.targetIncome ?? 0)
+    ? { type: 'earn.set_target', payload: { targetBefore: extras.targetIncome ?? 0, target: sideTarget, monthsBefore: extras.targetMonths ?? 12, months: Math.max(1, prepareMonths ?? 6), reason } }
+    : undefined;
+  // Còn tháng chuẩn bị → nhắc để dành mùng 5 mỗi tháng (tối đa 6 lần)
+  const reminders = Math.min(6, Math.max(0, prepareMonths ?? 0));
+  const prepAction = reminders > 0 && fundHave < fundNeed
+    ? { type: 'reminder.create', payload: {
+      title: `Để dành cho: ${option.title}`.slice(0, 80), time: '08:00', category: 'finance',
+      dates: Array.from({ length: reminders }, (_, i) => `${addMonths(state.today, i + 1)}-05`),
+    } }
+    : undefined;
   return [
-    { key: 'fund', need: fundNeed, have: fundHave, progress: progressOf(fundHave, fundNeed) },
-    { key: 'side_income', need: sideNeed, have: Math.max(0, extras.sideIncome), progress: progressOf(extras.sideIncome, sideNeed) },
-    { key: 'prepare', need: prepNeed, have: extras.elapsedMonths, progress: progressOf(extras.elapsedMonths, prepNeed) },
-    { key: 'safety', need: 100, have: safety, progress: safety / 100 },
+    { key: 'fund', need: fundNeed, have: fundHave, progress: progressOf(fundHave, fundNeed), to: '/quy-an-toan?focus=plan' },
+    { key: 'side_income', need: sideNeed, have: Math.max(0, extras.sideIncome), progress: progressOf(extras.sideIncome, sideNeed), to: '/tang-thu-nhap?focus=side', ...(sideAction ? { action: sideAction } : {}) },
+    { key: 'prepare', need: prepNeed, have: extras.elapsedMonths, progress: progressOf(extras.elapsedMonths, prepNeed), to: '/lich-ai', ...(prepAction ? { action: prepAction } : {}) },
+    { key: 'safety', need: 100, have: safety, progress: safety / 100, to: '/quy-an-toan' },
   ];
 }
 

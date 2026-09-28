@@ -1,31 +1,25 @@
 // 03 · Mô phỏng cú sốc kép cho một lựa chọn cuộc đời (bố cục theo mockup).
-// Kéo thanh trượt → POST /simulations/preview (debounce) → engine decisionSimulation (Bull/Base/Bear, 24 tháng).
+// Nạp dữ liệu 1 lần (GET /simulations/context) → engine decisionSimulation chạy ngay trong trình duyệt:
+// kéo thanh trượt / đổi Bull-Base-Bear không gọi server. "Lưu kết quả" và Agent vẫn tính lại ở server.
 
-import { useEffect, useState } from 'react';
+import { useDeferredValue, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, GraduationCap, Lightbulb, Repeat, Save } from 'lucide-react';
 import type { DecisionMode, DecisionShock, DecisionShockParams } from '@shared/types/api/decision';
+import { analyzeDecisionSimulation } from '@shared/engine/decisionSimulation';
 import { Button, ErrorState, FormAlert, PageSkeleton, Select } from '@/components/ui';
-import { useDecisionPreview, useLifeChoice, useLifeChoices, usePresets, useRunSimulation, type DecisionRequest } from '@/lib/queries';
+import { useDecisionContext, useRunSimulation, type DecisionRequest } from '@/lib/queries';
+import type { ApiError } from '@/lib/api';
 import { useLocale } from '@/app/locale';
 import { ShockPresets, ShockSetup } from './ShockSetup';
 import { CashflowChart, ChoiceImpact, EstimatedImpact, GoalImpact, StepsList } from './ShockImpact';
 import { AgentPlanUpdate } from './AgentPlanUpdate';
 
-function useDebounced<T>(value: T, ms = 300): T {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setV(value), ms);
-    return () => clearTimeout(id);
-  }, [value, ms]);
-  return v;
-}
-
-export default function DoubleShockPage({ choiceId, initialMode, onChangeChoice }: { choiceId: string; initialMode: DecisionMode; onChangeChoice: (id: string) => void }) {
+export default function DoubleShockPage({ choiceId: requested, initialMode, onChangeChoice, onNoChoice }: {
+  choiceId: string | undefined; initialMode: DecisionMode; onChangeChoice: (id: string) => void; onNoChoice: () => ReactNode;
+}) {
   const { t } = useLocale();
-  const presets = usePresets();
-  const choices = useLifeChoices();
-  const detail = useLifeChoice(choiceId);
+  const context = useDecisionContext(requested);
   const [mode, setMode] = useState<DecisionMode>(initialMode);
   const [shock, setShock] = useState<DecisionShock>('industry');
   const [params, setParams] = useState<DecisionShockParams | null>(null);
@@ -33,16 +27,25 @@ export default function DoubleShockPage({ choiceId, initialMode, onChangeChoice 
   const run = useRunSimulation();
   const [savedId, setSavedId] = useState<string | null>(null);
 
-  const presetOf = (s: DecisionShock) => presets.data?.shocks.find((x) => x.shock === s)?.params ?? null;
-  const current = params ?? presetOf(shock);
-  const request: DecisionRequest | null = current ? { choiceId, mode, shock, params: current } : null;
-  const preview = useDecisionPreview(useDebounced(request));
+  const ctx = context.data;
+  const current = params ?? ctx?.shocks.find((x) => x.shock === shock)?.params ?? null;
+  // Tham số trễ một nhịp khi kéo nhanh → thanh trượt luôn mượt, kết quả bắt kịp ngay sau đó
+  const deferred = useDeferredValue(current);
+  const r = useMemo(
+    () => (ctx && deferred ? analyzeDecisionSimulation(ctx.state, ctx.choice, ctx.option, { mode, shock, params: deferred }, ctx.extras) : null),
+    [ctx, deferred, mode, shock],
+  );
 
-  if (presets.isPending || detail.isPending) return <PageSkeleton />;
-  if (presets.error || detail.error) return <ErrorState error={presets.error ?? detail.error} onRetry={() => { presets.refetch(); detail.refetch(); }} />;
-  const d = detail.data;
-  const option = d.options.find((o) => o.selected) ?? d.options[0];
-  const r = preview.data;
+  if (context.isPending) return <PageSkeleton />;
+  if (context.error) {
+    if ((context.error as ApiError).status === 404) return <>{onNoChoice()}</>;
+    return <ErrorState error={context.error} onRetry={() => context.refetch()} />;
+  }
+  const choiceId = ctx!.choice.id;
+  const d = { title: ctx!.choice.title };
+  const option = ctx!.option;
+  const choices = { data: ctx!.choices };
+  const request: DecisionRequest | null = current ? { choiceId, mode, shock, params: current } : null;
 
   const pickShock = (s: DecisionShock) => { setShock(s); setParams(null); setSavedId(null); };
   const save = () => request && run.mutate(request, { onSuccess: (x) => setSavedId(x.runId) });
@@ -64,7 +67,7 @@ export default function DoubleShockPage({ choiceId, initialMode, onChangeChoice 
         <div className="min-w-0">
           <p className="text-[12.5px] font-semibold text-ink-soft">{t('simulation.choice.label')}:</p>
           <p className="text-[17px] font-extrabold text-ink">{d.title}</p>
-          {option && d.options.length > 1 && <p className="text-[12px] text-ink-soft">{t('simulation.choice.option', { title: option.title })}</p>}
+          {option.title !== d.title && <p className="text-[12px] text-ink-soft">{t('simulation.choice.option', { title: option.title })}</p>}
         </div>
         <p className="hidden max-w-[420px] border-l border-line pl-4 text-[12.5px] text-ink-soft lg:block">{t('simulation.choice.hint')}</p>
         <div className="ml-auto flex items-center gap-2">
@@ -92,7 +95,6 @@ export default function DoubleShockPage({ choiceId, initialMode, onChangeChoice 
           {r ? <EstimatedImpact r={r} /> : <div className="rounded-2xl border border-line bg-white p-4 shadow-card" role="status">{t('simulation.loading')}</div>}
         </div>
       )}
-      {preview.error && <ErrorState error={preview.error} onRetry={() => preview.refetch()} />}
 
       {r && request && (
         <>

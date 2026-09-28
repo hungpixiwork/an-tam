@@ -135,7 +135,7 @@ interface OptionRow {
 interface PrereqRow { id: string; title: string; done: number; auto_key: string | null }
 interface TaskRow {
   id: string; title: string; detail: string; priority: LifeChoiceTask['priority']; done: number;
-  category: LifeChoiceTask['category']; today: number;
+  category: LifeChoiceTask['category']; today: number; link: string | null; action_json: string | null;
 }
 
 const toChoice = (r: Row): LifeChoice => {
@@ -186,7 +186,7 @@ export async function loadDetail(db: D1Database, row: Row, userId: string, cache
   const [options, prereqs, tasks] = await db.batch([
     db.prepare('SELECT * FROM life_choice_options WHERE choice_id = ? ORDER BY order_idx, rowid').bind(row.id),
     db.prepare('SELECT id, title, done, auto_key FROM life_choice_prereqs WHERE choice_id = ? ORDER BY order_idx, rowid').bind(row.id),
-    db.prepare('SELECT id, title, detail, priority, done, category, today FROM life_choice_tasks WHERE choice_id = ? ORDER BY order_idx, rowid').bind(row.id),
+    db.prepare('SELECT id, title, detail, priority, done, category, today, link, action_json FROM life_choice_tasks WHERE choice_id = ? ORDER BY order_idx, rowid').bind(row.id),
   ]);
   const state = await statePromise;
   const choice = toChoice(row);
@@ -206,6 +206,7 @@ export async function loadDetail(db: D1Database, row: Row, userId: string, cache
     prereqs: pre,
     tasks: (tasks.results as unknown as TaskRow[]).map((t) => ({
       id: t.id, title: t.title, detail: t.detail, priority: t.priority, category: t.category ?? 'finance', today: t.today === 1, done: t.done === 1,
+      link: t.link, action: t.action_json ? JSON.parse(t.action_json) : null,
     })),
     recommendedOptionId: best?.id ?? null,
   };
@@ -258,18 +259,22 @@ export function lifeChoiceInsertStatements(db: D1Database, userId: string, id: s
 
 /** Thu nhập làm thêm trung bình 3 tháng gần nhất + số tháng đã chuẩn bị từ lúc tạo lựa chọn. */
 async function choiceProgress(db: D1Database, userId: string, row: Row, today: string) {
-  const [side, runs] = await db.batch([
+  const [side, runs, income] = await db.batch([
     db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM transactions
       WHERE user_id = ? AND kind = 'income' AND category IN (${SIDE_INCOME_CATEGORIES.map(() => '?').join(', ')}) AND occurred_on >= ? AND occurred_on < ?`)
       .bind(userId, ...SIDE_INCOME_CATEGORIES, `${addMonths(today, -3)}-01`, `${today}-01`),
     db.prepare('SELECT 1 AS ok FROM simulation_runs WHERE user_id = ? AND choice_id = ? LIMIT 1').bind(userId, row.id),
+    db.prepare('SELECT target_income, target_months FROM income_profiles WHERE user_id = ?').bind(userId),
   ]);
+  const inc = income.results[0] as { target_income?: number; target_months?: number } | undefined;
   const total = Number((side.results[0] as { total?: number } | undefined)?.total ?? 0);
   const month = row.created_at?.slice(0, 7);
   return {
     sideIncome: Math.round(total / 3),
     elapsedMonths: month ? Math.max(0, monthsBetween(month, today)) : 0,
     simulated: runs.results.length > 0,
+    targetIncome: inc?.target_income ?? 0,
+    targetMonths: inc?.target_months ?? 12,
   };
 }
 
@@ -313,7 +318,7 @@ const nextIdx = async (db: D1Database, table: string, choiceId: string) =>
 
 export const lifeChoices = new Hono<AppEnv>()
   // Đường dẫn tĩnh (templates, evaluate, compare) khai báo trước '/:id'
-  .get('/templates', (c) => ok(c, LIFE_CHOICE_TEMPLATES))
+  .get('/templates', (c) => { c.header('Cache-Control', 'private, max-age=3600'); return ok(c, LIFE_CHOICE_TEMPLATES); })
   .post('/evaluate', body(evaluateSchema), async (c) => {
     const v = c.req.valid('json');
     const db = c.env.DB;

@@ -7,7 +7,7 @@ import type { DecisionRequest } from './simulation';
 /* ───────── 08 · AI Workspace ───────── */
 
 const idemKey = () => ({ 'Idempotency-Key': `web-${crypto.randomUUID()}` });
-const AGENT_KEYS = [['agents'], ['agent-run'], ['agent-actions'], ['calendar'], ['budgets'], ['life-choices'], ['life-choice'], ['decision-preview'], ['decision-next'], ...FINANCE_KEYS];
+const AGENT_KEYS = [['agents'], ['agent-run'], ['agent-actions'], ['calendar'], ['budgets'], ['life-choices'], ['life-choice'], ['decision-context'], ['decision-next'], ...FINANCE_KEYS];
 
 const useRefreshAgents = () => {
   const qc = useQueryClient();

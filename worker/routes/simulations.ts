@@ -8,7 +8,7 @@ import { DECISION_SHOCKS, decisionPreset } from '../../shared/engine/decisionSim
 import { notFound, ok } from '../lib/http';
 import { loadUserState } from '../lib/state';
 import { body } from '../lib/validate';
-import { runDecisionSimulation } from '../lib/decision';
+import { loadDecisionContext, runDecisionSimulation } from '../lib/decision';
 
 const SECTORS = ['technology', 'finance', 'real_estate', 'manufacturing', 'consumer', 'healthcare', 'education_public', 'other'] as const;
 const pct = z.number().min(0).max(100);
@@ -65,13 +65,19 @@ export const simulations = new Hono<AppEnv>()
       c.env.DB.prepare('SELECT id, slug, name, icon, params_json FROM simulation_presets ORDER BY order_idx').all<PresetRow>(),
       c.env.DB.prepare('SELECT sector FROM income_profiles WHERE user_id = ?').bind(c.get('userId')).first<{ sector: (typeof SECTORS)[number] | null }>(),
     ]);
+    c.header('Cache-Control', 'private, max-age=3600');
     return ok(c, {
       presets: results.map((p) => ({ id: p.id, slug: p.slug, name: p.name, icon: p.icon, params: JSON.parse(p.params_json) as SimulationParams })),
       /** Mẫu cú sốc kép theo ngành trong hồ sơ nghề nghiệp. */
       shocks: DECISION_SHOCKS.map((shock) => ({ shock, params: decisionPreset(shock, income?.sector ?? 'technology') })),
     });
   })
-  /** Xem trước (không lưu) — gọi khi người dùng kéo thanh trượt. */
+  /** Dữ liệu cho engine chạy ở trình duyệt (kéo thanh trượt / đổi kịch bản không gọi server). */
+  .get('/context', async (c) => {
+    const ctx = await loadDecisionContext(c.env.DB, c.get('userId'), { choiceId: c.req.query('choiceId') || undefined });
+    return ok(c, { ...ctx, shocks: DECISION_SHOCKS.map((shock) => ({ shock, params: decisionPreset(shock, ctx.sector) })) });
+  })
+  /** Xem trước (không lưu) — MCP và trình duyệt cũ; trang Mô phỏng tính tại chỗ bằng /context. */
   .post('/preview', body(simulationInputSchema), async (c) => {
     return ok(c, await reportFor(c.env.DB, c.get('userId'), c.req.valid('json')));
   })

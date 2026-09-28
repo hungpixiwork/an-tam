@@ -13,6 +13,7 @@ import { DEFAULT_CUT_PCT, evaluateLifeChoice, liquidAssets, type EvaluateContext
 import { expectedCompletion, mainGoal } from './goals';
 import { addMonths, monthsBetween } from './month';
 import { peaceScore, savingsCapacity } from './peace';
+import { reservePlan } from './safety';
 import { MARKET_BETA } from './simulate';
 
 export const HORIZON_MONTHS = 24;
@@ -42,12 +43,21 @@ const CONCENTRATION_CAP = 0.1;
 /** Khi lấp lại phần thiếu, giả định chỉ dồn được 60% tiền dư (40% vẫn góp cho mục tiêu khác) → cận trên của khoảng. */
 const SLOW_SAVE_SHARE = 0.6;
 const MAX_DROP = 0.95;
+/** Ngân sách tháng sau gợi ý = chi tiêu hiện tại − 10%. */
+const BUDGET_CUT = 0.1;
+/** Thời gian đặt cho mục tiêu làm thêm. */
+const SIDE_INCOME_MONTHS = 6;
 /** Trợ cấp thất nghiệp (Luật Việc làm): 60% lương, tối thiểu 3 tháng — chỉ khi đang đi làm mà mất việc. */
 const UNEMPLOYMENT_BENEFIT = { share: 0.6, months: 3 } as const;
 
 export interface DecisionIncomeExtras {
   /** Thưởng năm (VND) — lấy từ hồ sơ thu nhập. */
   bonusAnnual: number;
+  /** Mục tiêu thu nhập hiện tại (Tăng thu nhập) — giá trị "trước" cho hành động đặt mục tiêu làm thêm. */
+  targetIncome?: number;
+  targetMonths?: number;
+  /** Ngân sách chi tháng sau đang đặt (null = chưa đặt). */
+  budgetLimit?: number | null;
   /** Cổ phiếu thưởng (ESOP) nhận mỗi năm, quy ra VND. */
   esopAnnual: number;
 }
@@ -254,11 +264,68 @@ export function analyzeDecisionSimulation(
 
   const sideIncome = roundMillion(selected.incomeLost / HORIZON_MONTHS);
   const steps: DecisionStep[] = [];
-  if (share > CONCENTRATION_CAP) steps.push({ key: 'reduce_concentration', params: { amount: roundMillion(concentrated - CONCENTRATION_CAP * liquid), sharePct: Math.round(share * 100), capPct: CONCENTRATION_CAP * 100 } });
-  if (extraMonths > 0) steps.push({ key: 'raise_reserve', params: { from: Math.floor(selected.monthsSafe), to: targetMonths, amount: roundMillion(extraMonths * E) } });
-  if (sideIncome > 0) steps.push({ key: 'side_income', params: { amount: sideIncome } });
-  if (delayStart.max > 0) steps.push({ key: 'delay_start', params: { min: delayStart.min, max: delayStart.max } });
-  if (!steps.length) steps.push({ key: 'keep_plan', params: {} });
+  const reason = `Mô phỏng cú sốc kép: còn ${round1(selected.monthsSafe)} tháng an toàn (khung ${input.mode}).`;
+
+  // 1) Giảm tài sản tập trung: chuyển từ khoản cổ phiếu công ty / cùng ngành lớn nhất sang khoản tiền mặt lớn nhất
+  if (share > CONCENTRATION_CAP) {
+    const amount = roundMillion(concentrated - CONCENTRATION_CAP * liquid);
+    const from = state.holdings.filter((h) => isLiquid(h) && (h.isEmployerStock || (h.sector === input.params.sector && h.category !== 'cash')))
+      .sort((a, b) => Number(!!b.isEmployerStock) - Number(!!a.isEmployerStock) || b.value - a.value)[0];
+    const to = state.holdings.filter((h) => h.category === 'cash').sort((a, b) => b.value - a.value)[0];
+    const move = from ? Math.min(amount, from.value) : 0;
+    steps.push({
+      key: 'reduce_concentration', to: '/danh-muc?focus=employer',
+      params: { amount, sharePct: Math.round(share * 100), capPct: CONCENTRATION_CAP * 100 },
+      ...(from && to && move > 0 ? { action: { type: 'holding.rebalance', payload: {
+        fromId: from.id, fromName: from.name, toId: to.id, toName: to.name, amount: move, fromBefore: from.value, toBefore: to.value, reason,
+      } } } : {}),
+    });
+  }
+  // 2) Quỹ dự phòng đủ số tháng mục tiêu (tạo / cập nhật mục tiêu quỹ, mức để dành mỗi tháng)
+  if (extraMonths > 0) {
+    const plan = reservePlan(state, targetMonths);
+    const goal = state.goals.find((g) => g.kind === 'emergency');
+    steps.push({
+      key: 'raise_reserve', to: '/quy-an-toan?focus=reserve',
+      params: { from: Math.floor(selected.monthsSafe), to: targetMonths, amount: roundMillion(extraMonths * E) },
+      ...(plan.monthly > 0 ? { action: { type: 'safety.set_target', payload: {
+        months: targetMonths, monthsBefore: state.profile.emergencyTargetMonths || 6, goalId: goal?.id ?? null,
+        targetAmount: plan.targetAmount, targetBefore: goal?.targetAmount ?? null, monthly: plan.monthly, monthlyBefore: goal?.monthlyContribution ?? null,
+        targetMonth: addMonths(state.today, Math.max(1, plan.duration)), targetMonthBefore: goal?.targetMonth ?? null, reason,
+      } } } : {}),
+    });
+    // 3) Ngân sách tháng sau: cắt 10% chi tiêu để lấp quỹ nhanh hơn
+    const limit = Math.floor((E * (1 - BUDGET_CUT)) / 100_000) * 100_000;
+    if (extras.budgetLimit == null || extras.budgetLimit > limit) {
+      steps.push({
+        key: 'cut_budget', to: '/thu-chi?modal=budget',
+        params: { amount: limit, saving: E - limit, pct: BUDGET_CUT * 100 },
+        action: { type: 'budget.set', payload: { month: addMonths(state.today, 1), limitBefore: extras.budgetLimit ?? null, limit, saving: E - limit, reason } },
+      });
+    }
+  }
+  // 4) Nguồn làm thêm: nâng mục tiêu thu nhập ở trang Tăng thu nhập
+  if (sideIncome > 0) {
+    const target = Math.max(extras.targetIncome ?? 0, Math.round(state.profile.monthlyIncome + sideIncome));
+    steps.push({
+      key: 'side_income', to: '/tang-thu-nhap?focus=side', params: { amount: sideIncome },
+      ...(target > (extras.targetIncome ?? 0) ? { action: { type: 'earn.set_target', payload: {
+        targetBefore: extras.targetIncome ?? 0, target, monthsBefore: extras.targetMonths ?? 12, months: SIDE_INCOME_MONTHS, reason,
+      } } } : {}),
+    });
+  }
+  // 5) Lùi thời điểm bắt đầu lựa chọn
+  if (delayStart.max > 0) {
+    const startBefore = option.startMonth ?? null;
+    steps.push({
+      key: 'delay_start', to: `/lua-chon?id=${encodeURIComponent(choice.id)}`, params: { min: delayStart.min, max: delayStart.max },
+      action: { type: 'life_choice.update_plan', payload: {
+        choiceId: choice.id, optionId: option.id, choiceTitle: choice.title.slice(0, 80), startBefore,
+        startAfter: addMonths(startBefore ?? state.today, delayStart.max), tasks: [], reason,
+      } },
+    });
+  }
+  if (!steps.length) steps.push({ key: 'keep_plan', params: {}, to: `/lua-chon?id=${encodeURIComponent(choice.id)}` });
 
   return {
     choiceId: choice.id, choiceTitle: choice.title, optionId: option.id, optionTitle: option.title,
@@ -282,7 +349,7 @@ export function analyzeDecisionSimulation(
         { key: 'side_income', params: { amount: sideIncome } },
       ],
     },
-    steps: steps.slice(0, 4),
+    steps,
     concentration: { amount: concentrated, share: Math.round(share * 1000) / 1000 },
     basis: 'Ước tính tất định theo từng tháng từ thu nhập, thưởng, chi tiêu, tài sản và phương án bạn nhập. '
       + 'Số tháng mất thu nhập = số tháng × xác suất; đã nghỉ việc để thực hiện lựa chọn thì tính là tìm việc lại chậm hơn sau khi xong, '

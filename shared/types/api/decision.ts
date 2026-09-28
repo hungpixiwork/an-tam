@@ -66,9 +66,19 @@ export interface DecisionGoalTile {
   delta: DecisionRange | number | null;
 }
 
+/** Hành động 1 chạm đi kèm một gợi ý (POST /api/actions/apply). `type` là khóa trong shared/agent/actions.ts. */
+export interface SuggestedAction {
+  type: string;
+  payload: Record<string, unknown>;
+}
+
 export interface DecisionStep {
-  key: 'reduce_concentration' | 'raise_reserve' | 'side_income' | 'delay_start' | 'keep_plan';
+  key: 'reduce_concentration' | 'raise_reserve' | 'cut_budget' | 'side_income' | 'delay_start' | 'keep_plan';
   params: Record<string, number>;
+  /** Có → hiện nút "Áp dụng" (xem trước trước → sau, hoàn tác được). */
+  action?: SuggestedAction;
+  /** Trang CRUD liên quan. */
+  to: string;
 }
 
 export interface DecisionSimulationResult {

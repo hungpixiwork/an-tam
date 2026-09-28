@@ -13,7 +13,7 @@ import { HeroLakeCity } from '@/components/pixel';
 import { Bot, Target } from 'lucide-react';
 import { Button, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, Select, cx, type Tone } from '@/components/ui';
 import { NeedData } from '@/components/NeedData';
-import { useLifeChoices, usePresets, useRunSimulation, useSimulationPreview, type Preset } from '@/lib/queries';
+import { usePresets, useRunSimulation, useSimulationPreview, type Preset } from '@/lib/queries';
 import DoubleShockPage from './DoubleShockPage';
 
 /* ───────── Cấu hình slider ───────── */
@@ -59,17 +59,13 @@ function useDebounced<T>(value: T, ms: number): T {
 /** /mo-phong: có lựa chọn cuộc đời (?choiceId= hoặc lựa chọn đang ghim) → Mô phỏng cú sốc kép; ?preset= hoặc chưa có lựa chọn → mô phỏng chung. */
 export default function SimulationPage() {
   const [search, setSearch] = useSearchParams();
-  const choices = useLifeChoices();
   const requestedMode = search.get('mode');
   const mode = requestedMode === 'bull' || requestedMode === 'bear' ? requestedMode : 'base';
   if (search.get('preset')) return <LegacySimulationPage />;
-  if (choices.isPending) return <PageSkeleton />;
-  const choiceId = search.get('choiceId') ?? choices.data?.[0]?.id;
-  if (choiceId) {
-    const change = (id: string) => setSearch((p) => { p.set('choiceId', id); return p; });
-    return <DoubleShockPage key={choiceId} choiceId={choiceId} initialMode={mode} onChangeChoice={change} />;
-  }
-  return <LegacySimulationPage />;
+  // Không chờ danh sách lựa chọn: /simulations/context tự lấy lựa chọn đang ghim, 404 = chưa có → mô phỏng chung
+  const choiceId = search.get('choiceId') ?? undefined;
+  const change = (id: string) => setSearch((p) => { p.set('choiceId', id); return p; });
+  return <DoubleShockPage key={choiceId ?? 'pinned'} choiceId={choiceId} initialMode={mode} onChangeChoice={change} onNoChoice={() => <LegacySimulationPage />} />;
 }
 
 function LegacySimulationPage() {

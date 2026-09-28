@@ -37,3 +37,14 @@ test('mất việc không làm giảm tài sản, chỉ cắt thu nhập', () =>
   expect(r.scenarios.base.incomeLost).toBeGreaterThan(0);
   expect(r.scenarios.base.path[24]).toBeLessThan(r.baseline.path[24]);
 });
+
+test('mỗi gợi ý có hành động hợp lệ theo danh mục (áp dụng 1 chạm được)', async () => {
+  const { validateAction, isActionType } = await import('../shared/agent/actions');
+  const r = analyzeDecisionSimulation(demoState(), choice, option, { mode: 'bear', shock: 'industry', params: decisionPreset('industry') }, extras);
+  const withAction = r.steps.filter((s) => s.action);
+  expect(withAction.length).toBeGreaterThan(0);
+  for (const s of withAction) {
+    expect(isActionType(s.action!.type)).toBe(true);
+    expect(() => validateAction(s.action!.type as never, s.action!.payload)).not.toThrow();
+  }
+});
