@@ -69,7 +69,7 @@ const targetWeek = (maskedPrompt: string, explicit?: string) => {
 };
 
 /** Bàn đầu tư (làm sau): nhận mã, trả câu phân tích + các bước. Chưa có → planner dùng ghi chú tất định. */
-export type DeskHook = (symbol: string) => Promise<{ reply?: string; steps?: StepDraft[] } | null>;
+export type DeskHook = (symbol: string) => Promise<{ reply?: string; steps?: StepDraft[]; actions?: ActionDraft[] } | null>;
 export interface RunHooks { deskHook?: DeskHook }
 
 const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
@@ -119,6 +119,7 @@ async function buildPlan(
     const p = planDesk(state, symbol);
     const desk = symbol && hooks.deskHook ? await hooks.deskHook(symbol).catch(() => null) : null;
     steps.push(...p.steps, ...(desk?.steps ?? []));
+    actions.push(...(desk?.actions ?? []));
     replies.push(desk?.reply ?? p.reply);
   }
   const agents = AGENT_KEYS.filter((k) => k === 'planner' || actions.some((a) => a.agent === k) || steps.some((s) => s.agent === k));

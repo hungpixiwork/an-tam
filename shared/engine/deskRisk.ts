@@ -116,7 +116,7 @@ export function deskRisk(input: DeskRiskInput): DeskRisk {
     suggestedActions.push({
       type: 'alert_rule.create',
       title: `Báo khi ${input.name} giảm từ ${thresholdPct}% trong ngày`,
-      payload: { symbol: input.symbol, direction: 'down', thresholdPct },
+      payload: { symbol: input.symbol, label: input.name.slice(0, 40), direction: 'down', thresholdPct },
     });
   }
 

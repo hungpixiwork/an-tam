@@ -45,6 +45,8 @@ import { refreshMarket } from './market/refresh';
 import { marketAlertUserIds, runMarketAlertsForAll } from './market/alerts';
 import { PAGE } from './jobs/monitor';
 import { desk } from './desk/routes';
+import { runDailyDesk } from './desk';
+import { vnClock } from './market/http';
 
 // Workflow bàn đầu tư (wrangler.jsonc → workflows)
 export { DeskWorkflow } from './desk/workflow';
@@ -170,6 +172,14 @@ async function runFrequent(env: Env): Promise<void> {
     }
   } catch (err) {
     console.error('refreshMarket', err);
+  }
+  // Bàn đầu tư hằng ngày: lượt chạy lúc 16:05 giờ VN (sau khi đóng cửa 15:15) — mỗi mã 1 lần, dùng chung cho mọi người, kèm rút kinh nghiệm.
+  if (vnClock().hour === 16) {
+    try {
+      await runDailyDesk(env);
+    } catch (err) {
+      console.error('runDailyDesk', err);
+    }
   }
   // TODO(wave 2–3): worker/jobs/{automation,sync,purge}.ts
 }

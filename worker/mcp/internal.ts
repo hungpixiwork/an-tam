@@ -14,6 +14,7 @@ import { market } from '../routes/market';
 import { lifeChoices } from '../routes/lifeChoices';
 import { portfolioRisk } from '../routes/portfolioRisk';
 import { agent } from '../routes/agent';
+import { desk } from '../desk/routes';
 
 const USER_HEADER = 'x-antam-mcp-user';
 
@@ -39,6 +40,7 @@ inner.route('/market', market);
 inner.route('/life-choices', lifeChoices);
 inner.route('/portfolio', portfolioRisk);
 inner.route('/agent', agent);
+inner.route('/desk', desk);
 
 export class RouteError extends Error {}
 

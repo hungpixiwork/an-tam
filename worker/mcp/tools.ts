@@ -153,8 +153,13 @@ export const TOOLS: ToolDef[] = [
     selfAudit: true,
     run: (ctx, a) => proposeAction(ctx, a.type, a.payload, a.note),
   }),
-  // ── Điểm đăng ký run_desk(symbol) — Agent G thêm khi merge (worker/desk/*), chỉ đọc: ──
-  // tool({ name: 'run_desk', description: '...', input: z.object({ symbol: ... }), run: ({ env, userId }, a) => ... }),
+  tool({
+    name: 'run_desk',
+    description:
+      "Get today's multi-agent analysis desk report for an asset the user holds (or SJC gold / VNINDEX): analysts (technical, news, fundamentals, macro), optimist vs cautious views, a synthesized verdict (trend, risk, confidence, reasons) and a personal risk note (share of assets, impact in VND, months the safety fund covers). Never a buy recommendation. Runs the desk if today's report is missing.",
+    input: z.object({ symbol: z.string().regex(/^[A-Za-z0-9]{1,12}$/).describe('Symbol the user holds, or SJC / VNINDEX.') }),
+    run: ({ env, userId }, a) => callRoute(env, userId, `/desk/${a.symbol.toUpperCase()}/run`, {}),
+  }),
 ];
 
 export async function proposeAction(ctx: ToolCtx, type: string, payload: unknown, note?: string): Promise<{ id: string; status: 'pending'; expiresAt: string }> {

@@ -55,7 +55,7 @@ export type DeskStance = 'binh_tinh' | 'can_nhac_giam' | 'theo_doi';
 /** Việc chờ người dùng duyệt — tầng agent tạo pending action từ payload này (bàn không tự tạo). */
 export type DeskSuggestedAction =
   | { type: 'reminder.create'; title: string; payload: { title: string; time: string; dates: string[]; category: 'finance' } }
-  | { type: 'alert_rule.create'; title: string; payload: { symbol: string; direction: 'down' | 'up'; thresholdPct: number } };
+  | { type: 'alert_rule.create'; title: string; payload: { symbol: string; label: string; direction: 'down' | 'up'; thresholdPct: number } };
 
 export interface DeskRisk {
   stance: DeskStance;
