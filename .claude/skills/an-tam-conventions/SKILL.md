@@ -42,4 +42,6 @@ description: Quy ước bắt buộc khi code An Tâm AI — stack, lệnh, ch�
 - **Worktree guard chặn trong Bash**: heredoc, `eval`, `$var`, `mklink` → dùng tool PowerShell hoặc script Node (`scripts/dev/smoke.mjs`).
 - **Tắt worker**: chỉ giết tiến trình giữ đúng cổng (xem skill `dev-env`), không `Stop-Process -Name workerd` khi có agent khác đang chạy.
 - `wrangler dev` cần thư mục `client/dist` tồn tại.
+- **Worktree mới thiếu `client/node_modules` và `client/dist`** → tạo junction từ repo chính (PowerShell `New-Item -ItemType Junction -Path client\node_modules -Target <main>\client\node_modules`), gỡ junction trước khi commit.
+- File dùng CRLF: script Node `replace()` với chuỗi có `\n` sẽ không khớp → dùng tool Edit.
 - Class Tailwind truyền vào component đã có `w-full`/`h-full` sẽ không thắng → bọc bằng div có kích thước.
