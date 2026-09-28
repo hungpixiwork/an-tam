@@ -74,7 +74,11 @@ export function autoCategory(kind: 'income' | 'expense', content: string): strin
   return RULES.find(([re]) => re.test(t))?.[1] ?? 'other_expense';
 }
 
-export type WebhookResult = { status: 'created'; transactionId: string; userId: string } | { status: 'duplicate' } | { status: 'unmatched' };
+export type WebhookResult =
+  | { status: 'created'; transactionId: string; userId: string }
+  | { status: 'duplicate' }
+  | { status: 'unmatched' }
+  | { status: 'pending_verification' };
 
 /**
  * Ghi sự kiện (chống trùng) → nếu khớp tài khoản đã liên kết thì thêm giao dịch (source 'sepay', external_id)
@@ -114,6 +118,20 @@ export async function handleSepayEvent(env: { DB: D1Database; AUDIT_HASH_SALT?: 
     await db.prepare('UPDATE bank_accounts SET verified_by_event_id = ? WHERE id = ? AND verified_by_event_id IS NULL').bind(eventId, bank.id).run();
   }
 
+  // Tài khoản chưa xác thực: chỉ giữ sự kiện, chưa ghi vào sổ (tránh người khai nhầm/giả nhận giao dịch của người khác).
+  // Xác thực xong, replayPendingEvents ghi bù.
+  if (bank.status !== 'active') return { status: 'pending_verification' };
+  return recordTransaction(env, bank, p, externalId);
+}
+
+/** Ghi 1 giao dịch SePay vào sổ thu chi (chống trùng theo external_id) + nhật ký. */
+async function recordTransaction(
+  env: { DB: D1Database; AUDIT_HASH_SALT?: string },
+  bank: { id: string; user_id: string },
+  p: SepayPayload,
+  externalId: string,
+): Promise<WebhookResult> {
+  const db = env.DB;
   const kind = p.transferType === 'in' ? 'income' : 'expense';
   const category = autoCategory(kind, p.content);
   const occurredOn = p.transactionDate.slice(0, 10);
@@ -135,4 +153,26 @@ export async function handleSepayEvent(env: { DB: D1Database; AUDIT_HASH_SALT?: 
     { salt: env.AUDIT_HASH_SALT },
   );
   return { status: 'created', transactionId: id, userId: bank.user_id };
+}
+
+/**
+ * Sau khi tài khoản được xác thực: ghi bù các giao dịch nhận trong lúc chờ (chỉ sự kiện của đúng người này,
+ * nhận sau khi liên kết). Trả về số giao dịch được ghi.
+ */
+export async function replayPendingEvents(
+  env: { DB: D1Database; AUDIT_HASH_SALT?: string },
+  bank: { id: string; user_id: string; created_at: string },
+): Promise<number> {
+  const rows = await env.DB
+    .prepare("SELECT external_id, payload_json FROM bank_webhook_events WHERE provider = 'sepay' AND user_id = ? AND received_at >= ? AND payload_json != '{}' ORDER BY received_at")
+    .bind(bank.user_id, bank.created_at)
+    .all<{ external_id: string; payload_json: string }>();
+  let created = 0;
+  for (const r of rows.results) {
+    // Payload lưu đã che số tài khoản → thay bằng giá trị hợp lệ (tài khoản đã biết qua bank).
+    const parsed = sepayPayload.safeParse({ ...JSON.parse(r.payload_json), accountNumber: '0000' });
+    if (!parsed.success) continue;
+    if ((await recordTransaction(env, bank, parsed.data, r.external_id)).status === 'created') created++;
+  }
+  return created;
 }

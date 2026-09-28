@@ -11,7 +11,7 @@ describe.skipIf(!hasDb)('POST /api/webhooks/sepay', () => {
   it('sai khóa → 401; gửi trùng referenceCode → bỏ qua, chỉ 1 giao dịch', async () => {
     const t = (await openMigratedD1())!;
     insertUser(t.raw, 'u1');
-    t.raw.prepare("INSERT INTO bank_accounts (id, user_id, bank_code, account_masked, account_hash) VALUES ('b1', 'u1', 'VCB', '•••• 6789', ?)").run(await accountHash('0123456789'));
+    t.raw.prepare("INSERT INTO bank_accounts (id, user_id, bank_code, account_masked, account_hash, status) VALUES ('b1', 'u1', 'VCB', '•••• 6789', ?, 'active')").run(await accountHash('0123456789'));
     const env = { DB: t.d1, SEPAY_WEBHOOK_KEY: 'secret-key' } as unknown as Env;
     const payload = { id: 1, gateway: 'Vietcombank', transactionDate: '2026-09-27 10:24:00', accountNumber: '0123456789', content: 'GRAB thanh toan', transferType: 'out', transferAmount: 85000, referenceCode: 'FT001' };
     const send = (key: string) =>
@@ -46,6 +46,8 @@ describe.skipIf(!hasDb)('POST /api/webhooks/sepay', () => {
 
     const tx = (ref: string, content: string) => call('/api/webhooks/sepay', 'POST', '', { id: ref, gateway: 'Vietcombank', transactionDate: '2026-09-27 10:00:00', accountNumber: '0123456789', content, transferType: 'in', transferAmount: 2000, referenceCode: ref });
     await tx('FT1', 'chuyen tien');
+    const txCount = () => (t.raw.prepare("SELECT COUNT(*) AS n FROM transactions WHERE user_id = 'u1'").get() as { n: number }).n;
+    expect(txCount()).toBe(0); // chưa xác thực → chưa ghi vào sổ
     expect((await call('/api/integrations/sepay/verify', 'POST', 'tok-u1')).status).toBe(409);
     const code = (t.raw.prepare("SELECT verify_code FROM bank_accounts WHERE user_id = 'u1'").get() as { verify_code: string }).verify_code;
     expect(code).toMatch(/^AT[A-Z0-9]{6}$/);
@@ -53,5 +55,6 @@ describe.skipIf(!hasDb)('POST /api/webhooks/sepay', () => {
     const ok = await call('/api/integrations/sepay/verify', 'POST', 'tok-u1');
     expect(ok.status).toBe(200);
     expect(((await ok.json()) as any).data.status).toBe('active');
+    expect(txCount()).toBe(2); // xác thực xong → ghi bù cả 2 giao dịch đã nhận
   });
 });

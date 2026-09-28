@@ -12,7 +12,8 @@ import { randomToken } from '../lib/crypto';
 import { ApiError, ok } from '../lib/http';
 import { writeAudit } from '../lib/audit';
 import { body, dateString } from '../lib/validate';
-import { accountHash, digitsOnly, maskAccount, newVerifyCode } from '../integrations/sepay/webhook';
+import { accountHash, digitsOnly, maskAccount, newVerifyCode, replayPendingEvents } from '../integrations/sepay/webhook';
+import { afterChange } from '../lib/refresh';
 import { authUrl, exchangeCode, googleConfigured, pkceChallenge, redirectUri, revokeToken } from '../integrations/google/oauth';
 import { loadIntegration, readRefreshToken, saveTokens } from '../integrations/tokens';
 import { ensureAppCalendar, syncGoogleWeek } from '../integrations/google/sync';
@@ -108,6 +109,9 @@ export const integrations = new Hono<AppEnv>()
     const now = new Date().toISOString();
     await c.env.DB.prepare("UPDATE bank_accounts SET status = 'active', verified_at = ? WHERE id = ?").bind(now, bank.id).run();
     await writeAudit(c.env.DB, { userId, actor: 'user', agent: 'bank', action: 'bank.verify', entityType: 'bank_account', entityId: bank.id, summaryMasked: `Xác thực tài khoản ${bank.bank_code} sau khi nhận giao dịch có mã xác thực`, dataLabel: 'Tài khoản ngân hàng (đã che số)', status: 'approved', approver: 'user' }, { salt: c.env.AUDIT_HASH_SALT });
+    // Ghi bù giao dịch nhận được trong lúc chờ xác thực.
+    const replayed = await replayPendingEvents(c.env, { id: bank.id, user_id: userId, created_at: bank.created_at });
+    if (replayed) await afterChange(c.env.DB, userId, { title: 'Nhận giao dịch từ ngân hàng' });
     return ok(c, toBank({ ...bank, status: 'active', verified_at: now }));
   })
   .delete('/sepay', async (c) => {
