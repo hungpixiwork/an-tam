@@ -188,6 +188,42 @@ const insertOption = (db: D1Database, choiceId: string, o: LifeChoiceOptionInput
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(crypto.randomUUID(), choiceId, o.title, o.description ?? '', o.cost, o.otherCost, o.durationMonths, o.monthsWithoutIncome, o.monthlyIncomeDelta, selected ? 1 : 0, idx);
 
+export interface NewLifeChoice {
+  title: string; description?: string; icon?: string; cost?: number; steps?: string[]; currentStep?: number; pinned?: boolean;
+  kind?: LifeChoiceKind; outcome?: string; incomeUpliftPct?: number; template?: (typeof TEMPLATE_KEYS)[number];
+}
+
+/**
+ * Lệnh ghi một lựa chọn mới (+ phương án / điều kiện / việc cần làm từ mẫu nếu có).
+ * `options` có giá trị → dùng thay cho phương án của mẫu (agent tạo từ câu hỏi của người dùng).
+ */
+export function lifeChoiceInsertStatements(db: D1Database, userId: string, id: string, v: NewLifeChoice, options?: LifeChoiceOptionInput[]): D1PreparedStatement[] {
+  const tpl = v.template ? lifeChoiceTemplate(v.template) : undefined;
+  const steps = v.steps?.length ? v.steps : (tpl?.steps ?? []);
+  const icon = v.icon ?? 'graduation-cap';
+  const insert = db.prepare(
+    `INSERT INTO life_choices (id, user_id, title, description, icon, cost, steps_json, current_step, pinned, kind, outcome, income_uplift_pct)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    id, userId, v.title, v.description || tpl?.description || '', tpl && icon === 'graduation-cap' ? tpl.icon : icon, v.cost || tpl?.cost || 0,
+    JSON.stringify(steps), Math.min(v.currentStep ?? 0, steps.length), v.pinned ? 1 : 0,
+    v.kind ?? tpl?.key ?? 'custom', v.outcome ?? tpl?.outcome ?? '', v.incomeUpliftPct ?? tpl?.incomeUpliftPct ?? 0,
+  );
+  const stmts = [...(v.pinned ? [db.prepare('UPDATE life_choices SET pinned = 0 WHERE user_id = ?').bind(userId)] : []), insert];
+  if (options) options.forEach((o, i) => stmts.push(insertOption(db, id, o, i, i === 0)));
+  if (tpl) {
+    // Học phí người dùng nhập áp cho mọi phương án của mẫu
+    if (!options) tpl.options.forEach((o, i) => stmts.push(insertOption(db, id, v.cost ? { ...o, cost: v.cost } : o, i, i === 0)));
+    tpl.prereqs.forEach((p, i) =>
+      stmts.push(db.prepare('INSERT INTO life_choice_prereqs (id, choice_id, title, auto_key, order_idx) VALUES (?, ?, ?, ?, ?)').bind(crypto.randomUUID(), id, p.title, p.autoKey ?? null, i)),
+    );
+    tpl.tasks.forEach((t, i) =>
+      stmts.push(db.prepare('INSERT INTO life_choice_tasks (id, choice_id, title, detail, priority, order_idx) VALUES (?, ?, ?, ?, ?, ?)').bind(crypto.randomUUID(), id, t.title, t.detail, t.priority, i)),
+    );
+  }
+  return stmts;
+}
+
 const nextIdx = async (db: D1Database, table: string, choiceId: string) =>
   ((await db.prepare(`SELECT COALESCE(MAX(order_idx), -1) + 1 AS n FROM ${table} WHERE choice_id = ?`).bind(choiceId).first<{ n: number }>())?.n ?? 0);
 
@@ -231,28 +267,7 @@ export const lifeChoices = new Hono<AppEnv>()
     const db = c.env.DB;
     const userId = c.get('userId');
     const id = crypto.randomUUID();
-    const tpl = v.template ? lifeChoiceTemplate(v.template) : undefined;
-    const steps = v.steps.length ? v.steps : (tpl?.steps ?? []);
-    const insert = db.prepare(
-      `INSERT INTO life_choices (id, user_id, title, description, icon, cost, steps_json, current_step, pinned, kind, outcome, income_uplift_pct)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(
-      id, userId, v.title, v.description || tpl?.description || '', tpl && v.icon === 'graduation-cap' ? tpl.icon : v.icon, v.cost || tpl?.cost || 0,
-      JSON.stringify(steps), Math.min(v.currentStep, steps.length), v.pinned ? 1 : 0,
-      v.kind ?? tpl?.key ?? 'custom', v.outcome ?? tpl?.outcome ?? '', v.incomeUpliftPct ?? tpl?.incomeUpliftPct ?? 0,
-    );
-    const stmts = [...(v.pinned ? [db.prepare('UPDATE life_choices SET pinned = 0 WHERE user_id = ?').bind(userId)] : []), insert];
-    if (tpl) {
-      // Học phí người dùng nhập áp cho mọi phương án của mẫu
-      tpl.options.forEach((o, i) => stmts.push(insertOption(db, id, v.cost ? { ...o, cost: v.cost } : o, i, i === 0)));
-      tpl.prereqs.forEach((p, i) =>
-        stmts.push(db.prepare('INSERT INTO life_choice_prereqs (id, choice_id, title, auto_key, order_idx) VALUES (?, ?, ?, ?, ?)').bind(crypto.randomUUID(), id, p.title, p.autoKey ?? null, i)),
-      );
-      tpl.tasks.forEach((t, i) =>
-        stmts.push(db.prepare('INSERT INTO life_choice_tasks (id, choice_id, title, detail, priority, order_idx) VALUES (?, ?, ?, ?, ?, ?)').bind(crypto.randomUUID(), id, t.title, t.detail, t.priority, i)),
-      );
-    }
-    await db.batch(stmts);
+    await db.batch(lifeChoiceInsertStatements(db, userId, id, v));
     return ok(c, { id }, 201);
   })
   .get('/:id', async (c) => {

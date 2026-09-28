@@ -58,6 +58,30 @@ export const notionPayload = z.object({
   sections: z.array(z.string().max(200)).max(10),
 });
 
+/** Phương án ngã rẽ lớn (cùng khuôn với POST /api/life-choices/:id/options). */
+export const lifeChoicePayload = z.object({
+  title: z.string().min(2).max(80),
+  kind: z.enum(['study', 'care', 'startup', 'switch', 'sabbatical', 'custom']),
+  option: z.object({
+    title: z.string().min(2).max(80),
+    description: z.string().max(200).default(''),
+    cost: money,
+    otherCost: money,
+    durationMonths: z.number().int().min(1).max(120),
+    monthsWithoutIncome: z.number().int().min(0).max(120),
+    monthlyIncomeDelta: z.number().int().min(-10_000_000_000).max(10_000_000_000),
+  }).refine((o) => o.monthsWithoutIncome <= o.durationMonths, { message: 'Số tháng không có thu nhập vượt quá thời gian thực hiện' }),
+  reason: z.string().max(300),
+});
+
+/** Luật cảnh báo giá (bảng alert_rules). */
+export const alertRulePayload = z.object({
+  symbol: z.string().regex(/^[A-Z][A-Z0-9]{1,9}$/),
+  label: z.string().max(40),
+  direction: z.enum(['down', 'up']),
+  thresholdPct: z.number().positive().max(100),
+});
+
 export interface ActionDef<S extends z.ZodTypeAny = z.ZodTypeAny> {
   agent: AgentKey;
   integration: ActionIntegration | 'google_calendar_or_local';
@@ -69,6 +93,8 @@ export interface ActionDef<S extends z.ZodTypeAny = z.ZodTypeAny> {
 const vnd = (n: number) => formatVndFull(n);
 const hhmm = (s: string) => s.slice(11, 16);
 const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+
+const pctText = (n: number) => `${String(Math.round(n * 10) / 10).replace('.', ',')}%`;
 
 const def = <S extends z.ZodTypeAny>(d: ActionDef<S>) => d;
 
@@ -87,7 +113,12 @@ export const ACTION_TYPES = {
   }),
   'reminder.create': def({
     agent: 'skill', integration: 'local', risk: 'low', schema: reminderPayload,
-    preview: (p) => ({ lines: [`${p.time} mỗi ngày · ${p.dates.length} ngày (${ddmm(p.dates[0])}–${ddmm(p.dates[p.dates.length - 1])})`] }),
+    preview: (p) => {
+      const range = `${ddmm(p.dates[0])}–${ddmm(p.dates[p.dates.length - 1])}`;
+      // Ngày cách nhau đúng 1 ngày → nhắc mỗi ngày; còn lại (vd mùng 5 hằng tháng) → số lần nhắc
+      const daily = p.dates.every((d, i) => i === 0 || Date.parse(d) - Date.parse(p.dates[i - 1]) === 86_400_000);
+      return { lines: [daily ? `${p.time} mỗi ngày · ${p.dates.length} ngày (${range})` : `${p.time} · ${p.dates.length} lần nhắc (${range})`] };
+    },
   }),
   'gmail.send': def({
     agent: 'planner', integration: 'gmail', risk: 'high', schema: gmailPayload,
@@ -96,6 +127,23 @@ export const ACTION_TYPES = {
   'sheets.update_budget': def({
     agent: 'cashflow', integration: 'google_sheets', risk: 'mid', schema: sheetsPayload,
     preview: (p) => ({ after: vnd(p.limit), lines: [`Tháng ${p.month.slice(5)}/${p.month.slice(0, 4)}`] }),
+  }),
+  'life_choice.create': def({
+    agent: 'goal', integration: 'local', risk: 'low', schema: lifeChoicePayload,
+    preview: (p) => ({
+      after: p.option.title,
+      lines: [
+        `Thời gian: ${p.option.durationMonths} tháng`,
+        ...(p.option.cost ? [`Chi phí chính: ${vnd(p.option.cost)}`] : []),
+        ...(p.option.otherCost ? [`Chi phí khác trong thời gian thực hiện: ${vnd(p.option.otherCost)}`] : []),
+        p.option.monthsWithoutIncome ? `${p.option.monthsWithoutIncome} tháng không có thu nhập` : p.option.monthlyIncomeDelta < 0 ? `Thu nhập giảm ${vnd(-p.option.monthlyIncomeDelta)}/tháng` : 'Vẫn giữ thu nhập',
+        p.reason,
+      ],
+    }),
+  }),
+  'alert_rule.create': def({
+    agent: 'planner', integration: 'local', risk: 'low', schema: alertRulePayload,
+    preview: (p) => ({ after: `Báo khi ${p.label} ${p.direction === 'down' ? 'giảm' : 'tăng'} từ ${pctText(p.thresholdPct)} trở lên`, lines: ['Chỉ báo tin, không tự mua bán'] }),
   }),
   'notion.weekly_report': def({
     agent: 'planner', integration: 'notion', risk: 'low', schema: notionPayload,

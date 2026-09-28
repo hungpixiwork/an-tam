@@ -15,6 +15,9 @@ import { afterChange } from '../lib/refresh';
 import { loadIntegration } from '../integrations/tokens';
 import { pushApproved, syncInfo } from '../integrations/google/sync';
 import { getAccessToken } from '../integrations/tokens';
+import { lifeChoiceInsertStatements } from '../routes/lifeChoices';
+import { userPlan } from '../lib/usage';
+import { PLANS, PLAN_LABEL } from '../../shared/plans';
 
 interface Row { id: string; run_id: string | null; agent: string | null; type: string; title: string; payload_json: string; status: AgentActionStatus; expires_at: string }
 
@@ -107,6 +110,39 @@ async function prepare(env: Env, userId: string, row: Row, type: ActionType): Pr
         ),
         result: { eventIds: ids, count: ids.length },
         summary: `Tạo ${ids.length} nhắc nhở`,
+      };
+    }
+    case 'life_choice.create': {
+      const p = payload as ReturnType<typeof ACTION_TYPES['life_choice.create']['schema']['parse']>;
+      const choiceId = crypto.randomUUID();
+      return {
+        statements: lifeChoiceInsertStatements(db, userId, choiceId, {
+          title: p.title, description: p.option.description, cost: p.option.cost, kind: p.kind,
+          template: p.kind === 'custom' ? undefined : p.kind,
+        }, [p.option]),
+        result: { choiceId },
+        summary: `Lưu phương án "${p.option.title}" vào Lựa chọn cuộc đời`,
+      };
+    }
+    case 'alert_rule.create': {
+      const p = payload as ReturnType<typeof ACTION_TYPES['alert_rule.create']['schema']['parse']>;
+      let count: number;
+      try {
+        count = (await db.prepare('SELECT COUNT(*) AS n FROM alert_rules WHERE user_id = ?').bind(userId).first<{ n: number }>())?.n ?? 0;
+      } catch (err) {
+        if (err instanceof Error && /no such table/i.test(err.message)) throw new Error('Chưa hỗ trợ cảnh báo giá');
+        throw err;
+      }
+      const { plan } = await userPlan(db, userId);
+      const max = PLANS[plan].alertRules;
+      if (count >= max) throw new Error(`Gói ${PLAN_LABEL[plan]} đặt tối đa ${max} cảnh báo giá`);
+      const ruleId = crypto.randomUUID();
+      return {
+        statements: [
+          db.prepare('INSERT INTO alert_rules (id, user_id, symbol, direction, threshold_pct) VALUES (?, ?, ?, ?, ?)').bind(ruleId, userId, p.symbol, p.direction, p.thresholdPct),
+        ],
+        result: { ruleId, symbol: p.symbol },
+        summary: `Bật cảnh báo giá ${p.label}`,
       };
     }
     case 'gmail.send':

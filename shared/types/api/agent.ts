@@ -65,6 +65,8 @@ export interface AgentRunView {
   tools: string[];
   /** Lượt AI đã dùng hôm nay / hạn mức theo gói (chỉ có trong phản hồi POST /runs). */
   aiQuota?: { used: number; limit: number };
+  /** Câu trả lời ngắn cho người dùng (số do engine tính; có thể được AI diễn đạt lại, số giữ nguyên). */
+  reply?: string;
 }
 
 export type AgentKeyName = 'planner' | 'calendar' | 'cashflow' | 'skill' | 'goal';

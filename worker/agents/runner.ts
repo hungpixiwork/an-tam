@@ -3,13 +3,20 @@
 
 import type { Env } from '../env';
 import type { AgentActionView, AgentRunSource, AgentRunView, AgentStepView, PlannedEventView } from '../../shared/types/api';
-import { sanitizePrompt } from '../../shared/agent/sanitize';
-import { fold, mergeIntents, parseIntentRules, type IntentResult } from '../../shared/agent/intent';
-import { planRun, type PlannerContext } from '../../shared/agent/planner';
+import { maskWithPlaceholders, sanitizePrompt } from '../../shared/agent/sanitize';
+import {
+  fold, mergeIntents, mergeParams, paramsFromLLM, parseIntentRules, parseParamsRules, type Intent, type IntentParams, type IntentResult,
+} from '../../shared/agent/intent';
+import {
+  planAlert, planDesk, planLifeDecision, planRun, type ActionDraft, type PlannerContext, type PlanResult, type StepDraft,
+} from '../../shared/agent/planner';
 import { previewAction } from '../../shared/agent/actions';
-import { TOOL_KEYS } from '../../shared/agent/tools';
+import { AGENT_KEYS, TOOL_KEYS } from '../../shared/agent/tools';
 import { addDays, weekStartOf } from '../../shared/engine/scheduler';
-import { classifyIntentLLM } from './llm';
+import { PLANS } from '../../shared/plans';
+import { classifyLLM, narrateReply } from './llm';
+import { loadUserState } from '../lib/state';
+import { userPlan } from '../lib/usage';
 import { loadBills, loadEventsBetween } from '../routes/calendar';
 import { syncInfo } from '../integrations/google/sync';
 import { writeAudit, maskSummary } from '../lib/audit';
@@ -60,7 +67,64 @@ const targetWeek = (maskedPrompt: string, explicit?: string) => {
   return /tuan nay|this week/.test(fold(maskedPrompt)) ? thisWeek : addDays(thisWeek, 7);
 };
 
-export async function runAgent(env: Env, userId: string, input: RunInput): Promise<string> {
+/** Bàn đầu tư (làm sau): nhận mã, trả câu phân tích + các bước. Chưa có → planner dùng ghi chú tất định. */
+export type DeskHook = (symbol: string) => Promise<{ reply?: string; steps?: StepDraft[] } | null>;
+export interface RunHooks { deskHook?: DeskHook }
+
+const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+const SPECIAL = new Set<Intent>(['life_decision', 'set_alert', 'ask_desk']);
+
+/** Ghép kế hoạch tuần (ý định cũ) với quyết định lớn / cảnh báo giá / hỏi về mã. */
+async function buildPlan(
+  env: Env, userId: string, ctx: PlannerContext, intent: IntentResult, params: IntentParams, maskedPrompt: string, hooks: RunHooks,
+): Promise<PlanResult & { reply: string }> {
+  const want = (i: Intent) => intent.intents.includes(i);
+  const week = intent.intents.filter((i) => !SPECIAL.has(i));
+  const steps: StepDraft[] = [];
+  const actions: ActionDraft[] = [];
+  const replies: string[] = [];
+  let weekPlan: PlanResult | null = null;
+  if (week.length || !intent.intents.some((i) => SPECIAL.has(i))) {
+    weekPlan = planRun(ctx, week.length ? week : ['plan_week']);
+    steps.push(...weekPlan.steps);
+    actions.push(...weekPlan.actions);
+    replies.push(weekPlan.actions.length
+      ? `An Tâm đã lập kế hoạch tuần ${ddmm(ctx.weekStart)} với ${weekPlan.actions.length} việc chờ bạn duyệt.`
+      : 'Tuần này chưa có việc cần đề xuất thêm.');
+  }
+  const needState = (want('life_decision') && params.life) || want('ask_desk');
+  const state = needState ? await loadUserState(env.DB, userId) : null;
+  if (!weekPlan && state) {
+    steps.push({ agent: 'planner', kind: 'plan', title: 'Phân tích dữ liệu cá nhân', detail: 'Đọc thu chi, tài sản, mục tiêu (đã ẩn số liệu)' });
+  }
+  if (want('life_decision') && params.life && state) {
+    const p = planLifeDecision(state, params.life, { budgetLimit: ctx.budgetLimit, lastMonthExpense: ctx.lastMonthExpense, maskedPrompt });
+    steps.push(...p.steps);
+    actions.push(...p.actions);
+    replies.push(p.reply);
+  }
+  if (want('set_alert') && params.alert) {
+    const { plan } = await userPlan(env.DB, userId);
+    const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM alert_rules WHERE user_id = ?').bind(userId).first<{ n: number }>()
+      .then((r) => r?.n ?? 0).catch(() => null); // bảng chưa có → để bước duyệt báo rõ
+    const p = planAlert(params.alert, { count, max: PLANS[plan].alertRules });
+    steps.push(...p.steps);
+    actions.push(...p.actions);
+    replies.push(p.reply);
+  }
+  if (want('ask_desk') && state) {
+    const symbol = params.desk?.symbol ?? null;
+    const p = planDesk(state, symbol);
+    const desk = symbol && hooks.deskHook ? await hooks.deskHook(symbol).catch(() => null) : null;
+    steps.push(...p.steps, ...(desk?.steps ?? []));
+    replies.push(desk?.reply ?? p.reply);
+  }
+  const agents = AGENT_KEYS.filter((k) => k === 'planner' || actions.some((a) => a.agent === k) || steps.some((s) => s.agent === k));
+  const intents = weekPlan ? [...weekPlan.intents, ...intent.intents.filter((i) => SPECIAL.has(i))] : intent.intents;
+  return { agents, intents, steps, actions, reply: replies.join(' ') };
+}
+
+export async function runAgent(env: Env, userId: string, input: RunInput, hooks: RunHooks = {}): Promise<string> {
   const db = env.DB;
   const masked = sanitizePrompt(input.prompt);
   const note = input.note ? sanitizePrompt(input.note) : undefined;
@@ -80,10 +144,16 @@ export async function runAgent(env: Env, userId: string, input: RunInput): Promi
   ]);
 
   try {
-    const rules = parseIntentRules(note ? `${masked} ${note}` : masked);
-    const intent: IntentResult = mergeIntents(await classifyIntentLLM(env, masked, userId), rules);
+    // AI và luật đọc câu có ký hiệu (AMT_1, DUR_1…) — số thật chỉ nằm trong `ph.map`, không lưu
+    const ph = maskWithPlaceholders(input.prompt);
+    const rules = parseIntentRules(note ? `${ph.masked} ${note}` : ph.masked);
+    const llm = await classifyLLM(env, ph.masked, userId);
+    const intent: IntentResult = mergeIntents(llm?.intents ?? null, rules);
+    const params = mergeParams(llm ? paramsFromLLM(llm, ph.map) : null, parseParamsRules(ph.masked, ph.map, intent.intents));
     const weekStart = targetWeek(masked, input.weekStart);
-    const plan = planRun(await loadContext(env, userId, weekStart, note), intent.intents);
+    const ctx = await loadContext(env, userId, weekStart, note);
+    const plan = await buildPlan(env, userId, ctx, intent, params, ph.masked, hooks);
+    const reply = await narrateReply(env, userId, plan.reply);
     const created = new Date();
     const expires = new Date(created.getTime() + ACTION_TTL_MS).toISOString();
     const actionSource = source === 'user' ? 'agent' : source;
@@ -103,7 +173,7 @@ export async function runAgent(env: Env, userId: string, input: RunInput): Promi
         ),
       ),
       db.prepare('UPDATE agent_runs SET intent = ?, agents_json = ?, status = ?, updated_at = ?, completed_at = ? WHERE id = ?').bind(
-        JSON.stringify({ intents: plan.intents, source: intent.source, weekStart }),
+        JSON.stringify({ intents: plan.intents, source: intent.source, weekStart, reply: reply.text, narrated: reply.narrated }),
         JSON.stringify(plan.agents),
         plan.actions.length ? 'awaiting_approval' : 'completed',
         created.toISOString(),
@@ -162,7 +232,7 @@ export async function loadRunView(db: D1Database, userId: string, runId: string)
       .bind(runId, userId).all<{ id: string; idx: number; agent: string; kind: AgentStepView['kind']; title: string; detail_masked: string | null; status: AgentStepView['status']; started_at: string }>(),
     db.prepare(`SELECT ${ACTION_COLS} FROM agent_actions WHERE run_id = ? AND user_id = ? ORDER BY created_at`).bind(runId, userId).all<ActionRow>(),
   ]);
-  const intent = run.intent ? (JSON.parse(run.intent) as { intents: string[]; source: 'rules' | 'llm'; weekStart: string }) : null;
+  const intent = run.intent ? (JSON.parse(run.intent) as { intents: string[]; source: 'rules' | 'llm'; weekStart: string; reply?: string }) : null;
   const cal = actions.results.find((a) => a.type === 'calendar.create_events');
   const plannedEvents: PlannedEventView[] = cal ? (JSON.parse(cal.payload_json) as { events: PlannedEventView[] }).events : [];
   const used = new Set<string>(['google_calendar']);
@@ -177,6 +247,7 @@ export async function loadRunView(db: D1Database, userId: string, runId: string)
     actions: actions.results.map(toActionView),
     plannedEvents,
     tools: TOOL_KEYS.filter((k) => used.has(k)),
+    ...(intent?.reply ? { reply: intent.reply } : {}),
   };
 }
 
