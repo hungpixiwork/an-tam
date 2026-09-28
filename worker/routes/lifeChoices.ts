@@ -14,6 +14,7 @@ import { LIFE_CHOICE_TEMPLATES, lifeChoiceTemplate } from '../../shared/data/lif
 import { ApiError, notFound, ok } from '../lib/http';
 import { body, money } from '../lib/validate';
 import { loadUserState } from '../lib/state';
+import { loadSignals } from './signals';
 
 const KINDS = ['study', 'care', 'startup', 'switch', 'sabbatical', 'custom'] as const;
 const TEMPLATE_KEYS = ['study', 'care', 'startup', 'switch', 'sabbatical'] as const;
@@ -56,6 +57,7 @@ const optionSchema = z
     durationMonths: z.number().int().min(1).max(120).default(12),
     monthsWithoutIncome: z.number().int().min(0).max(120).default(0),
     monthlyIncomeDelta: z.number().int().min(-10_000_000_000).max(10_000_000_000).default(0),
+    cutPct: z.number().min(0).max(0.9).optional(),
   })
   .refine((o) => o.monthsWithoutIncome <= o.durationMonths, { message: 'Số tháng không có thu nhập vượt quá thời gian thực hiện', path: ['monthsWithoutIncome'] });
 
@@ -165,7 +167,8 @@ async function loadDetail(db: D1Database, row: Row, userId: string): Promise<Lif
   const state = await loadUserState(db, userId);
   const choice = toChoice(row);
   const pre = toPrereqs(prereqs.results as unknown as PrereqRow[], state);
-  const ctx = { kind: choice.kind, incomeUpliftPct: choice.incomeUpliftPct, prereqsDone: pre.filter((p) => p.done).length, prereqsTotal: pre.length };
+  const signals = await loadSignals(db, userId, state);
+  const ctx = { kind: choice.kind, incomeUpliftPct: choice.incomeUpliftPct, prereqsDone: pre.filter((p) => p.done).length, prereqsTotal: pre.length, signals };
   const opts = (options.results as unknown as OptionRow[]).map((o) => ({
     id: o.id, selected: o.selected === 1, ...toOptionInput(o), evaluation: evaluateLifeChoice(state, toOptionInput(o), ctx),
   }));
@@ -205,7 +208,7 @@ export const lifeChoices = new Hono<AppEnv>()
       return ok(c, opt.evaluation);
     }
     const state = await loadUserState(db, userId);
-    return ok(c, evaluateLifeChoice(state, v.option, v));
+    return ok(c, evaluateLifeChoice(state, v.option, { ...v, signals: await loadSignals(db, userId, state) }));
   })
   .post('/compare', body(compareSchema), async (c) => {
     const v = c.req.valid('json');
@@ -217,7 +220,8 @@ export const lifeChoices = new Hono<AppEnv>()
       result = detail.options.map(({ id: _id, selected: _s, ...o }) => o);
     } else {
       const state = await loadUserState(db, userId);
-      result = v.options.map((o) => ({ ...o, evaluation: evaluateLifeChoice(state, o, { kind: v.kind, incomeUpliftPct: v.incomeUpliftPct, prereqsDone: 0, prereqsTotal: 0 }) }));
+      const signals = await loadSignals(db, userId, state);
+      result = v.options.map((o) => ({ ...o, evaluation: evaluateLifeChoice(state, o, { kind: v.kind, incomeUpliftPct: v.incomeUpliftPct, prereqsDone: 0, prereqsTotal: 0, signals }) }));
     }
     const recommendedIndex = result.reduce((b, o, i) => (o.evaluation.feasibility > result[b].evaluation.feasibility ? i : b), 0);
     return ok<LifeChoiceCompare>(c, { options: result, recommendedIndex });

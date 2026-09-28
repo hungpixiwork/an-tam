@@ -14,3 +14,4 @@ export * from './lifeChoices';
 export * from './safety';
 export * from './allocation';
 export * from './market';
+export * from './signals';
