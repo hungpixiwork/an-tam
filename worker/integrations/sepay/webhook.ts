@@ -35,6 +35,19 @@ export function sepayAuthorized(header: string | undefined, key: string | undefi
   return !!m && timingSafeEqual(m[1].trim(), key);
 }
 
+/** Mã xác thực chủ tài khoản: "AT" + 6 ký tự chữ in hoa/số (ngẫu nhiên an toàn). */
+export function newVerifyCode(): string {
+  const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // bỏ 0/O, 1/I để dễ gõ — 32 ký tự nên chia hết 256, không lệch
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  return `AT${[...bytes].map((b) => ALPHABET[b % ALPHABET.length]).join('')}`;
+}
+
+/** Nội dung chuyển khoản có chứa mã không (không phân biệt hoa thường, bỏ khoảng trắng). */
+export const hasVerifyCode = (content: string, code: string) => {
+  const squash = (s: string) => s.replace(/\s+/g, '').toUpperCase();
+  return squash(content).includes(squash(code));
+};
+
 /** Bỏ dấu tiếng Việt, về chữ thường — để dò từ khóa trong nội dung chuyển khoản. */
 const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase();
 
@@ -71,18 +84,35 @@ export async function handleSepayEvent(env: { DB: D1Database; AUDIT_HASH_SALT?: 
   const db = env.DB;
   const externalId = (p.referenceCode || '').trim() || `id:${p.id}`;
   const bank = await db
-    .prepare("SELECT id, user_id FROM bank_accounts WHERE account_hash = ? AND status != 'revoked' ORDER BY created_at DESC LIMIT 1")
+    .prepare("SELECT id, user_id, status, verify_code FROM bank_accounts WHERE account_hash = ? AND status != 'revoked' ORDER BY created_at DESC LIMIT 1")
     .bind(await accountHash(p.accountNumber))
-    .first<{ id: string; user_id: string }>();
+    .first<{ id: string; user_id: string; status: string; verify_code: string | null }>();
 
   // Lưu payload đã bỏ số tài khoản đầy đủ
   const stored = JSON.stringify({ ...p, accountNumber: maskAccount(p.accountNumber) });
+  let eventId: string = crypto.randomUUID();
   const ins = await db
     .prepare("INSERT OR IGNORE INTO bank_webhook_events (id, provider, external_id, user_id, payload_json) VALUES (?, 'sepay', ?, ?, ?)")
-    .bind(crypto.randomUUID(), externalId, bank?.user_id ?? null, stored)
+    .bind(eventId, externalId, bank?.user_id ?? null, stored)
     .run();
-  if (!ins.meta.changes) return { status: 'duplicate' };
+  if (!ins.meta.changes) {
+    // Trùng: nếu lần trước chưa khớp được ai (liên kết sau khi SePay gửi) mà giờ đã khớp → gán lại và ghi giao dịch.
+    // Giao dịch vẫn không bị nhân đôi nhờ INSERT OR IGNORE + idx_transactions_external.
+    const prev = await db
+      .prepare("SELECT id, user_id FROM bank_webhook_events WHERE provider = 'sepay' AND external_id = ?")
+      .bind(externalId)
+      .first<{ id: string; user_id: string | null }>();
+    if (!prev || prev.user_id !== null || !bank) return { status: 'duplicate' };
+    const claimed = await db.prepare('UPDATE bank_webhook_events SET user_id = ? WHERE id = ? AND user_id IS NULL').bind(bank.user_id, prev.id).run();
+    if (!claimed.meta.changes) return { status: 'duplicate' };
+    eventId = prev.id;
+  }
   if (!bank) return { status: 'unmatched' };
+
+  // Giao dịch xác thực: nội dung chứa mã của tài khoản đang chờ → ghi nhận để POST /sepay/verify cho kích hoạt.
+  if (bank.status === 'pending' && bank.verify_code && hasVerifyCode(`${p.content} ${p.description ?? ''}`, bank.verify_code)) {
+    await db.prepare('UPDATE bank_accounts SET verified_by_event_id = ? WHERE id = ? AND verified_by_event_id IS NULL').bind(eventId, bank.id).run();
+  }
 
   const kind = p.transferType === 'in' ? 'income' : 'expense';
   const category = autoCategory(kind, p.content);

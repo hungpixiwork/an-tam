@@ -4,18 +4,29 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppEnv } from '../env';
 import { formatVnd } from '../../shared/format';
+import { auditUserWrite } from '../lib/audit';
 import { notFound, ok } from '../lib/http';
 import { afterChange } from '../lib/refresh';
 import { loadUserState, type LoadedState } from '../lib/state';
 import { body, money } from '../lib/validate';
 
+const LIABILITY_KINDS = ['mortgage', 'consumer', 'credit_card', 'student', 'other'] as const;
+
 const liabilitySchema = z.object({
   name: z.string().trim().min(1, 'Vui lòng nhập tên khoản nợ').max(60),
-  kind: z.enum(['mortgage', 'consumer', 'credit_card', 'student', 'other']).default('other'),
+  kind: z.enum(LIABILITY_KINDS).default('other'),
   balance: money,
   monthlyPayment: money.default(0),
   rateBp: z.number().int().min(0).max(10000).default(0),
 });
+
+const KIND_LABEL: Record<(typeof LIABILITY_KINDS)[number], string> = {
+  mortgage: 'vay mua nhà', consumer: 'vay tiêu dùng', credit_card: 'thẻ tín dụng', student: 'vay học phí', other: 'khác',
+};
+
+/** Nhật ký không ghi tên khoản nợ hay số tiền — chỉ loại thao tác. */
+const liabilityAudit = (action: 'create' | 'update' | 'delete', summary: string, id: string | null) =>
+  ({ agent: 'cashflow', action: `liability.${action}`, entityType: 'liability', entityId: id, summary, dataLabel: 'Khoản nợ (đã ẩn danh)' });
 
 const debtLine = (s: LoadedState) => `Tổng nợ: ${formatVnd((s.liabilities ?? []).reduce((t, l) => t + l.balance, 0))}.`;
 
@@ -33,6 +44,7 @@ export const liabilities = new Hono<AppEnv>()
       .bind(id, userId, l.name, l.kind, l.balance, l.monthlyPayment, l.rateBp, userId)
       .run();
     await afterChange(c.env.DB, userId, { title: 'Cập nhật khoản nợ', detail: debtLine, before });
+    await auditUserWrite(c.env, userId, liabilityAudit('create', `Thêm khoản nợ loại ${KIND_LABEL[l.kind]}`, id));
     return ok(c, { id }, 201);
   })
   .patch('/:id', body(liabilitySchema.partial()), async (c) => {
@@ -47,6 +59,7 @@ export const liabilities = new Hono<AppEnv>()
       .run();
     if (!res.meta.changes) throw notFound('Không tìm thấy khoản nợ');
     await afterChange(c.env.DB, userId, { title: 'Cập nhật khoản nợ', detail: debtLine, before });
+    await auditUserWrite(c.env, userId, liabilityAudit('update', 'Cập nhật thông tin khoản nợ', c.req.param('id')));
     return ok(c, null);
   })
   .delete('/:id', async (c) => {
@@ -55,5 +68,6 @@ export const liabilities = new Hono<AppEnv>()
     const res = await c.env.DB.prepare('DELETE FROM liabilities WHERE id = ? AND user_id = ?').bind(c.req.param('id'), userId).run();
     if (!res.meta.changes) throw notFound('Không tìm thấy khoản nợ');
     await afterChange(c.env.DB, userId, { title: 'Cập nhật khoản nợ', detail: debtLine, before });
+    await auditUserWrite(c.env, userId, liabilityAudit('delete', 'Xóa một khoản nợ', c.req.param('id')));
     return ok(c, null);
   });

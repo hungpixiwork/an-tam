@@ -18,17 +18,20 @@ function InfoTip({ text }: { text: string }) {
   );
 }
 
-function FundSummary({ data }: { data: SafetyData }) {
-  const { t, locale } = useLocale();
-  const { fund } = data;
-  const months = decimal(fund.months, locale);
-  const Row = ({ dot, label, value }: { dot: string; label: string; value: ReactNode }) => (
+function Row({ dot, label, value }: { dot: string; label: string; value: ReactNode }) {
+  return (
     <div className="flex items-center gap-3">
       <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: dot }} aria-hidden />
       <span className="min-w-0 flex-1 text-[13px] text-ink">{label}</span>
       <span className="shrink-0 text-[16px] font-extrabold tabular-nums text-ink">{value}</span>
     </div>
   );
+}
+
+function FundSummary({ data }: { data: SafetyData }) {
+  const { t, locale } = useLocale();
+  const { fund } = data;
+  const months = decimal(fund.months, locale);
   return (
     <div className="min-w-0 flex-1">
       <div className="flex items-start gap-3">

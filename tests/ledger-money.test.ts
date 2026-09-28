@@ -8,6 +8,11 @@ describe('chia đều chi phí', () => {
     expect(splitEvenly(1_000_000, 3)).toEqual([334_000, 333_000, 333_000]);
     expect(splitEvenly(850_500, 4).reduce((a, b) => a + b, 0)).toBe(850_500);
   });
+  it('không ai phải trả số âm khi chia nhiều người', () => {
+    const shares = splitEvenly(50_000, 30);
+    expect(shares.every((s) => s >= 0)).toBe(true);
+    expect(shares.reduce((a, b) => a + b, 0)).toBe(50_000);
+  });
   it('link VietQR có số tiền và tên không dấu', () => {
     const url = vietQrUrl({ bankBin: '970436', accountNo: '0123456789', accountName: 'Phạm Phú Nguyễn Hưng' }, 333_000, 'Chia tien');
     expect(url).toContain('https://img.vietqr.io/image/970436-0123456789-compact2.png?');

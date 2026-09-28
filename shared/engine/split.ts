@@ -11,7 +11,8 @@ export function splitEvenly(total: number, people: number): number[] {
   if (!Number.isInteger(total) || total <= 0) throw new Error('total must be a positive integer');
   if (!Number.isInteger(people) || people < 1) throw new Error('people must be >= 1');
   if (people === 1) return [total];
-  const each = Math.round(total / people / SPLIT_ROUNDING) * SPLIT_ROUNDING;
+  // floor (không round): nếu làm tròn lên, phần người trả có thể thành âm (vd 50.000 / 30 người).
+  const each = Math.floor(total / people / SPLIT_ROUNDING) * SPLIT_ROUNDING;
   const others = Array.from({ length: people - 1 }, () => each);
   return [total - each * (people - 1), ...others];
 }

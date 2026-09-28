@@ -9,6 +9,7 @@ import { billStatus } from '../../shared/engine/bills';
 import { categoryOf } from '../../shared/engine/ledger';
 import { addMonths, vnDate } from '../../shared/engine/month';
 import { formatVndFull } from '../../shared/format';
+import { auditUserWrite } from '../lib/audit';
 import { ApiError, notFound, ok } from '../lib/http';
 import { afterChange } from '../lib/refresh';
 import { loadUserState } from '../lib/state';
@@ -24,6 +25,20 @@ const billSchema = z.object({
   autoRenew: z.boolean().default(false),
   icon: z.enum(BILL_ICONS).default('receipt'),
 });
+
+// Sửa: mọi trường tùy chọn, KHÔNG có .default() — trường không gửi thì giữ nguyên giá trị đã lưu.
+const billPatchSchema = z.object({
+  name: z.string().trim().min(1, 'Nhập tên hóa đơn').max(60).optional(),
+  amount: money.positive('Số tiền phải lớn hơn 0').optional(),
+  category: z.string().refine((k) => categoryOf(k)?.kind === 'expense', 'Danh mục chi không hợp lệ').optional(),
+  dayOfMonth: z.number().int().min(1).max(31).optional(),
+  autoRenew: z.boolean().optional(),
+  icon: z.enum(BILL_ICONS).optional(),
+});
+
+/** Nhật ký không ghi tên hóa đơn hay số tiền — chỉ loại thao tác. */
+const billAudit = (action: 'create' | 'update' | 'delete' | 'paid', summary: string, id: string) =>
+  ({ agent: 'cashflow', action: `bill.${action}`, entityType: 'bill', entityId: id, summary, dataLabel: 'Hóa đơn định kỳ (đã ẩn danh)' });
 
 interface Row { id: string; name: string; amount: number; category: string; day_of_month: number; auto_renew: number; icon: string }
 
@@ -48,19 +63,29 @@ export const bills = new Hono<AppEnv>()
     await c.env.DB.prepare('INSERT INTO recurring_bills (id, user_id, name, amount, category, day_of_month, auto_renew, icon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .bind(id, c.get('userId'), b.name, b.amount, b.category, b.dayOfMonth, b.autoRenew ? 1 : 0, b.icon)
       .run();
+    await auditUserWrite(c.env, c.get('userId'), billAudit('create', 'Thêm hóa đơn định kỳ', id));
     return ok(c, { id }, 201);
   })
-  .patch('/:id', body(billSchema), async (c) => {
+  .patch('/:id', body(billPatchSchema), async (c) => {
     const b = c.req.valid('json');
-    const res = await c.env.DB.prepare('UPDATE recurring_bills SET name = ?, amount = ?, category = ?, day_of_month = ?, auto_renew = ?, icon = ? WHERE id = ? AND user_id = ?')
-      .bind(b.name, b.amount, b.category, b.dayOfMonth, b.autoRenew ? 1 : 0, b.icon, c.req.param('id'), c.get('userId'))
+    const userId = c.get('userId');
+    const cols: Record<string, unknown> = {
+      name: b.name, amount: b.amount, category: b.category, day_of_month: b.dayOfMonth,
+      auto_renew: b.autoRenew === undefined ? undefined : b.autoRenew ? 1 : 0, icon: b.icon,
+    };
+    const entries = Object.entries(cols).filter(([, v]) => v !== undefined);
+    if (!entries.length) return ok(c, null);
+    const res = await c.env.DB.prepare(`UPDATE recurring_bills SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ? AND user_id = ?`)
+      .bind(...entries.map(([, v]) => v), c.req.param('id'), userId)
       .run();
     if (!res.meta.changes) throw notFound('Không tìm thấy hóa đơn');
+    await auditUserWrite(c.env, userId, billAudit('update', 'Cập nhật hóa đơn định kỳ', c.req.param('id')));
     return ok(c, null);
   })
   .delete('/:id', async (c) => {
     const res = await c.env.DB.prepare('DELETE FROM recurring_bills WHERE id = ? AND user_id = ?').bind(c.req.param('id'), c.get('userId')).run();
     if (!res.meta.changes) throw notFound('Không tìm thấy hóa đơn');
+    await auditUserWrite(c.env, c.get('userId'), billAudit('delete', 'Xóa một hóa đơn định kỳ', c.req.param('id')));
     return ok(c, null);
   })
   .post('/:id/paid', body(z.object({ occurredOn: dateString.optional() })), async (c) => {
@@ -82,5 +107,6 @@ export const bills = new Hono<AppEnv>()
       .bind(crypto.randomUUID(), userId, bill.amount, bill.category, bill.name, occurredOn, bill.id)
       .run();
     await afterChange(db, userId, { title: 'Đã trả hóa đơn', detail: `${bill.name}: ${formatVndFull(bill.amount)}.`, before });
+    await auditUserWrite(c.env, userId, billAudit('paid', 'Đánh dấu đã trả một hóa đơn định kỳ', bill.id));
     return ok(c, null);
   });

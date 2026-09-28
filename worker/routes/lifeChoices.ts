@@ -312,7 +312,7 @@ export const lifeChoices = new Hono<AppEnv>()
     const entries = Object.entries(cols).filter(([, x]) => x !== undefined);
     const stmts = [];
     if (v.selected) stmts.push(db.prepare('UPDATE life_choice_options SET selected = 0 WHERE choice_id = ?').bind(id));
-    if (entries.length) stmts.push(db.prepare(`UPDATE life_choice_options SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ?`).bind(...entries.map(([, x]) => x), optionId));
+    if (entries.length) stmts.push(db.prepare(`UPDATE life_choice_options SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ? AND choice_id = ?`).bind(...entries.map(([, x]) => x), optionId, id));
     if (stmts.length) await db.batch(stmts);
     return ok(c, null);
   })
@@ -344,7 +344,7 @@ export const lifeChoices = new Hono<AppEnv>()
     if (cur.auto_key && v.done !== undefined) throw new ApiError(400, 'invalid_input', 'Điều kiện này được tự kiểm tra từ dữ liệu tài chính của bạn');
     const cols: Record<string, unknown> = { title: v.title, done: v.done === undefined ? undefined : v.done ? 1 : 0 };
     const entries = Object.entries(cols).filter(([, x]) => x !== undefined);
-    if (entries.length) await db.prepare(`UPDATE life_choice_prereqs SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ?`).bind(...entries.map(([, x]) => x), c.req.param('prereqId')).run();
+    if (entries.length) await db.prepare(`UPDATE life_choice_prereqs SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ? AND choice_id = ?`).bind(...entries.map(([, x]) => x), c.req.param('prereqId'), id).run();
     return ok(c, null);
   })
   .delete('/:id/prereqs/:prereqId', async (c) => {

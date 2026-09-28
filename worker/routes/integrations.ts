@@ -12,7 +12,7 @@ import { randomToken } from '../lib/crypto';
 import { ApiError, ok } from '../lib/http';
 import { writeAudit } from '../lib/audit';
 import { body, dateString } from '../lib/validate';
-import { accountHash, digitsOnly, maskAccount } from '../integrations/sepay/webhook';
+import { accountHash, digitsOnly, maskAccount, newVerifyCode } from '../integrations/sepay/webhook';
 import { authUrl, exchangeCode, googleConfigured, pkceChallenge, redirectUri, revokeToken } from '../integrations/google/oauth';
 import { loadIntegration, readRefreshToken, saveTokens } from '../integrations/tokens';
 import { ensureAppCalendar, syncGoogleWeek } from '../integrations/google/sync';
@@ -24,7 +24,10 @@ const linkSchema = z.object({
   accountNumber: z.string().trim().refine((v) => /^[\d\s-]+$/.test(v) && /^\d{6,20}$/.test(digitsOnly(v)), 'Số tài khoản gồm 6–20 chữ số'),
 });
 
-interface BankRow { id: string; bank_code: string; account_masked: string; status: BankLink['status']; verified_at: string | null; last_event_at: string | null; created_at: string; events: number }
+interface BankRow {
+  id: string; bank_code: string; account_masked: string; status: BankLink['status']; verified_at: string | null; last_event_at: string | null; created_at: string; events: number;
+  verify_code: string | null; verified_by_event_id: string | null;
+}
 
 /** Tài khoản ngân hàng đang liên kết (chưa thu hồi) + số giao dịch đã nhận kể từ khi liên kết. */
 const loadBank = (db: D1Database, userId: string) =>
@@ -77,10 +80,17 @@ export const integrations = new Hono<AppEnv>()
     const code = bankCode.toUpperCase();
     const id = crypto.randomUUID();
     const db = c.env.DB;
+    const hash = await accountHash(accountNumber);
+    // Một tài khoản chỉ thuộc một người — tránh người khác liên kết để đọc giao dịch của bạn.
+    const taken = await db
+      .prepare("SELECT 1 FROM bank_accounts WHERE account_hash = ? AND user_id != ? AND status IN ('pending', 'active') LIMIT 1")
+      .bind(hash, userId)
+      .first();
+    if (taken) throw new ApiError(409, 'account_taken', 'Tài khoản này đã được liên kết với một người dùng khác.');
     await db.batch([
       db.prepare("UPDATE bank_accounts SET status = 'revoked' WHERE user_id = ? AND status != 'revoked'").bind(userId),
-      db.prepare("INSERT INTO bank_accounts (id, user_id, provider, bank_code, account_masked, account_hash, status) VALUES (?, ?, 'sepay', ?, ?, ?, 'pending')")
-        .bind(id, userId, code, maskAccount(accountNumber), await accountHash(accountNumber)),
+      db.prepare("INSERT INTO bank_accounts (id, user_id, provider, bank_code, account_masked, account_hash, status, verify_code) VALUES (?, ?, 'sepay', ?, ?, ?, 'pending', ?)")
+        .bind(id, userId, code, maskAccount(accountNumber), hash, newVerifyCode()),
     ]);
     await writeAudit(db, { userId, actor: 'user', agent: 'bank', action: 'bank.link', entityType: 'bank_account', entityId: id, summaryMasked: `Liên kết tài khoản ${code} (chỉ đọc giao dịch), chờ xác thực`, dataLabel: 'Tài khoản ngân hàng (đã che số)', status: 'completed', approver: 'user' }, { salt: c.env.AUDIT_HASH_SALT });
     return ok(c, toBank((await loadBank(db, userId))!), 201);
@@ -91,15 +101,22 @@ export const integrations = new Hono<AppEnv>()
     const bank = await loadBank(c.env.DB, userId);
     if (!bank) throw new ApiError(404, 'not_found', 'Bạn chưa liên kết tài khoản ngân hàng');
     if (bank.status === 'active') return ok(c, toBank(bank));
-    if (!bank.events) throw new ApiError(409, 'not_verified', 'Chưa nhận được giao dịch nào từ tài khoản này. Hãy chuyển thử một khoản nhỏ rồi bấm Xác thực lại.');
+    // Chỉ kích hoạt khi đã nhận giao dịch có đúng mã xác thực (chứng minh bạn là chủ tài khoản).
+    if (!bank.verified_by_event_id) {
+      throw new ApiError(409, 'not_verified', `Chưa nhận được giao dịch xác thực. Hãy chuyển 2.000đ vào tài khoản này với nội dung ${bank.verify_code ?? ''} rồi bấm Xác thực lại.`);
+    }
     const now = new Date().toISOString();
     await c.env.DB.prepare("UPDATE bank_accounts SET status = 'active', verified_at = ? WHERE id = ?").bind(now, bank.id).run();
-    await writeAudit(c.env.DB, { userId, actor: 'user', agent: 'bank', action: 'bank.verify', entityType: 'bank_account', entityId: bank.id, summaryMasked: `Xác thực tài khoản ${bank.bank_code} sau khi nhận giao dịch đầu tiên`, dataLabel: 'Tài khoản ngân hàng (đã che số)', status: 'approved', approver: 'user' }, { salt: c.env.AUDIT_HASH_SALT });
+    await writeAudit(c.env.DB, { userId, actor: 'user', agent: 'bank', action: 'bank.verify', entityType: 'bank_account', entityId: bank.id, summaryMasked: `Xác thực tài khoản ${bank.bank_code} sau khi nhận giao dịch có mã xác thực`, dataLabel: 'Tài khoản ngân hàng (đã che số)', status: 'approved', approver: 'user' }, { salt: c.env.AUDIT_HASH_SALT });
     return ok(c, toBank({ ...bank, status: 'active', verified_at: now }));
   })
   .delete('/sepay', async (c) => {
     const userId = c.get('userId');
-    const res = await c.env.DB.prepare("UPDATE bank_accounts SET status = 'revoked' WHERE user_id = ? AND status != 'revoked'").bind(userId).run();
+    const [res] = await c.env.DB.batch([
+      c.env.DB.prepare("UPDATE bank_accounts SET status = 'revoked' WHERE user_id = ? AND status != 'revoked'").bind(userId),
+      // Ngắt liên kết → xóa nội dung gốc các sự kiện ngân hàng đã nhận (giao dịch trong sổ thu chi vẫn giữ).
+      c.env.DB.prepare("UPDATE bank_webhook_events SET payload_json = '{}' WHERE user_id = ?").bind(userId),
+    ]);
     if (res.meta.changes) await writeAudit(c.env.DB, { userId, actor: 'user', agent: 'bank', action: 'bank.unlink', entityType: 'bank_account', summaryMasked: 'Ngắt liên kết tài khoản ngân hàng', status: 'completed', approver: 'user' }, { salt: c.env.AUDIT_HASH_SALT });
     return ok(c, null);
   })

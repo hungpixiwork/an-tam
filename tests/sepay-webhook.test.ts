@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import worker from '../worker/index';
 import type { Env } from '../worker/env';
 import { accountHash } from '../worker/integrations/sepay/webhook';
+import { hashToken } from '../worker/lib/session';
 import { hasSqlite, insertUser, openMigratedD1 } from './helpers/sqlite-d1';
 
 const hasDb = await hasSqlite();
@@ -24,5 +25,33 @@ describe.skipIf(!hasDb)('POST /api/webhooks/sepay', () => {
 
     const rows = t.raw.prepare("SELECT kind, amount, category, source FROM transactions WHERE user_id = 'u1'").all();
     expect(rows.map((r: object) => ({ ...r }))).toEqual([{ kind: 'expense', amount: 85000, category: 'transport', source: 'sepay' }]);
+  });
+
+  it('liên kết: người khác không lấy được tài khoản; xác thực chỉ khi nhận giao dịch có đúng mã', async () => {
+    const t = (await openMigratedD1())!;
+    const env = { DB: t.d1, SEPAY_WEBHOOK_KEY: 'k' } as unknown as Env;
+    const call = (path: string, method: string, cookie: string, body?: object) =>
+      worker.fetch(new Request(`http://localhost${path}`, {
+        method, headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: `at_session=${cookie}` } : { Authorization: 'Apikey k' }) }, body: body ? JSON.stringify(body) : undefined,
+      }), env);
+    for (const u of ['u1', 'u2']) {
+      insertUser(t.raw, u);
+      t.raw.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)').run(await hashToken(`tok-${u}`), u, '2999-01-01T00:00:00Z');
+    }
+    const acct = { bankCode: 'VCB', accountNumber: '0123456789' };
+    expect((await call('/api/integrations/sepay/link', 'POST', 'tok-u1', acct)).status).toBe(201);
+    const taken = await call('/api/integrations/sepay/link', 'POST', 'tok-u2', acct);
+    expect(taken.status).toBe(409);
+    expect(((await taken.json()) as any).error.code).toBe('account_taken');
+
+    const tx = (ref: string, content: string) => call('/api/webhooks/sepay', 'POST', '', { id: ref, gateway: 'Vietcombank', transactionDate: '2026-09-27 10:00:00', accountNumber: '0123456789', content, transferType: 'in', transferAmount: 2000, referenceCode: ref });
+    await tx('FT1', 'chuyen tien');
+    expect((await call('/api/integrations/sepay/verify', 'POST', 'tok-u1')).status).toBe(409);
+    const code = (t.raw.prepare("SELECT verify_code FROM bank_accounts WHERE user_id = 'u1'").get() as { verify_code: string }).verify_code;
+    expect(code).toMatch(/^AT[A-Z0-9]{6}$/);
+    await tx('FT2', `xac thuc ${code.slice(0, 4).toLowerCase()} ${code.slice(4)}`);
+    const ok = await call('/api/integrations/sepay/verify', 'POST', 'tok-u1');
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as any).data.status).toBe('active');
   });
 });

@@ -24,7 +24,9 @@ export default function WorkspacePage() {
   const agents = useAgents();
   const runQ = useAgentRun(runId);
   const run = runQ.data ?? null;
-  const week = useCalendarWeek(run?.weekStart ?? new Date(Date.now() + 7 * 3_600_000 + 7 * 86_400_000).toISOString().slice(0, 10));
+  // Tính một lần khi mở trang — tránh tạo queryKey mới mỗi lần render qua nửa đêm.
+  const [defaultWeek] = useState(() => new Date(Date.now() + 7 * 3_600_000 + 7 * 86_400_000).toISOString().slice(0, 10));
+  const week = useCalendarWeek(run?.weekStart ?? defaultWeek);
   const google = useIntegrationStatus();
   const start = useStartRun();
   const approve = useApproveBatch();
