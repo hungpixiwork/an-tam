@@ -1,6 +1,7 @@
 // Lựa chọn cuộc đời (B1) — Tổng quan (lựa chọn ghim) + màn Lựa chọn cuộc đời (/lua-chon).
 
 import type { LifeChoiceReadiness } from '../../engine/lifeChoice';
+import type { DecisionMode } from './decision';
 
 export type LifeChoiceKind = 'study' | 'care' | 'startup' | 'switch' | 'sabbatical' | 'custom';
 
@@ -145,4 +146,16 @@ export interface LifeChoiceTemplate {
 export interface LifeChoiceCompare {
   options: (LifeChoiceOptionInput & { evaluation: LifeChoiceEvaluation })[];
   recommendedIndex: number;
+}
+
+/** Preview có thể lặp lại từ hồ sơ tài chính và giả định do người dùng nhập. */
+export interface LifeChoicePreview {
+  mode: DecisionMode;
+  optionId: string;
+  evaluation: LifeChoiceEvaluation;
+  expectedMonthlyIncome: number;
+  startAfterMonths: number | null;
+  goalImpactMonths: number | null;
+  assumptions: { costFactor: number; upliftFactor: number; preparationDelayMonths: number };
+  basis: string;
 }

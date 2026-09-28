@@ -9,7 +9,8 @@ import type {
   LifeChoice, LifeChoiceCompare, LifeChoiceDetail, LifeChoiceKind, LifeChoiceOptionInput, LifeChoicePrereq, LifeChoiceTask,
 } from '../../shared/types/api';
 import type { UserState } from '../../shared/types/domain';
-import { autoPrereq, evaluateLifeChoice } from '../../shared/engine/lifeChoice';
+import type { FinancialSignals } from '../../shared/types/api/signals';
+import { autoPrereq, evaluateLifeChoice, previewLifeChoice } from '../../shared/engine/lifeChoice';
 import { LIFE_CHOICE_TEMPLATES, lifeChoiceTemplate } from '../../shared/data/life-choice-templates';
 import { ApiError, notFound, ok } from '../lib/http';
 import { body, money } from '../lib/validate';
@@ -158,16 +159,16 @@ const toPrereqs = (rows: PrereqRow[], state: UserState): LifeChoicePrereq[] =>
     return { id: p.id, title: p.title, done: a.done, autoKey: p.auto_key, params: a.params };
   });
 
-async function loadDetail(db: D1Database, row: Row, userId: string): Promise<LifeChoiceDetail> {
+async function loadDetail(db: D1Database, row: Row, userId: string, cached?: { state: Awaited<ReturnType<typeof loadUserState>>; signals: FinancialSignals }): Promise<LifeChoiceDetail> {
   const [options, prereqs, tasks] = await db.batch([
     db.prepare('SELECT * FROM life_choice_options WHERE choice_id = ? ORDER BY order_idx, rowid').bind(row.id),
     db.prepare('SELECT id, title, done, auto_key FROM life_choice_prereqs WHERE choice_id = ? ORDER BY order_idx, rowid').bind(row.id),
     db.prepare('SELECT id, title, detail, priority, done FROM life_choice_tasks WHERE choice_id = ? ORDER BY order_idx, rowid').bind(row.id),
   ]);
-  const state = await loadUserState(db, userId);
+  const state = cached?.state ?? await loadUserState(db, userId);
   const choice = toChoice(row);
   const pre = toPrereqs(prereqs.results as unknown as PrereqRow[], state);
-  const signals = await loadSignals(db, userId, state);
+  const signals = cached?.signals ?? await loadSignals(db, userId, state);
   const ctx = { kind: choice.kind, incomeUpliftPct: choice.incomeUpliftPct, prereqsDone: pre.filter((p) => p.done).length, prereqsTotal: pre.length, signals };
   const opts = (options.results as unknown as OptionRow[]).map((o) => ({
     id: o.id, selected: o.selected === 1, ...toOptionInput(o), evaluation: evaluateLifeChoice(state, toOptionInput(o), ctx),
@@ -273,6 +274,25 @@ export const lifeChoices = new Hono<AppEnv>()
     const id = crypto.randomUUID();
     await db.batch(lifeChoiceInsertStatements(db, userId, id, v));
     return ok(c, { id }, 201);
+  })
+  .get('/:id/preview', async (c) => {
+    const mode = z.enum(['bull', 'base', 'bear']).safeParse(c.req.query('mode') ?? 'base');
+    if (!mode.success) throw new ApiError(400, 'invalid_input', 'Kịch bản không hợp lệ');
+    const db = c.env.DB;
+    const userId = c.get('userId');
+    const row = await ownChoice(db, c.req.param('id'), userId);
+    const state = await loadUserState(db, userId);
+    if (state.profile.monthlyExpense <= 0) throw new ApiError(422, 'missing_data', 'Cần nhập chi tiêu hàng tháng để tính kịch bản');
+    const signals = await loadSignals(db, userId, state);
+    const detail = await loadDetail(db, row, userId, { state, signals });
+    const option = detail.options.find((o) => o.selected) ?? detail.options[0];
+    if (!option) throw new ApiError(422, 'missing_data', 'Lựa chọn chưa có phương án để phân tích');
+    const { id: optionId, evaluation: _evaluation, selected: _selected, ...input } = option;
+    return ok(c, previewLifeChoice(state, optionId, input, {
+      kind: detail.kind, incomeUpliftPct: detail.incomeUpliftPct,
+      prereqsDone: detail.prereqs.filter((p) => p.done).length,
+      prereqsTotal: detail.prereqs.length, signals,
+    }, mode.data));
   })
   .get('/:id', async (c) => {
     const db = c.env.DB;

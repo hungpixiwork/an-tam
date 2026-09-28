@@ -5,6 +5,7 @@ import { formatDuration, formatPct, formatVnd } from '@shared/format';
 import { HeroLakeCity } from '@/components/pixel';
 import { ButtonLink, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, Rich, cx, type Tone } from '@/components/ui';
 import { useRun } from '@/lib/queries';
+import { SavedDecisionResult } from './DecisionSimulationPage';
 
 export default function SimulationResultPage() {
   const { runId = '' } = useParams();
@@ -21,6 +22,7 @@ export default function SimulationResultPage() {
         </div>
       </div>
     );
+  if (data.decision) return <SavedDecisionResult analysis={data.decision} />;
   return <Result report={data} />;
 }
 

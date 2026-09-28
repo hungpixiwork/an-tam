@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { Check, CircleCheck, Circle, Plus, Sparkles, Trash2 } from 'lucide-react';
 import type { LifeChoiceDetail, LifeChoiceTaskPriority } from '@shared/types/api';
-import { Badge, Button, SectionCard, Select, TextInput, cx, type ExtTone } from '@/components/ui';
+import { Badge, Button, FormAlert, SectionCard, Select, TextInput, cx, type ExtTone } from '@/components/ui';
 import { useAddChoiceTask, useDeleteChoiceTask, useTogglePrereq, useToggleChoiceTask } from '@/lib/queries';
 import { useLocale } from '@/app/locale';
 import { num } from './shared';
@@ -47,6 +47,7 @@ export function PrereqsCard({ detail }: { detail: LifeChoiceDetail }) {
           </div>
         );
       })}
+      <FormAlert error={toggle.error} />
     </SectionCard>
   );
 }
@@ -88,14 +89,15 @@ export function ActionPlanCard({ detail }: { detail: LifeChoiceDetail }) {
     >
       <ol className="space-y-1.5">
         {detail.tasks.map((task, i) => (
-          <li key={task.id} className={cx('group relative flex items-center gap-2.5 rounded-xl border border-line py-2 pl-2.5 pr-7', task.done && 'bg-slate-50')}>
+          <li key={task.id} title={task.detail || undefined} className={cx('group relative flex items-start gap-2 rounded-xl border border-line p-2 pr-7', task.done && 'bg-slate-50')}>
             <button
               type="button"
+              disabled={toggle.isPending}
               onClick={() => toggle.mutate({ id: task.id, done: !task.done })}
               aria-pressed={task.done}
               aria-label={t(task.done ? 'choices.plan.mark_undone' : 'choices.plan.mark_done', { title: task.title })}
               className={cx(
-                'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold',
+                'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold',
                 task.done ? 'bg-[#1FA16B] text-white' : 'bg-[#EEF3FA] text-ink hover:bg-[#E3F5EB]',
               )}
             >
@@ -103,22 +105,24 @@ export function ActionPlanCard({ detail }: { detail: LifeChoiceDetail }) {
             </button>
             <div className="min-w-0 flex-1">
               <p className={cx('text-[13.5px] font-semibold text-ink', task.done && 'text-ink-soft line-through')}>{task.title}</p>
-              {task.detail && <p className="mt-0.5 text-[11.5px] leading-snug text-ink-soft">{task.detail}</p>}
+              {task.detail && <p className="sr-only">{task.detail}</p>}
+              <Badge tone={PRIORITY_TONE[task.priority]} size="sm" className="mt-1 whitespace-nowrap">
+                {t(`choices.plan.priority.${task.priority}`)}
+              </Badge>
             </div>
-            <Badge tone={PRIORITY_TONE[task.priority]} size="sm" className="shrink-0 whitespace-nowrap">
-              {t(`choices.plan.priority.${task.priority}`)}
-            </Badge>
             <button
               type="button"
+              disabled={remove.isPending}
               onClick={() => remove.mutate(task.id)}
               aria-label={t('choices.plan.remove', { title: task.title })}
-              className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-1 text-ink-mute opacity-0 hover:bg-slate-100 hover:text-danger-600 focus:opacity-100 group-hover:opacity-100"
+              className="absolute right-1 top-1 rounded-md p-1 text-ink-mute opacity-0 hover:bg-slate-100 hover:text-danger-600 focus:opacity-100 group-hover:opacity-100"
             >
               <Trash2 className="h-4 w-4" aria-hidden />
             </button>
           </li>
         ))}
       </ol>
+      <FormAlert error={toggle.error ?? remove.error ?? add.error} />
       {adding ? (
         <form onSubmit={submit} className="mt-3 space-y-2 rounded-xl border border-line p-3">
           <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('choices.plan.add_ph')} aria-label={t('choices.plan.add_ph')} maxLength={80} autoFocus />

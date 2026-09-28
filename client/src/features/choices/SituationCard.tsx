@@ -2,11 +2,11 @@
 // Chọn tình huống khác / tạo tình huống mới từ mẫu.
 
 import { useState, type FormEvent } from 'react';
-import { Briefcase, GraduationCap, Plus, Target, type LucideIcon } from 'lucide-react';
+import { Briefcase, GraduationCap, Pencil, Plus, Target, type LucideIcon } from 'lucide-react';
 import type { LifeChoice, LifeChoiceDetail, LifeChoiceTemplate } from '@shared/types/api';
 import { formatVndFull } from '@shared/format';
 import { Button, FormAlert, FormField, IconTile, Modal, MoneyInput, Segmented, Select, TextInput, Toggle, type ExtTone } from '@/components/ui';
-import { useCreateLifeChoice, useLifeChoiceTemplates } from '@/lib/queries';
+import { useCreateLifeChoice, useLifeChoiceTemplates, useSelectOption, useUpdateChoiceOption, useUpdateLifeChoice } from '@/lib/queries/choices';
 import { useLocale } from '@/app/locale';
 
 function Stat({ icon, tone, label, value, sub }: { icon: LucideIcon; tone: ExtTone; label: string; value?: string; sub: string }) {
@@ -22,35 +22,39 @@ function Stat({ icon, tone, label, value, sub }: { icon: LucideIcon; tone: ExtTo
   );
 }
 
-export function SituationCard({ detail, choices, onPick, onNew }: { detail: LifeChoiceDetail; choices: LifeChoice[]; onPick: (id: string) => void; onNew: () => void }) {
+export function SituationCard({ detail, choices, onPick, onNew, onEdit }: { detail: LifeChoiceDetail; choices: LifeChoice[]; onPick: (id: string) => void; onNew: () => void; onEdit: () => void }) {
   const { t } = useLocale();
   const selected = detail.options.find((o) => o.selected) ?? detail.options[0];
+  const select = useSelectOption(detail.id);
   return (
-    <section className="grid grid-cols-1 gap-4 rounded-2xl border border-line bg-white p-5 shadow-card xl:grid-cols-[minmax(0,1fr)_minmax(0,730px)] xl:items-center">
+    <section className="min-w-0 rounded-2xl border border-line bg-white p-4 shadow-card">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[14px] font-semibold text-ink">{t('choices.situation.eyebrow')}</p>
+          <h2 className="text-[17px] font-bold text-ink">{t('choices.situation.eyebrow')}</h2>
           {choices.length > 1 && (
             <Select value={detail.id} onChange={onPick} label={t('choices.situation.pick')} options={choices.map((c) => ({ value: c.id, label: c.title }))} className="max-w-[240px]" />
           )}
           <Button variant="soft" size="sm" icon={Plus} onClick={onNew}>
             {t('choices.situation.new')}
           </Button>
+          <Button variant="white" size="sm" icon={Pencil} onClick={onEdit}>{t('choices.situation.edit')}</Button>
         </div>
-        <h2 className="mt-1.5 text-[24px] font-extrabold leading-tight text-ink">{detail.title}</h2>
+        <h3 className="mt-3 text-[18px] font-extrabold leading-tight text-ink">{detail.title}</h3>
         <p className="mt-2 max-w-[640px] text-[14px] leading-relaxed text-ink-soft">{detail.description}</p>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Stat
           icon={GraduationCap}
           tone="blue"
           label={t('choices.situation.cost')}
-          value={formatVndFull(detail.cost)}
+          value={formatVndFull(selected?.cost ?? detail.cost)}
           sub={t('choices.situation.cost_sub', { months: selected?.durationMonths ?? 0 })}
         />
         <Stat icon={Briefcase} tone="sky" label={t('choices.situation.income')} value={formatVndFull(detail.monthlyIncome)} sub={t('choices.situation.income_sub')} />
         <Stat icon={Target} tone="rose" label={t('choices.situation.outcome')} sub={detail.outcome || '—'} />
       </div>
+      {detail.options.length > 1 && <fieldset className="mt-3 min-w-0"><legend className="mb-1.5 text-[12px] font-bold text-ink">{t('choices.compare.title')}</legend><div className="flex flex-wrap gap-2">{detail.options.map((option) => <label key={option.id} className={option.selected ? 'flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#4AAE88] bg-[#EAF7F0] px-2 py-1.5 text-[12px] font-semibold text-[#126349]' : 'flex cursor-pointer items-center gap-1.5 rounded-lg border border-line px-2 py-1.5 text-[12px] text-ink'}><input type="radio" name={`option-${detail.id}`} checked={option.selected} disabled={select.isPending} onChange={() => select.mutate(option.id)} className="accent-[#087D59]" />{option.title} · {option.evaluation.feasibility}/100</label>)}</div></fieldset>}
+      <FormAlert error={select.error} />
     </section>
   );
 }
@@ -77,7 +81,7 @@ export function NewChoiceModal({ onClose, onCreated }: { onClose: () => void; on
     );
   };
   return (
-    <Modal title={t('choices.new.title')} onClose={onClose} className="max-w-lg">
+    <Modal title={t('choices.new.title')} onClose={() => { if (!create.isPending) onClose(); }} className="max-w-lg">
       <form onSubmit={submit} className="space-y-4">
         <div>
           <p className="mb-1.5 text-sm font-semibold text-ink">{t('choices.new.template')}</p>
@@ -90,6 +94,7 @@ export function NewChoiceModal({ onClose, onCreated }: { onClose: () => void; on
               setUplift(null);
             }}
             label={t('choices.new.template')}
+            className="flex-wrap [&>button]:min-w-[120px]"
             options={(['study', 'care', 'startup', 'switch', 'sabbatical'] as const).map((k) => ({ value: k, label: t(`choices.tpl.${k}`) }))}
           />
           {tpl && <p className="mt-2 text-[13px] text-ink-soft">{tpl.description}</p>}
@@ -106,7 +111,7 @@ export function NewChoiceModal({ onClose, onCreated }: { onClose: () => void; on
         <Toggle checked={pinned} onChange={setPinned} label={t('choices.new.pin')} />
         <FormAlert error={create.error} />
         <div className="flex justify-end gap-2 pt-1">
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose} disabled={create.isPending}>
             {t('choices.plan.cancel')}
           </Button>
           <Button type="submit" disabled={!tpl || create.isPending}>
@@ -116,4 +121,45 @@ export function NewChoiceModal({ onClose, onCreated }: { onClose: () => void; on
       </form>
     </Modal>
   );
+}
+
+export function EditChoiceModal({ detail, onClose }: { detail: LifeChoiceDetail; onClose: () => void }) {
+  const { t } = useLocale();
+  const option = detail.options.find((o) => o.selected) ?? detail.options[0];
+  const update = useUpdateLifeChoice(detail.id);
+  const updateOption = useUpdateChoiceOption(detail.id, option?.id ?? '');
+  const [title, setTitle] = useState(detail.title);
+  const [description, setDescription] = useState(detail.description);
+  const [cost, setCost] = useState(option?.cost ?? detail.cost);
+  const [duration, setDuration] = useState(option?.durationMonths ?? 12);
+  const [noIncome, setNoIncome] = useState(option?.monthsWithoutIncome ?? 0);
+  const [uplift, setUplift] = useState(detail.incomeUpliftPct);
+  const [outcome, setOutcome] = useState(detail.outcome);
+  const [saving, setSaving] = useState(false);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!option || title.trim().length < 2 || noIncome > duration) return;
+    setSaving(true);
+    try {
+      await update.mutateAsync({ title: title.trim(), description: description.trim(), cost, outcome: outcome.trim(), incomeUpliftPct: uplift });
+      await updateOption.mutateAsync({ cost, durationMonths: duration, monthsWithoutIncome: noIncome });
+      onClose();
+    } catch {
+      // Error stays visible in the form; keep entered values for retry.
+    } finally {
+      setSaving(false);
+    }
+  };
+  return <Modal title={t('choices.edit.title')} onClose={() => { if (!saving) onClose(); }} className="max-w-lg">
+    <form onSubmit={submit} className="space-y-3">
+      <FormField label={t('choices.new.name')}>{(id) => <TextInput id={id} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} autoFocus />}</FormField>
+      <FormField label={t('choices.edit.description')}>{(id) => <TextInput id={id} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={200} />}</FormField>
+      <div className="grid gap-3 sm:grid-cols-2"><FormField label={t('choices.new.cost')}>{(id) => <MoneyInput id={id} value={cost} onChange={(v) => setCost(v ?? 0)} />}</FormField><FormField label={t('choices.new.uplift')}>{(id) => <TextInput id={id} type="number" min={-100} max={300} value={uplift} onChange={(e) => setUplift(Number(e.target.value) || 0)} />}</FormField></div>
+      <div className="grid gap-3 sm:grid-cols-2"><FormField label={t('choices.edit.duration')}>{(id) => <TextInput id={id} type="number" min={1} max={120} value={duration} onChange={(e) => setDuration(Number(e.target.value) || 1)} />}</FormField><FormField label={t('choices.edit.no_income')}>{(id) => <TextInput id={id} type="number" min={0} max={duration} value={noIncome} onChange={(e) => setNoIncome(Number(e.target.value) || 0)} />}</FormField></div>
+      <FormField label={t('choices.edit.outcome')}>{(id) => <TextInput id={id} value={outcome} onChange={(e) => setOutcome(e.target.value)} maxLength={200} />}</FormField>
+      {noIncome > duration && <p className="text-sm text-danger-600">{t('choices.edit.invalid_months')}</p>}
+      <FormAlert error={update.error ?? updateOption.error} />
+      <div className="flex justify-end gap-2 pt-2"><Button variant="ghost" onClick={onClose} disabled={saving}>{t('choices.plan.cancel')}</Button><Button type="submit" disabled={saving || !option || title.trim().length < 2 || noIncome > duration}>{saving ? t('choices.edit.saving') : t('choices.plan.save')}</Button></div>
+    </form>
+  </Modal>;
 }

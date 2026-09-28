@@ -8,8 +8,9 @@
 
 import type { UserState } from '../types/domain';
 import type {
-  LifeChoiceEvaluation, LifeChoiceKind, LifeChoiceOptionInput, LifeChoiceVerdict, TextKey,
+  LifeChoiceEvaluation, LifeChoiceKind, LifeChoiceOptionInput, LifeChoicePreview, LifeChoiceVerdict, TextKey,
 } from '../types/api';
+import type { DecisionMode } from '../types/api/decision';
 import { emergencyAmount, savingsCapacity } from './peace';
 import { humanCapital, presentValueIncome, RISK_FREE } from './humanCapital';
 import type { FinancialSignals } from '../types/api/signals';
@@ -72,6 +73,39 @@ export const DEFAULT_CUT_PCT = 0.15;
 export const UNSTABLE_SAFETY_CUT = 0.25;
 /** Kịch bản xấu tất định (thay cho mô phỏng ngẫu nhiên): mất thu nhập 3 tháng + tài sản đầu tư giảm 20%. */
 export const WORST_CASE = { incomeLossMonths: 3, riskyDropPct: 20 } as const;
+
+/** Các hệ số minh bạch cho phân tích độ nhạy, không phải dự báo thị trường. */
+export const CHOICE_SCENARIOS: Record<DecisionMode, LifeChoicePreview['assumptions']> = {
+  bull: { costFactor: 0.9, upliftFactor: 1.25, preparationDelayMonths: 0 },
+  base: { costFactor: 1, upliftFactor: 1, preparationDelayMonths: 0 },
+  bear: { costFactor: 1.15, upliftFactor: 0.75, preparationDelayMonths: 3 },
+};
+
+export function previewLifeChoice(
+  state: UserState, optionId: string, option: LifeChoiceOptionInput, ctx: EvaluateContext, mode: DecisionMode,
+): LifeChoicePreview {
+  const assumptions = CHOICE_SCENARIOS[mode];
+  const adjusted = {
+    ...option,
+    cost: Math.round(option.cost * assumptions.costFactor),
+    otherCost: Math.round(option.otherCost * assumptions.costFactor),
+  };
+  const uplift = ctx.incomeUpliftPct * assumptions.upliftFactor;
+  const evaluation = evaluateLifeChoice(state, adjusted, { ...ctx, incomeUpliftPct: uplift });
+  const monthlySave = Math.max(0, savingsCapacity(state));
+  const prepare = evaluation.funding.shortfall > 0
+    ? monthlySave > 0 ? Math.ceil(evaluation.funding.shortfall / monthlySave) : null
+    : 0;
+  const startAfterMonths = prepare === null ? null : prepare + assumptions.preparationDelayMonths;
+  return {
+    mode, optionId, evaluation,
+    expectedMonthlyIncome: Math.max(0, Math.round(state.profile.monthlyIncome * (1 + uplift / 100))),
+    startAfterMonths,
+    goalImpactMonths: prepare,
+    assumptions,
+    basis: 'Kịch bản là phép thử độ nhạy từ chi phí và mức tăng thu nhập bạn nhập; không phải dự báo thị trường.',
+  };
+}
 
 /** Phần tiền dùng được ngay nằm ở tài sản có giá lên xuống (cổ phiếu, quỹ, vàng/khác) — không tính tiền mặt, trái phiếu. */
 const riskyLiquid = (state: UserState): number =>

@@ -14,6 +14,7 @@ import { Bot, Target } from 'lucide-react';
 import { Button, Card, CardTitle, ErrorState, IconTile, PageHero, PageSkeleton, Select, cx, type Tone } from '@/components/ui';
 import { NeedData } from '@/components/NeedData';
 import { usePresets, useRunSimulation, useSimulationPreview, type Preset } from '@/lib/queries';
+import DecisionSimulationPage from './DecisionSimulationPage';
 
 /* ───────── Cấu hình slider ───────── */
 
@@ -56,6 +57,15 @@ function useDebounced<T>(value: T, ms: number): T {
 }
 
 export default function SimulationPage() {
+  const [search] = useSearchParams();
+  const choiceId = search.get('choiceId');
+  const requestedMode = search.get('mode');
+  const mode = requestedMode === 'bull' || requestedMode === 'bear' ? requestedMode : 'base';
+  if (choiceId) return <DecisionSimulationPage key={choiceId} choiceId={choiceId} initialMode={mode} />;
+  return <LegacySimulationPage />;
+}
+
+function LegacySimulationPage() {
   const [search] = useSearchParams();
   const presets = usePresets();
   if (presets.isPending) return <PageSkeleton />;
