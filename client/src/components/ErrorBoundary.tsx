@@ -12,7 +12,7 @@ import {
   Layers,
 } from 'lucide-react';
 import type { Locale } from '@shared/i18n';
-import { t as sharedT } from '@shared/i18n';
+import { translate as sharedT } from '@/app/messages';
 import { useSafeLocale, getStoredLocale } from '@/app/locale';
 
 const FALLBACK_TRANSLATIONS: Record<Locale, Record<string, string>> = {

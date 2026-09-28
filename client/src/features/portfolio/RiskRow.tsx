@@ -5,7 +5,8 @@ import { ALLOCATION_ASSUMPTIONS } from '@shared/engine/allocation';
 import { CATEGORY_ORDER } from '@shared/engine/portfolio';
 import type { AssetCategory } from '@shared/types/domain';
 import { formatVndFull } from '@shared/format';
-import { DonutChart, Gauge, SectionCard, Segmented, cx, type ExtTone } from '@/components/ui';
+import { Gauge, SectionCard, Segmented, cx, type ExtTone } from '@/components/ui';
+import { DonutChart } from '@/components/ui/DonutChart';
 import { useLocale } from '@/app/locale';
 
 export const CATEGORY_COLOR: Record<AssetCategory, string> = {

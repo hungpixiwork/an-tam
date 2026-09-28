@@ -1,7 +1,8 @@
 import { PieChart } from 'lucide-react';
 import type { LedgerDashboard } from '@shared/types/api';
 import { formatVndFull } from '@shared/format';
-import { DonutChart, EmptyState, SectionCard } from '@/components/ui';
+import { EmptyState, SectionCard } from '@/components/ui';
+import { DonutChart } from '@/components/ui/DonutChart';
 import { useLocale } from '@/app/locale';
 import { categoryColor } from './categoryIcons';
 

@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Locale, Currency } from '@shared/i18n';
-import { t } from '@shared/i18n';
+import { loadMessages, messagesReady, translate } from '@/app/messages';
 import { useAuth } from '@/app/auth';
 import { useSettings, useUpdateSettings } from '@/lib/queries';
 
@@ -80,16 +80,29 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const translate = (key: string, vars?: Record<string, string | number>) => t(locale, key, vars);
+  // en / zh tải lười: lần đầu chuyển ngôn ngữ chờ từ điển (vài chục ms) rồi mới vẽ lại
+  const [ready, setReady] = useState(() => messagesReady(locale));
+  const booted = useRef(false);
+  useEffect(() => {
+    if (messagesReady(locale)) { setReady(true); return; }
+    let alive = true;
+    setReady(false);
+    loadMessages(locale).then(() => alive && setReady(true), () => alive && setReady(true));
+    return () => { alive = false; };
+  }, [locale]);
+  const tr = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars);
 
   const value: LocaleValue = {
     locale,
     currency,
-    t: translate,
+    t: tr,
     setLocale: handleSetLocale,
     setCurrency: handleSetCurrency,
   };
 
+  // Chỉ chờ ở lần mở app đầu tiên; đổi ngôn ngữ giữa chừng thì giữ nguyên cây giao diện (không mất trạng thái trang)
+  if (!ready && !booted.current) return null;
+  booted.current = true;
   return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
 }
 

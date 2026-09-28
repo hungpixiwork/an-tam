@@ -86,32 +86,15 @@ export default defineConfig({
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('recharts')) {
-              return 'vendor-charts'
-            }
-            if (id.includes('@tanstack/react-query')) {
-              return 'vendor-query'
-            }
-            if (id.includes('lucide-react')) {
-              return 'vendor-icons'
-            }
-            if (
-              id.includes('/react/') ||
-              id.includes('\\react\\') ||
-              id.includes('/react-dom/') ||
-              id.includes('\\react-dom\\') ||
-              id.includes('/react-router/') ||
-              id.includes('\\react-router\\') ||
-              id.includes('/react-router-dom/') ||
-              id.includes('\\react-router-dom\\') ||
-              id.includes('/scheduler/') ||
-              id.includes('\\scheduler\\')
-            ) {
-              return 'vendor-react'
-            }
-          }
+        // Rolldown: nhóm có ưu tiên — React phải vào vendor-react trước, nếu không nhóm biểu đồ (recharts import React)
+        // sẽ kéo cả React vào vendor-charts và mọi trang phải tải sẵn recharts (~117 KB gz).
+        advancedChunks: {
+          groups: [
+            { name: 'vendor-react', priority: 40, test: /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/ },
+            { name: 'vendor-query', priority: 30, test: /[\\/]node_modules[\\/]@tanstack[\\/]/ },
+            { name: 'vendor-icons', priority: 30, test: /[\\/]node_modules[\\/]lucide-react[\\/]/ },
+            { name: 'vendor-charts', priority: 10, test: /[\\/]node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor|react-is|es-toolkit|decimal\.js-light|eventemitter3|@reduxjs|redux|reselect|immer|react-redux|use-sync-external-store|tiny-invariant|clsx)[\\/]/ },
+          ],
         },
       },
     },

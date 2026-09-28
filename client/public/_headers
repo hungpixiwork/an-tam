@@ -6,3 +6,8 @@
 
 /*
   Cache-Control: public, max-age=0, must-revalidate
+
+# Ảnh hero (tên không có hash): cache 7 ngày. Đặt sau /* và bỏ header của quy tắc trước để không bị gộp 2 giá trị.
+/*.jpg
+  ! Cache-Control
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
