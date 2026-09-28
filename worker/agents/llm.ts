@@ -106,7 +106,7 @@ export async function rephraseChecked(sentence: string, rewrite: (masked: string
 export async function narrateReply(env: Env, userId: string, sentence: string): Promise<{ text: string; narrated: boolean }> {
   if (!llmAvailable(env)) return { text: sentence, narrated: false };
   const { plan } = await userPlan(env.DB, userId);
-  if (plan === 'free' || !(await consumeAi(env, userId, 'narrate')).allowed) return { text: sentence, narrated: false };
+  if (plan === 'free' || !(await consumeAi(env, userId, 'narrate', new Date(), plan)).allowed) return { text: sentence, narrated: false };
   return rephraseChecked(sentence, (masked) => runText(env, NARRATE_SYSTEM, masked, 300));
 }
 

@@ -12,6 +12,7 @@ import {
 } from './analysts';
 import { breadthAsOf, historyAsOf, lastLesson, newsAsOf, symbolKind } from './data';
 import { askJson, DESK_QUICK_MODEL, DESK_SYNTH_MODEL } from './llm';
+import { consumeAi } from '../lib/usage';
 
 export interface DeskParams {
   symbol: string;
@@ -21,6 +22,8 @@ export interface DeskParams {
   userId?: string;
   /** Số vòng tranh luận (mặc định 1). */
   rounds?: number;
+  /** Hết lượt AI → mọi bước dùng mẫu tất định. */
+  noAi?: boolean;
 }
 
 /** Chạy một bước: Workflow → step.do (thử lại, giới hạn thời gian); chạy thẳng → gọi luôn. */
@@ -83,7 +86,7 @@ async function runNews(env: Env, p: DeskParams): Promise<Analysed> {
   const name = symbolName(p.symbol, kind);
   const ai = await askJson(env, LabelsSchema, {
     model: DESK_QUICK_MODEL,
-    userId: p.userId,
+    disabled: p.noAi,
     maxTokens: 200,
     timeoutMs: 8_000,
     system:
@@ -130,7 +133,7 @@ async function debateSide(env: Env, p: DeskParams, side: 'optimist' | 'cautious'
       : 'Bạn là PHE THẬN TRỌNG: nêu rủi ro người đang giữ tài sản này cần để ý.';
   const ai = await askJson(env, PointsSchema, {
     model: DESK_QUICK_MODEL,
-    userId: p.userId,
+    disabled: p.noAi,
     maxTokens: 350,
     timeoutMs: 10_000,
     system:
@@ -155,7 +158,7 @@ async function synthesize(env: Env, p: DeskParams, name: string, analysts: DeskA
   const last = debate.rounds[debate.rounds.length - 1];
   const ai = await askJson(env, VerdictSchema, {
     model: DESK_SYNTH_MODEL,
-    userId: p.userId,
+    disabled: p.noAi,
     maxTokens: 700,
     timeoutMs: 20_000,
     system:
@@ -186,6 +189,12 @@ async function synthesize(env: Env, p: DeskParams, name: string, analysts: DeskA
 export async function runDeskPipeline(env: Env, p: DeskParams, step: StepRunner = inlineStep): Promise<{ report: DeskReport; created: boolean }> {
   const existing = await step('kiểm tra báo cáo hôm nay', async () => (await loadReport(env.DB, p.symbol, p.day)) !== null);
   if (existing) return { report: (await loadReport(env.DB, p.symbol, p.day))!, created: false };
+  // Người bấm chạy trả đúng 1 lượt AI cho cả lần chạy (không trừ theo từng lần gọi mô hình)
+  if (p.userId) {
+    const userId = p.userId;
+    const aiOk = await step('trừ lượt AI', async () => (await consumeAi(env, userId, 'desk')).allowed);
+    p = { ...p, userId: undefined, noAi: !aiOk };
+  }
 
   const kind = await step('loại tài sản', () => symbolKind(env.DB, p.symbol));
   const [tech, news, fund, macro] = await Promise.all([

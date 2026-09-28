@@ -6,7 +6,7 @@ import { CalendarDays, ChartNoAxesColumnIncreasing, Clock3, GraduationCap, Light
 import type { LifeChoice, LifeChoiceDetail, LifeChoicePreview, LifeChoiceTemplate } from '@shared/types/api';
 import { formatVnd } from '@shared/format';
 import { Button, FormAlert, FormField, IconTile, MenuButton, Modal, MoneyInput, Segmented, TextInput, Toggle, cx } from '@/components/ui';
-import { useCreateLifeChoice, useLifeChoiceTemplates, useSelectOption, useUpdateChoiceOption, useUpdateLifeChoice } from '@/lib/queries/choices';
+import { useCreateLifeChoice, useLifeChoiceTemplates, useUpdateLifeChoice } from '@/lib/queries/choices';
 import { useLocale } from '@/app/locale';
 
 function Fact({ icon: Icon, tone, label, value, sub, compact }: { icon: LucideIcon; tone: string; label: string; value: string; sub?: string; compact?: boolean }) {
@@ -143,8 +143,6 @@ export function EditChoiceModal({ detail, onClose }: { detail: LifeChoiceDetail;
   const [optionId, setOptionId] = useState((detail.options.find((o) => o.selected) ?? detail.options[0])?.id ?? '');
   const option = detail.options.find((o) => o.id === optionId);
   const update = useUpdateLifeChoice(detail.id);
-  const updateOption = useUpdateChoiceOption(detail.id, optionId);
-  const select = useSelectOption(detail.id);
   const [title, setTitle] = useState(detail.title);
   const [description, setDescription] = useState(detail.description);
   const [cost, setCost] = useState(option?.cost ?? detail.cost);
@@ -168,9 +166,10 @@ export function EditChoiceModal({ detail, onClose }: { detail: LifeChoiceDetail;
     if (invalid) return;
     setSaving(true);
     try {
-      await update.mutateAsync({ title: title.trim(), description: description.trim(), cost, outcome: outcome.trim(), incomeUpliftPct: uplift });
-      await updateOption.mutateAsync({ cost, otherCost, durationMonths: duration, monthsWithoutIncome: noIncome, startMonth: start || null });
-      if (!option?.selected) await select.mutateAsync(optionId);
+      await update.mutateAsync({
+        title: title.trim(), description: description.trim(), cost, outcome: outcome.trim(), incomeUpliftPct: uplift,
+        option: { id: optionId, select: !option?.selected, cost, otherCost, durationMonths: duration, monthsWithoutIncome: noIncome, startMonth: start || null },
+      });
       onClose();
     } catch {
       // Lỗi hiện trong form; giữ nguyên số đã nhập để thử lại.
@@ -211,7 +210,7 @@ export function EditChoiceModal({ detail, onClose }: { detail: LifeChoiceDetail;
           <FormField label={t('choices.edit.outcome')}>{(id) => <TextInput id={id} value={outcome} onChange={(e) => setOutcome(e.target.value)} maxLength={200} />}</FormField>
         </div>
         {noIncome > duration && <p className="text-sm text-danger-600">{t('choices.edit.invalid_months')}</p>}
-        <FormAlert error={update.error ?? updateOption.error ?? select.error} />
+        <FormAlert error={update.error} />
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={onClose} disabled={saving}>{t('choices.plan.cancel')}</Button>
           <Button type="submit" disabled={saving || invalid}>{saving ? t('choices.edit.saving') : t('choices.plan.save')}</Button>

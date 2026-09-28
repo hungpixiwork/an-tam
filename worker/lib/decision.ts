@@ -26,7 +26,7 @@ export async function runDecisionSimulation(db: D1Database, userId: string, req:
     ? await ownChoice(db, req.choiceId, userId)
     : await db.prepare(`${SELECT} WHERE user_id = ? AND status = 'active' ORDER BY pinned DESC, created_at DESC LIMIT 1`).bind(userId).first<Row>();
   if (!row) throw notFound('Chưa có lựa chọn cuộc đời để mô phỏng');
-  const state = await loadUserState(db, userId);
+  const state = await loadUserState(db, userId, undefined, { snapshots: false });
   if (state.profile.monthlyExpense <= 0) throw new ApiError(422, 'insufficient_data', 'Cần nhập chi tiêu tháng trước khi mô phỏng');
   const [signals, income] = await Promise.all([
     loadSignals(db, userId, state),

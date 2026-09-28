@@ -143,6 +143,10 @@ export interface LifeChoiceDetail extends LifeChoice {
   tasks: LifeChoiceTask[];
   /** Phương án điểm khả thi cao nhất. */
   recommendedOptionId: string | null;
+  /** Chỉ có khi gọi ?previews=1: lộ trình Bull / Base / Bear của phương án đang chọn. */
+  previews?: Record<DecisionMode, LifeChoicePreview>;
+  /** Đã có lần mô phỏng cú sốc kép được lưu cho lựa chọn này. */
+  simulated?: boolean;
 }
 
 export interface LifeChoiceTemplate {

@@ -4,14 +4,11 @@
 import { Check } from 'lucide-react';
 import type { LifeChoiceDetail } from '@shared/types/api';
 import { cx } from '@/components/ui';
-import { useRuns } from '@/lib/queries';
 import { useLocale } from '@/app/locale';
 
 export function Journey({ detail }: { detail: LifeChoiceDetail }) {
   const { t } = useLocale();
-  const runs = useRuns();
-  const simulated = !!runs.data?.some((r) => r.choiceId === detail.id);
-  const done = [true, detail.tasks.some((x) => x.done), simulated, detail.status === 'done'];
+  const done = [true, detail.tasks.some((x) => x.done), !!detail.simulated, detail.status === 'done'];
   const current = done.findIndex((d) => !d);
   return (
     <nav aria-label={t('choices.journey.title')} className="px-1">

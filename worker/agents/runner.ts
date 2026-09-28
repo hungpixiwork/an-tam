@@ -67,6 +67,12 @@ async function loadContext(env: Env, userId: string, weekStart: string, note?: s
   };
 }
 
+/** Ngữ cảnh rỗng cho lượt có ý định cấu trúc (không lập kế hoạch tuần). */
+const minimalContext = (weekStart: string, note?: string): PlannerContext => ({
+  now: vnNow(), weekStart, events: [], bills: [], goals: [], focusSkill: '', skillHoursPerWeek: 0, recentTx: [],
+  budgetLimit: null, lastMonthExpense: 0, googleCalendarConnected: false, note,
+});
+
 /** "tuần này" → tuần hiện tại, còn lại → tuần tới. */
 const targetWeek = (maskedPrompt: string, explicit?: string) => {
   if (explicit) return weekStartOf(explicit);
@@ -182,16 +188,16 @@ export async function executeRun(env: Env, userId: string, runId: string, input:
 
   // AI và luật đọc câu có ký hiệu (AMT_1, DUR_1…) — số thật chỉ nằm trong `ph.map`, không lưu
   const ph = maskWithPlaceholders(input.prompt);
+  // Nút từ trang Mô phỏng đã có ý định rõ ràng → không tốn lượt AI phân loại, không nạp lịch/thu chi, không diễn đạt lại
+  const structured = !!input.decision;
   const rules = parseIntentRules(note ? `${ph.masked} ${note}` : ph.masked);
-  const llm = await classifyLLM(env, ph.masked, userId);
-  const merged: IntentResult = mergeIntents(llm?.intents ?? null, rules);
-  // Nút từ trang Mô phỏng: chỉ làm đúng việc mô phỏng + cập nhật kế hoạch
-  const intent: IntentResult = input.decision ? { ...merged, intents: ['simulate_decision'] } : merged;
+  const llm = structured ? null : await classifyLLM(env, ph.masked, userId);
+  const intent: IntentResult = structured ? { intents: ['simulate_decision'], source: 'rules' } : mergeIntents(llm?.intents ?? null, rules);
   const params = mergeParams(llm ? paramsFromLLM(llm, ph.map) : null, parseParamsRules(ph.masked, ph.map, intent.intents));
   const weekStart = targetWeek(masked, input.weekStart);
-  const ctx = await loadContext(env, userId, weekStart, note);
+  const ctx = structured ? minimalContext(weekStart, note) : await loadContext(env, userId, weekStart, note);
   const plan = await buildPlan(env, userId, ctx, intent, params, ph.masked, hooks, input.decision);
-  const reply = await narrateReply(env, userId, plan.reply);
+  const reply = structured ? { text: plan.reply, narrated: false } : await narrateReply(env, userId, plan.reply);
   const created = new Date();
   const expires = new Date(created.getTime() + ACTION_TTL_MS).toISOString();
   const actionSource = source === 'user' ? 'agent' : source;

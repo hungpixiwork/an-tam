@@ -52,13 +52,18 @@ export interface LoadedState extends UserState {
   sources: Omit<EffectiveProfile, 'profile'>;
 }
 
-export async function loadUserState(db: D1Database, userId: string, today = currentMonth()): Promise<LoadedState> {
+export interface LoadStateOptions {
+  /** false → không nạp lịch sử tài sản ròng (engine lựa chọn / mô phỏng không cần), bớt dữ liệu mỗi request. */
+  snapshots?: boolean;
+}
+
+export async function loadUserState(db: D1Database, userId: string, today = currentMonth(), opts: LoadStateOptions = {}): Promise<LoadedState> {
   const [user, profile, holdings, goals, snapshots, ledger, liabilities, prices] = await db.batch([
     db.prepare('SELECT salutation FROM users WHERE id = ?').bind(userId),
     db.prepare('SELECT * FROM financial_profiles WHERE user_id = ?').bind(userId),
     db.prepare('SELECT * FROM holdings WHERE user_id = ? ORDER BY order_idx').bind(userId),
     db.prepare('SELECT * FROM goals WHERE user_id = ? ORDER BY order_idx').bind(userId),
-    db.prepare('SELECT month, total, emergency, invested, cashflow, cash, other, debt FROM net_worth_snapshots WHERE user_id = ? ORDER BY month').bind(userId),
+    db.prepare(`SELECT month, total, emergency, invested, cashflow, cash, other, debt FROM net_worth_snapshots WHERE user_id = ? ORDER BY month${opts.snapshots === false ? ' LIMIT 0' : ''}`).bind(userId),
     db.prepare(
       `SELECT substr(occurred_on, 1, 7) AS month,
               SUM(CASE WHEN kind = 'income' THEN amount ELSE 0 END) AS income,

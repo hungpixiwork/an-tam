@@ -3,10 +3,9 @@
 
 import { Link } from 'react-router-dom';
 import { CalendarDays, Coins, House, TrendingDown, TrendingUp, Wallet, type LucideIcon } from 'lucide-react';
-import type { DecisionMode, LifeChoiceDetail } from '@shared/types/api';
+import type { DecisionMode, LifeChoiceDetail, LifeChoicePreview } from '@shared/types/api';
 import { formatVnd } from '@shared/format';
 import { cx } from '@/components/ui';
-import { useLifeChoicePreview } from '@/lib/queries/choices';
 import { useLocale } from '@/app/locale';
 import { monthShort, num } from './shared';
 
@@ -29,10 +28,8 @@ function Metric({ icon: Icon, label, value, sub }: { icon: LucideIcon; label: st
   );
 }
 
-export function RoadmapCard({ detail, mode, onMode }: { detail: LifeChoiceDetail; mode: DecisionMode; onMode: (m: DecisionMode) => void }) {
+export function RoadmapCard({ detail, preview: p, mode, onMode }: { detail: LifeChoiceDetail; preview: LifeChoicePreview | undefined; mode: DecisionMode; onMode: (m: DecisionMode) => void }) {
   const { t, locale } = useLocale();
-  const preview = useLifeChoicePreview(detail.id, mode);
-  const p = preview.data;
   const upliftPct = p && detail.monthlyIncome > 0 ? Math.round((p.expectedMonthlyIncome / detail.monthlyIncome - 1) * 100) : 0;
   return (
     <section className="min-w-0 rounded-2xl border border-line bg-white p-4 shadow-card" aria-labelledby="roadmap-title">
@@ -60,13 +57,9 @@ export function RoadmapCard({ detail, mode, onMode }: { detail: LifeChoiceDetail
         ))}
       </div>
 
-      {preview.isPending ? (
-        <p className="mt-4 text-sm text-ink-soft" role="status">{t('choices.scenario.loading')}</p>
-      ) : preview.error ? (
-        <div className="mt-4 text-sm text-danger-600" role="alert">
-          {preview.error.message} <button type="button" className="font-bold underline" onClick={() => preview.refetch()}>{t('choices.scenario.retry')}</button>
-        </div>
-      ) : p ? (
+      {!p ? (
+        <p className="mt-4 text-sm text-ink-soft">{t('choices.scenario.unknown')}</p>
+      ) : (
         <div className="mt-3 rounded-xl border border-[#E6EDF2] p-3" role="tabpanel">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
@@ -104,7 +97,7 @@ export function RoadmapCard({ detail, mode, onMode }: { detail: LifeChoiceDetail
             />
           </div>
         </div>
-      ) : null}
+      )}
       <p className="mt-2 text-[11px] leading-snug text-ink-soft">{t('choices.scenario.disclaimer')}</p>
     </section>
   );

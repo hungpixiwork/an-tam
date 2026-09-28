@@ -80,6 +80,11 @@ const optionPatchSchema = z.object({
   startMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Tháng không hợp lệ').nullable().optional(),
 });
 
+/** PATCH /:id kèm sửa phương án (modal "Chỉnh sửa tình huống" gửi 1 request). */
+const choicePatchSchema = patchSchema.extend({
+  option: optionPatchSchema.omit({ selected: true }).extend({ id: z.string().min(1), select: z.boolean().optional() }).optional(),
+});
+
 const prereqSchema = z.object({ title: z.string().trim().min(2, 'Nội dung quá ngắn').max(120), done: z.boolean().default(false) });
 const prereqPatchSchema = z.object({ title: z.string().trim().min(2).max(120).optional(), done: z.boolean().optional() });
 const taskSchema = z.object({
@@ -120,7 +125,7 @@ const compareSchema = z.union([
 export interface Row {
   id: string; title: string; description: string; icon: string; cost: number;
   steps_json: string; current_step: number; pinned: number; status: LifeChoice['status'];
-  kind: LifeChoiceKind; outcome: string; income_uplift_pct: number;
+  kind: LifeChoiceKind; outcome: string; income_uplift_pct: number; created_at?: string;
 }
 interface OptionRow {
   id: string; title: string; description: string; cost: number; other_cost: number; duration_months: number;
@@ -154,7 +159,7 @@ const toOptionInput = (o: OptionRow): LifeChoiceOptionInput => ({
   startMonth: o.start_month ?? null,
 });
 
-export const SELECT = 'SELECT id, title, description, icon, cost, steps_json, current_step, pinned, status, kind, outcome, income_uplift_pct FROM life_choices';
+export const SELECT = 'SELECT id, title, description, icon, cost, steps_json, current_step, pinned, status, kind, outcome, income_uplift_pct, created_at FROM life_choices';
 
 /** Lựa chọn được ghim (hoặc lựa chọn đang theo đuổi mới nhất) để hiện ở Tổng quan. */
 export async function loadPinnedLifeChoice(db: D1Database, userId: string): Promise<LifeChoice | null> {
@@ -177,12 +182,13 @@ const toPrereqs = (rows: PrereqRow[], state: UserState): LifeChoicePrereq[] =>
   });
 
 export async function loadDetail(db: D1Database, row: Row, userId: string, cached?: { state: Awaited<ReturnType<typeof loadUserState>>; signals: FinancialSignals }): Promise<LifeChoiceDetail> {
+  const statePromise = cached?.state ? Promise.resolve(cached.state) : loadUserState(db, userId);
   const [options, prereqs, tasks] = await db.batch([
     db.prepare('SELECT * FROM life_choice_options WHERE choice_id = ? ORDER BY order_idx, rowid').bind(row.id),
     db.prepare('SELECT id, title, done, auto_key FROM life_choice_prereqs WHERE choice_id = ? ORDER BY order_idx, rowid').bind(row.id),
     db.prepare('SELECT id, title, detail, priority, done, category, today FROM life_choice_tasks WHERE choice_id = ? ORDER BY order_idx, rowid').bind(row.id),
   ]);
-  const state = cached?.state ?? await loadUserState(db, userId);
+  const state = await statePromise;
   const choice = toChoice(row);
   const pre = toPrereqs(prereqs.results as unknown as PrereqRow[], state);
   const signals = cached?.signals ?? await loadSignals(db, userId, state);
@@ -251,16 +257,55 @@ export function lifeChoiceInsertStatements(db: D1Database, userId: string, id: s
 }
 
 /** Thu nhập làm thêm trung bình 3 tháng gần nhất + số tháng đã chuẩn bị từ lúc tạo lựa chọn. */
-async function choiceProgress(db: D1Database, userId: string, choiceId: string, today: string) {
-  const [side, created] = await db.batch([
+async function choiceProgress(db: D1Database, userId: string, row: Row, today: string) {
+  const [side, runs] = await db.batch([
     db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM transactions
       WHERE user_id = ? AND kind = 'income' AND category IN (${SIDE_INCOME_CATEGORIES.map(() => '?').join(', ')}) AND occurred_on >= ? AND occurred_on < ?`)
       .bind(userId, ...SIDE_INCOME_CATEGORIES, `${addMonths(today, -3)}-01`, `${today}-01`),
-    db.prepare('SELECT substr(created_at, 1, 7) AS month FROM life_choices WHERE id = ?').bind(choiceId),
+    db.prepare('SELECT 1 AS ok FROM simulation_runs WHERE user_id = ? AND choice_id = ? LIMIT 1').bind(userId, row.id),
   ]);
   const total = Number((side.results[0] as { total?: number } | undefined)?.total ?? 0);
-  const month = (created.results[0] as { month?: string } | undefined)?.month;
-  return { sideIncome: Math.round(total / 3), elapsedMonths: month ? Math.max(0, monthsBetween(month, today)) : 0 };
+  const month = row.created_at?.slice(0, 7);
+  return {
+    sideIncome: Math.round(total / 3),
+    elapsedMonths: month ? Math.max(0, monthsBetween(month, today)) : 0,
+    simulated: runs.results.length > 0,
+  };
+}
+
+/** Detail + lộ trình cả 3 kịch bản trong 1 lần nạp (state / signals / detail chỉ tải 1 lần, engine tính thuần). */
+async function detailWithPreviews(db: D1Database, row: Row, userId: string): Promise<LifeChoiceDetail> {
+  const state = await loadUserState(db, userId, undefined, { snapshots: false });
+  const [signals, progress] = await Promise.all([loadSignals(db, userId, state), choiceProgress(db, userId, row, state.today)]);
+  const detail = await loadDetail(db, row, userId, { state, signals });
+  const option = detail.options.find((o) => o.selected) ?? detail.options[0];
+  if (!option || state.profile.monthlyExpense <= 0) return { ...detail, simulated: progress.simulated };
+  const { id: optionId, evaluation: _e, selected: _s, ...input } = option;
+  const ctx = {
+    kind: detail.kind, incomeUpliftPct: detail.incomeUpliftPct, signals,
+    prereqsDone: detail.prereqs.filter((p) => p.done).length, prereqsTotal: detail.prereqs.length,
+  };
+  const previews = Object.fromEntries((['bull', 'base', 'bear'] as const).map((m) => [m, previewLifeChoice(state, optionId, input, ctx, m, progress)])) as LifeChoiceDetail['previews'];
+  return { ...detail, previews, simulated: progress.simulated };
+}
+
+/** Lệnh sửa 1 phương án (kiểm tra số tháng không thu nhập ≤ thời gian thực hiện). */
+async function optionUpdateStatements(db: D1Database, choiceId: string, optionId: string, v: z.infer<typeof optionPatchSchema>): Promise<D1PreparedStatement[]> {
+  const cur = await db.prepare('SELECT * FROM life_choice_options WHERE id = ? AND choice_id = ?').bind(optionId, choiceId).first<OptionRow>();
+  if (!cur) throw notFound('Không tìm thấy phương án');
+  if ((v.monthsWithoutIncome ?? cur.months_without_income) > (v.durationMonths ?? cur.duration_months)) {
+    throw new ApiError(400, 'invalid_input', 'Số tháng không có thu nhập vượt quá thời gian thực hiện');
+  }
+  const cols: Record<string, unknown> = {
+    title: v.title, description: v.description, cost: v.cost, other_cost: v.otherCost, duration_months: v.durationMonths,
+    months_without_income: v.monthsWithoutIncome, monthly_income_delta: v.monthlyIncomeDelta, selected: v.selected ? 1 : undefined,
+    cut_pct: v.cutPct, start_month: v.startMonth,
+  };
+  const entries = Object.entries(cols).filter(([, x]) => x !== undefined);
+  const stmts: D1PreparedStatement[] = [];
+  if (v.selected) stmts.push(db.prepare('UPDATE life_choice_options SET selected = 0 WHERE choice_id = ?').bind(choiceId));
+  if (entries.length) stmts.push(db.prepare(`UPDATE life_choice_options SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ? AND choice_id = ?`).bind(...entries.map(([, x]) => x), optionId, choiceId));
+  return stmts;
 }
 
 const nextIdx = async (db: D1Database, table: string, choiceId: string) =>
@@ -327,18 +372,20 @@ export const lifeChoices = new Hono<AppEnv>()
       kind: detail.kind, incomeUpliftPct: detail.incomeUpliftPct,
       prereqsDone: detail.prereqs.filter((p) => p.done).length,
       prereqsTotal: detail.prereqs.length, signals,
-    }, mode.data, await choiceProgress(db, userId, row.id, state.today)));
+    }, mode.data, await choiceProgress(db, userId, row, state.today)));
   })
   .get('/:id', async (c) => {
     const db = c.env.DB;
     const userId = c.get('userId');
-    return ok(c, await loadDetail(db, await ownChoice(db, c.req.param('id'), userId), userId));
+    const row = await ownChoice(db, c.req.param('id'), userId);
+    return ok(c, c.req.query('previews') === '1' ? await detailWithPreviews(db, row, userId) : await loadDetail(db, row, userId));
   })
-  .patch('/:id', body(patchSchema), async (c) => {
-    const v = c.req.valid('json');
+  .patch('/:id', body(choicePatchSchema), async (c) => {
+    const { option, ...v } = c.req.valid('json');
     const userId = c.get('userId');
     const id = c.req.param('id');
     const row = await ownChoice(c.env.DB, id, userId);
+    const optionStmts = option ? await optionUpdateStatements(c.env.DB, id, option.id, { ...option, selected: option.select ? true : undefined }) : [];
     const steps = v.steps ?? toChoice(row).steps;
     if ((v.currentStep ?? row.current_step) > steps.length) throw new ApiError(400, 'invalid_input', 'Mốc hiện tại vượt quá số mốc');
     const cols: Record<string, unknown> = {
@@ -348,9 +395,10 @@ export const lifeChoices = new Hono<AppEnv>()
       outcome: v.outcome, income_uplift_pct: v.incomeUpliftPct,
     };
     const entries = Object.entries(cols).filter(([, x]) => x !== undefined);
-    if (!entries.length) return ok(c, null);
-    const update = c.env.DB.prepare(`UPDATE life_choices SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ? AND user_id = ?`).bind(...entries.map(([, x]) => x), id, userId);
-    await c.env.DB.batch(v.pinned ? [c.env.DB.prepare('UPDATE life_choices SET pinned = 0 WHERE user_id = ?').bind(userId), update] : [update]);
+    if (!entries.length && !optionStmts.length) return ok(c, null);
+    const stmts = [...(v.pinned ? [c.env.DB.prepare('UPDATE life_choices SET pinned = 0 WHERE user_id = ?').bind(userId)] : [])];
+    if (entries.length) stmts.push(c.env.DB.prepare(`UPDATE life_choices SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ? AND user_id = ?`).bind(...entries.map(([, x]) => x), id, userId));
+    await c.env.DB.batch([...stmts, ...optionStmts]);
     return ok(c, null);
   })
   .delete('/:id', async (c) => {
@@ -374,20 +422,7 @@ export const lifeChoices = new Hono<AppEnv>()
     const id = c.req.param('id');
     const optionId = c.req.param('optionId');
     await ownChoice(db, id, c.get('userId'));
-    const cur = await db.prepare('SELECT * FROM life_choice_options WHERE id = ? AND choice_id = ?').bind(optionId, id).first<OptionRow>();
-    if (!cur) throw notFound('Không tìm thấy phương án');
-    if ((v.monthsWithoutIncome ?? cur.months_without_income) > (v.durationMonths ?? cur.duration_months)) {
-      throw new ApiError(400, 'invalid_input', 'Số tháng không có thu nhập vượt quá thời gian thực hiện');
-    }
-    const cols: Record<string, unknown> = {
-      title: v.title, description: v.description, cost: v.cost, other_cost: v.otherCost, duration_months: v.durationMonths,
-      months_without_income: v.monthsWithoutIncome, monthly_income_delta: v.monthlyIncomeDelta, selected: v.selected ? 1 : undefined,
-      cut_pct: v.cutPct, start_month: v.startMonth,
-    };
-    const entries = Object.entries(cols).filter(([, x]) => x !== undefined);
-    const stmts = [];
-    if (v.selected) stmts.push(db.prepare('UPDATE life_choice_options SET selected = 0 WHERE choice_id = ?').bind(id));
-    if (entries.length) stmts.push(db.prepare(`UPDATE life_choice_options SET ${entries.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ? AND choice_id = ?`).bind(...entries.map(([, x]) => x), optionId, id));
+    const stmts = await optionUpdateStatements(db, id, optionId, v);
     if (stmts.length) await db.batch(stmts);
     return ok(c, null);
   })

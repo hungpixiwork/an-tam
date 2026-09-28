@@ -6,7 +6,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Compass, Plus } from 'lucide-react';
 import type { DecisionMode, LifeChoiceTemplate } from '@shared/types/api';
 import { Button, EmptyState, ErrorState, HeroBanner, PageSkeleton } from '@/components/ui';
-import { useLifeChoice, useLifeChoicePreview, useLifeChoices } from '@/lib/queries/choices';
+import { useLifeChoice, useLifeChoices } from '@/lib/queries/choices';
 import { useLocale } from '@/app/locale';
 import { Journey } from './Journey';
 import { EditChoiceModal, NewChoiceModal, SituationCard } from './SituationCard';
@@ -26,7 +26,7 @@ export default function ChoicesPage() {
   const activeId = picked && list.data?.some((c) => c.id === picked) ? picked : list.data?.[0]?.id;
   const pick = (id: string) => setParams((p) => { p.set('id', id); return p; }, { replace: true });
   const detail = useLifeChoice(activeId);
-  const preview = useLifeChoicePreview(activeId, mode);
+  const preview = { data: detail.data?.previews?.[mode] };
 
   const hero = (
     <HeroBanner
@@ -62,7 +62,7 @@ export default function ChoicesPage() {
       <Journey detail={d} />
       <div className="grid gap-2.5 xl:grid-cols-[minmax(0,0.96fr)_minmax(0,1fr)]">
         <SituationCard detail={d} preview={preview.data} choices={list.data ?? []} onPick={pick} onNew={() => setCreating('study')} onEdit={() => setEditing(true)} />
-        <RoadmapCard detail={d} mode={mode} onMode={setMode} />
+        <RoadmapCard detail={d} preview={preview.data} mode={mode} onMode={setMode} />
       </div>
       <div className="grid gap-2.5 xl:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0 space-y-2.5">

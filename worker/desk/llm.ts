@@ -18,6 +18,8 @@ export interface AskOptions {
   timeoutMs?: number;
   /** Có → trừ 1 lượt AI của người này (consumeAi); hết lượt → null. Không có = lần chạy hệ thống (hằng ngày / cảnh báo). */
   userId?: string;
+  /** true → không gọi mô hình (hết lượt AI), nơi gọi dùng mẫu tất định. */
+  disabled?: boolean;
 }
 
 /** Lấy chuỗi trả lời từ các dạng output khác nhau của Workers AI. */
@@ -49,7 +51,7 @@ export function parseJsonReply<T>(text: string, schema: z.ZodType<T>): T | null 
 }
 
 export async function askJson<T>(env: Env, schema: z.ZodType<T>, opts: AskOptions): Promise<T | null> {
-  if (!env.AI) return null;
+  if (!env.AI || opts.disabled) return null;
   if (opts.userId && !(await consumeAi(env, opts.userId, 'desk')).allowed) return null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
