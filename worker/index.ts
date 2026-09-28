@@ -33,6 +33,8 @@ import { agent, agents } from './routes/agent';
 import { audit } from './routes/audit';
 import { integrations } from './routes/integrations';
 import { webhooks } from './routes/webhooks';
+import { market } from './routes/market';
+import { alertRules } from './routes/alertRules';
 import { health, APP_VERSION, BUILD_TIME } from './routes/health';
 import { runMonitor } from './jobs/monitor';
 
@@ -122,6 +124,8 @@ app.route('/api/allocation', allocation);
 app.route('/api/agents', agents);
 app.route('/api/agent', agent);
 app.route('/api/audit', audit);
+app.route('/api/market', market);
+app.route('/api/alert-rules', alertRules);
 app.route('/api/integrations', integrations);
 app.route('/api', settings);
 app.route('/api', common);

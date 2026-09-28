@@ -36,6 +36,12 @@ export interface Holding {
   isEmployerStock?: boolean;
   /** Thuộc danh mục đầu tư (false = tài sản khác: quỹ dự phòng, tài khoản chi tiêu, nhà, xe). Bỏ trống → suy theo loại. */
   inPortfolio?: boolean;
+  /** Mã thị trường (SJC, FPT, VESAF, BTC, USD...) — có mã + số lượng thì giá trị tính theo giá mới nhất. */
+  symbol?: string | null;
+  /** Số lượng (lượng vàng, số cổ phiếu, số chứng chỉ quỹ...). */
+  quantity?: number | null;
+  /** Thời điểm của giá dùng để tính `value` (ISO) — chỉ có khi định giá theo thị trường. */
+  priceAsOf?: string | null;
 }
 
 export interface Goal {

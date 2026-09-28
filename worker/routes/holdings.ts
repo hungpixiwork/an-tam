@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import type { AppEnv } from '../env';
+import type { AppEnv, Env } from '../env';
 import { holdingDefaults } from '../../shared/engine/ledger';
 import { defaultInPortfolio, totalValue } from '../../shared/engine/portfolio';
 import { formatVnd } from '../../shared/format';
@@ -9,6 +9,7 @@ import { auditUserWrite } from '../lib/audit';
 import { afterChange } from '../lib/refresh';
 import { loadUserState, type LoadedState } from '../lib/state';
 import { body, money } from '../lib/validate';
+import { refreshMarket } from '../market/refresh';
 
 export const holdingSchema = z.object({
   name: z.string().trim().min(1, 'Vui lòng nhập tên tài sản').max(60),
@@ -22,6 +23,10 @@ export const holdingSchema = z.object({
   isEmployerStock: z.boolean().optional(),
   /** Tính vào danh mục đầu tư. Bỏ trống → cổ phiếu / quỹ / trái phiếu = có, tiền mặt / khác = không. */
   inPortfolio: z.boolean().optional(),
+  /** Mã thị trường (SJC, FPT, VESAF, BTC, USD...) — có mã + số lượng thì giá trị tính theo giá mới nhất. null = bỏ mã. */
+  symbol: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,12}$/, 'Mã chỉ gồm chữ và số, tối đa 12 ký tự').nullable().optional(),
+  /** Số lượng (lượng vàng, số cổ phiếu, số chứng chỉ quỹ...). */
+  quantity: z.number().gt(0, 'Số lượng phải lớn hơn 0').max(1e12).nullable().optional(),
 });
 export type HoldingInput = z.infer<typeof holdingSchema>;
 
@@ -29,13 +34,22 @@ export function insertHolding(db: D1Database, userId: string, h: HoldingInput) {
   const d = holdingDefaults(h.category);
   return db
     .prepare(
-      `INSERT INTO holdings (id, user_id, name, category, value, role, volatility, risk_group, is_main, sector, is_employer_stock, in_portfolio, order_idx)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, (SELECT COALESCE(MAX(order_idx), 0) + 1 FROM holdings WHERE user_id = ?))`,
+      `INSERT INTO holdings (id, user_id, name, category, value, role, volatility, risk_group, is_main, sector, is_employer_stock, in_portfolio, symbol, quantity, order_idx)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(order_idx), 0) + 1 FROM holdings WHERE user_id = ?))`,
     )
     .bind(
       crypto.randomUUID(), userId, h.name, h.category, h.value, d.role, h.volatility ?? d.volatility, d.riskGroup,
-      h.sector ?? 'other', h.isEmployerStock ? 1 : 0, (h.inPortfolio ?? defaultInPortfolio(h.category)) ? 1 : 0, userId,
+      h.sector ?? 'other', h.isEmployerStock ? 1 : 0, (h.inPortfolio ?? defaultInPortfolio(h.category)) ? 1 : 0, h.symbol ?? null, h.quantity ?? null, userId,
     );
+}
+
+/** Mã mới chưa có giá → lấy ngay (tối đa ~5 giây, lỗi thì bỏ qua — giá trị tạm giữ số nhập tay). */
+async function ensurePrice(env: Env, symbol: string | null | undefined, category?: string) {
+  if (!symbol) return;
+  const has = await env.DB.prepare('SELECT 1 FROM market_prices WHERE symbol = ?').bind(symbol).first();
+  if (has) return;
+  const cat = category ?? (await env.DB.prepare('SELECT category FROM holdings WHERE UPPER(symbol) = ? LIMIT 1').bind(symbol).first<string>('category'));
+  await refreshMarket(env, new Date(), { only: [{ symbol, category: cat }] });
 }
 
 const b01 = (v: boolean | undefined) => (v === undefined ? undefined : v ? 1 : 0);
@@ -53,6 +67,7 @@ export const holdings = new Hono<AppEnv>()
     const h = c.req.valid('json');
     const before = await loadUserState(c.env.DB, userId);
     await insertHolding(c.env.DB, userId, h).run();
+    await ensurePrice(c.env, h.symbol, h.category);
     await afterChange(c.env.DB, userId, { title: 'Cập nhật tài sản', detail: totalLine, before });
     await auditUserWrite(c.env, userId, holdingAudit('create', `Thêm tài sản loại ${CATEGORY_LABEL[h.category]}`, null));
     return ok(c, null, 201);
@@ -72,6 +87,8 @@ export const holdings = new Hono<AppEnv>()
       sector: h.sector,
       is_employer_stock: b01(h.isEmployerStock),
       in_portfolio: b01(h.inPortfolio),
+      symbol: h.symbol,
+      quantity: h.quantity,
     };
     const entries = Object.entries(cols).filter(([, v]) => v !== undefined);
     if (entries.length === 0) return ok(c, null);
@@ -80,6 +97,7 @@ export const holdings = new Hono<AppEnv>()
       .bind(...entries.map(([, v]) => v), c.req.param('id'), userId)
       .run();
     if (!res.meta.changes) throw notFound('Không tìm thấy tài sản');
+    await ensurePrice(c.env, h.symbol, h.category);
     await afterChange(c.env.DB, userId, { title: 'Cập nhật tài sản', detail: totalLine, before });
     await auditUserWrite(c.env, userId, holdingAudit('update', 'Cập nhật thông tin tài sản', c.req.param('id')));
     return ok(c, null);

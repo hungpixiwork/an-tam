@@ -5,6 +5,7 @@ import type { FinancialProfile, Goal, Holding, Liability, MonthTotal, Salutation
 import { evaluateAlerts, type AlertCandidate } from '../../shared/engine/alerts';
 import { effectiveProfile, type EffectiveProfile } from '../../shared/engine/ledger';
 import { addMonths, currentMonth } from '../../shared/engine/month';
+import { holdingPricesQuery, marketValue, type PriceForValue } from '../market/valuation';
 
 interface UserRow {
   id: string; email: string; full_name: string; salutation: Salutation;
@@ -15,6 +16,7 @@ interface HoldingRow {
   id: string; name: string; category: Holding['category']; value: number; role: string;
   volatility: Holding['volatility']; risk_group: string; is_main: number;
   sector: Holding['sector']; is_employer_stock: number; in_portfolio: number;
+  symbol: string | null; quantity: number | null;
 }
 interface LiabilityRow {
   id: string; name: string; kind: Liability['kind']; balance: number; monthly_payment: number; rate_bp: number;
@@ -48,7 +50,7 @@ export interface LoadedState extends UserState {
 }
 
 export async function loadUserState(db: D1Database, userId: string, today = currentMonth()): Promise<LoadedState> {
-  const [user, profile, holdings, goals, snapshots, ledger, liabilities] = await db.batch([
+  const [user, profile, holdings, goals, snapshots, ledger, liabilities, prices] = await db.batch([
     db.prepare('SELECT salutation FROM users WHERE id = ?').bind(userId),
     db.prepare('SELECT * FROM financial_profiles WHERE user_id = ?').bind(userId),
     db.prepare('SELECT * FROM holdings WHERE user_id = ? ORDER BY order_idx').bind(userId),
@@ -61,7 +63,9 @@ export async function loadUserState(db: D1Database, userId: string, today = curr
        FROM transactions WHERE user_id = ? AND occurred_on >= ? GROUP BY month ORDER BY month`,
     ).bind(userId, `${addMonths(today, -11)}-01`),
     db.prepare('SELECT id, name, kind, balance, monthly_payment, rate_bp FROM liabilities WHERE user_id = ? ORDER BY order_idx, created_at').bind(userId),
+    holdingPricesQuery(db, userId),
   ]);
+  const priceMap = new Map((prices.results as unknown as PriceForValue[]).map((p) => [p.symbol, p]));
   const u = (user.results[0] ?? {}) as Record<string, string>;
   const salutation = (u.salutation ?? 'bạn') as Salutation;
   const p = (profile.results[0] ?? {}) as Record<string, number>;
@@ -82,7 +86,9 @@ export async function loadUserState(db: D1Database, userId: string, today = curr
     baseline,
     sources,
     holdings: (holdings.results as unknown as HoldingRow[]).map((h) => ({
-      id: h.id, name: h.name, category: h.category, value: h.value, role: h.role,
+      id: h.id, name: h.name, category: h.category, role: h.role,
+      // Có mã + số lượng + giá thị trường → giá trị theo giá mới nhất; không thì giữ số nhập tay
+      ...marketValue(h, priceMap), symbol: h.symbol ?? null, quantity: h.quantity ?? null,
       volatility: h.volatility, riskGroup: h.risk_group, isMain: h.is_main === 1,
       sector: h.sector ?? 'other', isEmployerStock: h.is_employer_stock === 1, inPortfolio: h.in_portfolio !== 0,
     })),
@@ -129,7 +135,8 @@ export async function syncAlerts(db: D1Database, userId: string, state: UserStat
     );
   }
   for (const key of openKeys) {
-    if (activeKeys.has(key)) continue;
+    // Cảnh báo thị trường (worker/market/alerts.ts) do người dùng tự đóng, không tự đóng theo luật tài chính
+    if (activeKeys.has(key) || key.startsWith('market:')) continue;
     statements.push(
       db.prepare("UPDATE ai_alerts SET status = 'resolved', resolved_at = ? WHERE user_id = ? AND rule_key = ? AND status = 'open'")
         .bind(now.toISOString(), userId, key),
