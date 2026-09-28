@@ -15,3 +15,4 @@ export * from './safety';
 export * from './allocation';
 export * from './market';
 export * from './signals';
+export * from './decision';
