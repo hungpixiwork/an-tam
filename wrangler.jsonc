@@ -9,7 +9,7 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     // API và Assets do Worker xử lý, chặn SPA fallback nuốt nhầm assets không tồn tại
-    "run_worker_first": ["/api/*", "/assets/*"]
+    "run_worker_first": ["/api/*", "/assets/*", "/mcp", "/authorize", "/token", "/register", "/.well-known/*"]
   },
   "d1_databases": [
     {
@@ -50,7 +50,6 @@
   // TOKEN_ENC_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, NOTION_CLIENT_ID, NOTION_CLIENT_SECRET,
   // SEPAY_WEBHOOK_KEY, SEPAY_API_TOKEN, AUDIT_HASH_SALT, PLAN_RECEIVER_BANK, PLAN_RECEIVER_ACCOUNT, PLAN_RECEIVER_NAME
   //
-  // Wave MCP: run_worker_first thêm "/mcp", "/oauth/*", "/.well-known/*"
   "triggers": {
     "crons": [
       // 08:00 giờ Việt Nam — "AI theo dõi" chạy lại cảnh báo cho mọi người dùng

@@ -48,6 +48,7 @@ import { desk } from './desk/routes';
 
 // Workflow bàn đầu tư (wrangler.jsonc → workflows)
 export { DeskWorkflow } from './desk/workflow';
+import { withMcp } from './mcp';
 
 const app = new Hono<AppEnv>();
 
@@ -174,7 +175,8 @@ async function runFrequent(env: Env): Promise<void> {
 }
 
 export default {
-  fetch: app.fetch,
+  // /mcp + OAuth (/authorize, /token, /register, /.well-known/*) → worker/mcp; còn lại → app Hono
+  fetch: withMcp(app.fetch),
   scheduled: (controller: ScheduledController, env: Env, ctx: ExecutionContext) => {
     // Cron lạ (vd. wrangler dev --test-scheduled) chạy job hằng ngày như trước
     ctx.waitUntil(controller.cron === CRON_FREQUENT ? runFrequent(env) : runMonitor(env));
