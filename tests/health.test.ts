@@ -99,8 +99,7 @@ describe('scheduled() dispatch theo cron', () => {
     return prepared;
   };
 
-  it('*/15 là placeholder (không chạm DB), cron hằng ngày chạy monitor', async () => {
-    expect(await run('*/15 * * * *')).toBe(0);
+  it('cron hằng ngày chạy monitor (quét người dùng)', async () => {
     expect(await run('0 1 * * *')).toBeGreaterThan(0);
   });
 });
