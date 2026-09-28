@@ -11,6 +11,8 @@ import { body, dateString } from '../lib/validate';
 import { idempotent } from '../lib/idempotency';
 import { latestRunId, listActions, loadRunView, runAgent } from '../agents/runner';
 import { approveAndExecute, decline } from '../agents/executor';
+import { usedToday, userPlan } from '../lib/usage';
+import { PLANS } from '../../shared/plans';
 
 const runSchema = z.object({ prompt: z.string().trim().min(3, 'Vui lòng nhập yêu cầu').max(500), weekStart: dateString.optional() });
 const noteSchema = z.object({ note: z.string().trim().max(300).default('') });
@@ -47,8 +49,10 @@ export const agents = new Hono<AppEnv>().get('/', async (c) => {
 export const agent = new Hono<AppEnv>()
   .post('/runs', body(runSchema), async (c) => {
     const { prompt, weekStart } = c.req.valid('json');
-    const id = await runAgent(c.env, c.get('userId'), { prompt, weekStart });
-    return ok(c, await loadRunView(c.env.DB, c.get('userId'), id), 201);
+    const userId = c.get('userId');
+    const id = await runAgent(c.env, userId, { prompt, weekStart });
+    const [view, { plan }, used] = await Promise.all([loadRunView(c.env.DB, userId, id), userPlan(c.env.DB, userId), usedToday(c.env.DB, userId)]);
+    return ok(c, { ...view, aiQuota: { used, limit: PLANS[plan].aiPerDay } }, 201);
   })
   .get('/runs/latest', async (c) => {
     const id = await latestRunId(c.env.DB, c.get('userId'));
