@@ -80,11 +80,12 @@ async function profile() {
 // tài sản khác 250tr (quỹ dự phòng, tài khoản chi tiêu, góp vốn nhà, xe).
 const HOLDINGS = [
   { name: 'Cổ phiếu công ty (thưởng)', category: 'stock', value: 112 * M, sector: 'technology', isEmployerStock: true, inPortfolio: true },
-  { name: 'Cổ phiếu FPT & CMG', category: 'stock', value: 32 * M, sector: 'technology', inPortfolio: true },
-  { name: 'Quỹ ETF VN30', category: 'fund', value: 80 * M, sector: 'finance', inPortfolio: true },
+  { name: 'Cổ phiếu FPT', category: 'stock', value: 32 * M, sector: 'technology', inPortfolio: true, symbol: 'FPT' },
+  { name: 'Quỹ ETF VN30', category: 'fund', value: 56 * M, sector: 'finance', inPortfolio: true },
+  { name: 'Chứng chỉ quỹ VESAF', category: 'fund', value: 24 * M, sector: 'finance', inPortfolio: true, symbol: 'VESAF' },
   { name: 'Trái phiếu doanh nghiệp tiêu dùng', category: 'bond', value: 48 * M, sector: 'consumer', inPortfolio: true },
   { name: 'Tiền chờ đầu tư', category: 'cash', value: 32 * M, sector: 'other', inPortfolio: true },
-  { name: 'Vàng SJC', category: 'other', value: 16 * M, volatility: 'low', sector: 'other', inPortfolio: true },
+  { name: 'Vàng SJC', category: 'other', value: 16 * M, volatility: 'low', sector: 'other', inPortfolio: true, symbol: 'SJC' },
   { name: 'Tiết kiệm ngân hàng (quỹ dự phòng)', category: 'cash', value: 84 * M, inPortfolio: false },
   { name: 'Tài khoản thanh toán', category: 'cash', value: 16 * M, inPortfolio: false },
   { name: 'Góp vốn mua nhà cùng bố mẹ', category: 'other', value: 90 * M, sector: 'real_estate', inPortfolio: false },
@@ -97,6 +98,39 @@ async function assets() {
   for (const h of HOLDINGS) await post('/holdings', h);
   for (const l of await get('/liabilities')) await del(`/liabilities/${l.id}`);
   for (const l of LIABILITIES) await post('/liabilities', l);
+}
+
+/* ───────── 3b. Mã & số lượng theo giá thị trường ───────── */
+// Có mã + số lượng → giá trị tính theo giá mới nhất. Số lượng suy từ giá trị ở HOLDINGS (vàng làm tròn theo chỉ = 0,1 lượng,
+// cổ phiếu theo cổ, quỹ 0,01 chứng chỉ); phần lệch bù vào "Tiền chờ đầu tư" để tài sản ròng vẫn khoảng 520 triệu.
+const QTY_STEP = { SJC: 0.1, FPT: 1, VESAF: 0.01 };
+
+async function marketHoldings() {
+  const prices = new Map((await get('/market')).quotes.map((q) => [q.symbol, q.price]));
+  const target = new Map(HOLDINGS.map((h) => [h.name, h.value]));
+  const missing = [];
+  let drift = 0;
+  for (const h of await get('/holdings')) {
+    const step = QTY_STEP[h.symbol];
+    if (!step) continue;
+    const price = prices.get(h.symbol);
+    if (!price) {
+      missing.push(h.symbol); // chưa lấy được giá → giữ giá trị nhập tay
+      continue;
+    }
+    const quantity = Number(Math.max(step, Math.round(target.get(h.name) / price / step) * step).toFixed(2));
+    await patch(`/holdings/${h.id}`, { quantity });
+    drift += Math.round(quantity * price) - target.get(h.name);
+  }
+  const cash = (await get('/holdings')).find((h) => h.name === 'Tiền chờ đầu tư');
+  if (cash && drift) await patch(`/holdings/${cash.id}`, { value: Math.max(0, cash.value - drift) });
+  if (missing.length) process.stdout.write(`(chưa có giá ${missing.join(', ')}) `);
+}
+
+/* ───────── 3c. Cảnh báo giá: vàng SJC giảm 3% ───────── */
+async function alertRules() {
+  for (const r of await get('/alert-rules')) await del(`/alert-rules/${r.id}`);
+  await post('/alert-rules', { symbol: 'SJC', direction: 'down', thresholdPct: 3 });
 }
 
 /* ───────── 4. Mục tiêu ───────── */
@@ -340,6 +374,33 @@ async function lifeChoices() {
   if (first) await patch(`/life-choices/${id}/tasks/${first.id}`, { detail: 'Bổ sung thêm 4 tháng chi phí sinh hoạt (~80.000.000đ) trong 6 tháng tới.' });
 }
 
+/* ───────── 8b. Lựa chọn: học thạc sĩ ở Thâm Quyến (chi phí tính bằng CNY, đổi theo tỷ giá thật) ───────── */
+const SHENZHEN = 'Học thạc sĩ 2 năm ở Thâm Quyến';
+
+async function lifeChoiceShenzhen() {
+  const cny = (await get('/market')).quotes.find((q) => q.symbol === 'CNY');
+  const rate = cny && !cny.stale && cny.price > 2_000 && cny.price < 6_000 ? cny.price : 3_800; // không có giá mới → ~3.800đ/CNY
+  const vnd = (amount) => Math.round((amount * rate) / (100 * K)) * 100 * K;
+  const tuition = vnd(2 * 45_000); // học phí sinh viên quốc tế ~45.000 CNY/năm
+  const other = vnd(24 * 1_300 + 2 * 800 + 6_000); // ký túc xá ~1.300 CNY/tháng, bảo hiểm ~800 CNY/năm, visa + vé máy bay ~6.000 CNY
+  for (const c of await get('/life-choices')) if (c.title === SHENZHEN) await del(`/life-choices/${c.id}`);
+  const { id } = await post('/life-choices', {
+    title: SHENZHEN,
+    kind: 'study',
+    description: 'Thạc sĩ Khoa học dữ liệu 2 năm tại Thâm Quyến (Trung Quốc). Học phí, ký túc xá, bảo hiểm, visa tính bằng nhân dân tệ, đổi theo tỷ giá hôm nay.',
+    icon: 'graduation-cap',
+    cost: tuition + other,
+    incomeUpliftPct: 35,
+    outcome: 'Làm chuyên viên dữ liệu cho công ty có thị trường Trung Quốc',
+    steps: ['Tìm hiểu trường', 'Thi HSK & hồ sơ', 'Chuẩn bị tài chính', 'Nhập học'],
+    currentStep: 1,
+  });
+  const base = { cost: tuition, otherCost: other, durationMonths: 24 };
+  await post(`/life-choices/${id}/options`, { ...base, title: 'Nghỉ việc, học toàn thời gian', monthsWithoutIncome: 24, monthlyIncomeDelta: 0 });
+  await post(`/life-choices/${id}/options`, { ...base, title: 'Vừa học vừa làm từ xa bán thời gian', monthsWithoutIncome: 0, monthlyIncomeDelta: -14 * M });
+  process.stdout.write(`(1 CNY = ${rate.toLocaleString('vi-VN')}đ) `);
+}
+
 /* ───────── 9. Kỹ năng đang học + kế hoạch học 7 ngày (trang Tăng thu nhập) ───────── */
 const SKILLS = [
   { name: 'Phân tích dữ liệu', tag: 'data', stage: 'foundation', monthsMin: 1, monthsMax: 3, hoursPerWeek: 4, progress: 60 },
@@ -370,13 +431,14 @@ async function skills() {
 }
 
 /* ───────── 10. Ngân hàng SePay + nhật ký AI (trang 9) ───────── */
-// Khóa webhook: biến môi trường SEPAY_WEBHOOK_KEY hoặc dòng SEPAY_WEBHOOK_KEY=… trong .dev.vars
-async function sepayKey() {
-  if (process.env.SEPAY_WEBHOOK_KEY) return process.env.SEPAY_WEBHOOK_KEY;
+// Biến dev: biến môi trường cùng tên hoặc dòng TÊN=… trong .dev.vars
+async function devVar(name) {
+  if (process.env[name]) return process.env[name];
   const { readFile } = await import('node:fs/promises');
   const vars = await readFile(new URL('../.dev.vars', import.meta.url), 'utf8').catch(() => '');
-  return /^SEPAY_WEBHOOK_KEY=(.*)$/m.exec(vars)?.[1]?.trim() ?? '';
+  return new RegExp(`^${name}=(.*)$`, 'm').exec(vars)?.[1]?.trim() ?? '';
 }
+const sepayKey = () => devVar('SEPAY_WEBHOOK_KEY');
 
 const DEMO_ACCOUNT = '0071000886789';
 
@@ -438,11 +500,42 @@ async function workspace() {
   return run;
 }
 
+/* ───────── 11. Gói Plus cho buổi demo (chỉ dev) ───────── */
+// Đi đúng đường thật: checkout lấy mã ANTAM… → giả SePay báo tiền về tài khoản nhận. Thiếu PLAN_RECEIVER_ACCOUNT / SEPAY_WEBHOOK_KEY
+// trong .dev.vars → bỏ qua; SEED_PLAN_SQL=1 thì in lệnh D1 để tự chạy.
+async function planPlus() {
+  const current = await get('/plan');
+  if (current.plan !== 'free') return process.stdout.write(`(đang dùng ${current.plan}) `);
+  const [receiver, key] = await Promise.all([devVar('PLAN_RECEIVER_ACCOUNT'), sepayKey()]);
+  if (receiver && key) {
+    const { code, amount } = await post('/plan/checkout');
+    const res = await fetch(`${API}/api/webhooks/sepay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Apikey ${key}` },
+      body: JSON.stringify({
+        id: `plan-${code}`, gateway: 'Vietcombank', transactionDate: `${today} 09:00:00`, accountNumber: receiver, code: null,
+        content: `${code} nang goi Plus`, transferType: 'in', transferAmount: amount, accumulated: 0, subAccount: null, referenceCode: `FT${code}`, description: code,
+      }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || json?.data?.status !== 'plan_paid') throw new Error(`Nâng gói qua webhook → ${res.status} ${json?.data?.status ?? ''}`);
+    return;
+  }
+  if (process.env.SEED_PLAN_SQL === '1') {
+    const sql = `UPDATE users SET plan = 'plus', plan_until = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days') WHERE email = '${EMAIL}'`;
+    return process.stdout.write(`\n  chạy lệnh: npx wrangler d1 execute an-tam-db --local --command "${sql}"\n  `);
+  }
+  process.stdout.write('(bỏ qua: .dev.vars thiếu PLAN_RECEIVER_ACCOUNT hoặc SEPAY_WEBHOOK_KEY; đặt SEED_PLAN_SQL=1 để in lệnh D1) ');
+}
+
 /* ───────── Chạy ───────── */
 const steps = [
   ['Tài khoản', login],
+  ['Gói Plus cho demo', planPlus],
   ['Thu chi cơ bản', profile],
   ['Tài sản & nợ', assets],
+  ['Mã & số lượng theo giá thị trường', marketHoldings],
+  ['Cảnh báo giá vàng', alertRules],
   ['Mục tiêu', goals],
   ['Biểu tượng & kỳ hạn mục tiêu', goalLooks],
   ['Sổ thu chi 6 tháng', ledger],
@@ -450,6 +543,7 @@ const steps = [
   ['Thu nhập, thời gian, kỹ năng', earn],
   ['Lịch AI cả tuần', calendar],
   ['Lựa chọn cuộc đời', lifeChoices],
+  ['Lựa chọn: thạc sĩ ở Thâm Quyến', lifeChoiceShenzhen],
   ['Kỹ năng & kế hoạch học', skills],
   ['AI Workspace: lượt agent chờ duyệt', workspace],
   ['Hiện lại đề xuất đã ẩn', () => del('/overview/suggestions/dismissals')],
