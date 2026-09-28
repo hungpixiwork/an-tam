@@ -23,23 +23,38 @@
   "vars": {
     // Origin công khai cho redirect OAuth; để trống = lấy origin từ request
     "APP_ORIGIN": "",
-    // Bộ phân loại ý định agent: "rules" (mặc định) | "workers-ai"
-    "INTENT_PROVIDER": "rules"
+    // Bộ phân loại ý định agent: "rules" | "workers-ai" (hết lượt AI theo gói → tự dùng luật)
+    "INTENT_PROVIDER": "workers-ai"
   },
+  // Workers AI (Qwen3) — wrangler dev gọi AI thật trên tài khoản đã đăng nhập (lỗi / chưa login → agent dùng luật)
+  "ai": { "binding": "AI", "remote": true },
+  // KV cho MCP OAuth. Không ghi id: wrangler dev dùng KV cục bộ, wrangler deploy tự tạo namespace.
+  // Nếu đã có namespace (wrangler kv namespace create OAUTH_KV) thì thêm "id": "<id>".
+  "kv_namespaces": [{ "binding": "OAUTH_KV" }],
+  // Việc nền theo từng người dùng: cron chỉ đẩy lô userId, consumer (worker/index.ts → queue) xử lý.
+  // Tạo trước khi deploy: wrangler queues create an-tam-jobs && wrangler queues create an-tam-jobs-dlq
+  "queues": {
+    "producers": [{ "binding": "JOBS", "queue": "an-tam-jobs" }],
+    "consumers": [
+      { "queue": "an-tam-jobs", "max_batch_size": 10, "max_batch_timeout": 5, "max_retries": 3, "dead_letter_queue": "an-tam-jobs-dlq" }
+    ]
+  },
+  // Workers Rate Limiting (namespace_id: số nguyên dạng chuỗi, duy nhất trong tài khoản; period chỉ 10 hoặc 60 giây)
+  "ratelimits": [
+    { "name": "RL_AUTH", "namespace_id": "2401", "simple": { "limit": 10, "period": 60 } },
+    { "name": "RL_AI", "namespace_id": "2402", "simple": { "limit": 30, "period": 60 } }
+  ],
   // Secrets (wrangler secret put …, local: .dev.vars — xem .dev.vars.example):
   // TOKEN_ENC_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, NOTION_CLIENT_ID, NOTION_CLIENT_SECRET,
-  // SEPAY_WEBHOOK_KEY, SEPAY_API_TOKEN, AUDIT_HASH_SALT
+  // SEPAY_WEBHOOK_KEY, SEPAY_API_TOKEN, AUDIT_HASH_SALT, PLAN_RECEIVER_BANK, PLAN_RECEIVER_ACCOUNT, PLAN_RECEIVER_NAME
   //
-  // Wave sau thêm (cần ID thật / remote):
-  // "ai": { "binding": "AI" },
-  // "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "<wrangler kv namespace create OAUTH_KV>" }],
-  // và run_worker_first thêm "/mcp", "/oauth/*", "/.well-known/*"
+  // Wave MCP: run_worker_first thêm "/mcp", "/oauth/*", "/.well-known/*"
   "triggers": {
     "crons": [
       // 08:00 giờ Việt Nam — "AI theo dõi" chạy lại cảnh báo cho mọi người dùng
       "0 1 * * *",
-      // Mỗi 15 phút — automation / đồng bộ / dọn dữ liệu hết hạn (worker/index.ts → scheduled)
-      "*/15 * * * *"
+      // Mỗi giờ (phút 05) — giá thị trường, automation / đồng bộ / dọn dữ liệu hết hạn (worker/index.ts → scheduled)
+      "5 * * * *"
     ]
   },
   "observability": { "enabled": true }

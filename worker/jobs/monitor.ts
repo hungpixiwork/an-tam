@@ -1,23 +1,28 @@
-// Cron "AI theo dõi": chạy engine cho mọi người dùng, mở / đóng cảnh báo, chụp snapshot tháng.
+// Cron "AI theo dõi" hằng ngày: chỉ lật trang danh sách người dùng theo keyset (id > ?) và đẩy từng lô
+// { type: 'user.refresh', userId } vào Queue an-tam-jobs — consumer (worker/jobs/handlers.ts) làm việc nặng.
+// Không có binding JOBS (test / môi trường thiếu Queue) → xử lý trực tiếp từng người như trước.
 
-import type { Env } from '../env';
-import { snapshotStatement } from '../lib/refresh';
-import { loadUserState, syncAlerts } from '../lib/state';
+import type { Env, JobMessage } from '../env';
+import { refreshUser } from './handlers';
 
-const BATCH = 50;
+/** Kích thước trang keyset; sendBatch nhận tối đa 100 thông điệp mỗi lần. */
+export const PAGE = 100;
 
-export async function runMonitor(env: Env): Promise<void> {
-  let offset = 0;
+export async function runMonitor(env: Env): Promise<{ users: number }> {
+  let after = '';
+  let users = 0;
   for (;;) {
-    const { results } = await env.DB.prepare('SELECT id FROM users ORDER BY id LIMIT ? OFFSET ?').bind(BATCH, offset).all<{ id: string }>();
-    for (const { id } of results) {
-      const state = await loadUserState(env.DB, id);
-      await syncAlerts(env.DB, id, state);
-      // Chụp lại snapshot tháng hiện tại mỗi ngày — tháng khép lại sẽ giữ số của ngày cuối cùng
-      await snapshotStatement(env.DB, id, state).run();
+    const { results } = await env.DB.prepare('SELECT id FROM users WHERE id > ? ORDER BY id LIMIT ?').bind(after, PAGE).all<{ id: string }>();
+    if (!results.length) break;
+    if (env.JOBS) {
+      await env.JOBS.sendBatch(results.map(({ id }) => ({ body: { type: 'user.refresh', userId: id } satisfies JobMessage })));
+    } else {
+      for (const { id } of results) await refreshUser(env, id);
     }
-    if (results.length < BATCH) break;
-    offset += BATCH;
+    users += results.length;
+    after = results[results.length - 1].id;
+    if (results.length < PAGE) break;
   }
   await env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(new Date().toISOString()).run();
+  return { users };
 }

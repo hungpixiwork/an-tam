@@ -5,11 +5,13 @@ import type { FinancialProfile, Goal, Holding, Liability, MonthTotal, Salutation
 import { evaluateAlerts, type AlertCandidate } from '../../shared/engine/alerts';
 import { effectiveProfile, type EffectiveProfile } from '../../shared/engine/ledger';
 import { addMonths, currentMonth } from '../../shared/engine/month';
+import { PLAN_LABEL, effectivePlan } from '../../shared/plans';
 
 interface UserRow {
   id: string; email: string; full_name: string; salutation: Salutation;
   avatar_seed: number; member_status: string; onboarded_at: string | null;
   life_stage: string | null;
+  plan?: string | null; plan_until?: string | null;
 }
 interface HoldingRow {
   id: string; name: string; category: Holding['category']; value: number; role: string;
@@ -31,7 +33,8 @@ export const toMe = (u: UserRow): Me => ({
   fullName: u.full_name,
   salutation: u.salutation,
   avatarSeed: u.avatar_seed,
-  memberStatus: u.member_status,
+  // Gói trả phí đang hiệu lực thay nhãn thành viên; gói miễn phí giữ nhãn cũ
+  memberStatus: ((p) => (p === 'free' ? u.member_status : PLAN_LABEL[p]))(effectivePlan(u.plan, u.plan_until)),
   onboarded: u.onboarded_at !== null,
   lifeStage: u.life_stage ?? undefined,
 });

@@ -81,7 +81,7 @@ export async function runAgent(env: Env, userId: string, input: RunInput): Promi
 
   try {
     const rules = parseIntentRules(note ? `${masked} ${note}` : masked);
-    const intent: IntentResult = mergeIntents(await classifyIntentLLM(env, masked), rules);
+    const intent: IntentResult = mergeIntents(await classifyIntentLLM(env, masked, userId), rules);
     const weekStart = targetWeek(masked, input.weekStart);
     const plan = planRun(await loadContext(env, userId, weekStart, note), intent.intents);
     const created = new Date();

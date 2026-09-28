@@ -1,10 +1,16 @@
 export interface Env {
   DB: D1Database;
   ASSETS?: Fetcher;
-  /** Workers AI (Qwen3) — binding thêm ở wave AI. */
+  /** Workers AI (Qwen3). Tùy chọn để test / môi trường thiếu binding vẫn chạy (dùng luật). */
   AI?: Ai;
-  /** KV cho @cloudflare/workers-oauth-provider (MCP) — binding thêm ở wave MCP. */
+  /** KV cho @cloudflare/workers-oauth-provider (MCP). */
   OAUTH_KV?: KVNamespace;
+  /** Queue an-tam-jobs (producer). Thiếu (test) → job chạy trực tiếp. */
+  JOBS?: Queue<JobMessage>;
+  /** Workers Rate Limiting: đăng nhập / đăng ký (10 lần / 60 giây theo IP). */
+  RL_AUTH?: RateLimit;
+  /** Workers Rate Limiting: lượt chạy agent (30 lần / 60 giây theo người dùng). */
+  RL_AI?: RateLimit;
 
   // vars (wrangler.jsonc)
   /** Origin công khai, ví dụ https://antam.example — dùng cho redirect OAuth. */
@@ -23,7 +29,14 @@ export interface Env {
   SEPAY_API_TOKEN?: string;
   /** Khóa HMAC cho chuỗi hash audit_log (worker/lib/audit.ts). */
   AUDIT_HASH_SALT?: string;
+  /** Tài khoản nhận tiền nâng gói (VietQR): mã BIN ngân hàng, số tài khoản, tên chủ tài khoản. */
+  PLAN_RECEIVER_BANK?: string;
+  PLAN_RECEIVER_ACCOUNT?: string;
+  PLAN_RECEIVER_NAME?: string;
 }
+
+/** Thông điệp trong Queue an-tam-jobs — worker/jobs/handlers.ts xử lý theo `type`. */
+export interface JobMessage { type: 'user.refresh' | (string & {}); userId?: string }
 
 export interface Variables {
   userId: string;

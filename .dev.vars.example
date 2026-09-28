@@ -20,3 +20,9 @@ NOTION_CLIENT_SECRET=
 # Trên SePay chọn "Xác thực: API Key" và dán cùng giá trị. Máy local: chuỗi bất kỳ (scripts/seed-demo.mjs đọc từ .dev.vars).
 SEPAY_WEBHOOK_KEY=
 SEPAY_API_TOKEN=
+
+# Tài khoản nhận tiền nâng Gói Plus (VietQR): mã BIN ngân hàng (vd. 970436 = Vietcombank), số tài khoản, tên chủ tài khoản.
+# Để trống → POST /api/plan/checkout trả qrUrl = null.
+PLAN_RECEIVER_BANK=
+PLAN_RECEIVER_ACCOUNT=
+PLAN_RECEIVER_NAME=

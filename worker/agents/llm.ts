@@ -3,6 +3,7 @@
 
 import type { Env } from '../env';
 import { INTENTS, IntentSchema, type Intent } from '../../shared/agent/intent';
+import { consumeAi } from '../lib/usage';
 
 export const INTENT_MODEL = '@cf/qwen/qwen3-30b-a3b-fp8';
 const TIMEOUT_MS = 3000;
@@ -14,8 +15,10 @@ follow_up_clients = khách hàng, freelance; review_goals = mục tiêu tài ch�
 
 export const llmAvailable = (env: Env) => !!env.AI && env.INTENT_PROVIDER === 'workers-ai';
 
-export async function classifyIntentLLM(env: Env, maskedPrompt: string): Promise<Intent[] | null> {
+/** Có `userId` → trừ 1 lượt AI theo gói; hết lượt → null (runner dùng luật, không báo lỗi). */
+export async function classifyIntentLLM(env: Env, maskedPrompt: string, userId?: string): Promise<Intent[] | null> {
   if (!llmAvailable(env)) return null;
+  if (userId && !(await consumeAi(env, userId, 'intent')).allowed) return null;
   try {
     const call = env.AI!.run(INTENT_MODEL as Parameters<Ai['run']>[0], {
       messages: [

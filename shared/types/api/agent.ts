@@ -63,6 +63,8 @@ export interface AgentRunView {
   plannedEvents: PlannedEventView[];
   /** Công cụ bên ngoài lượt này dùng / sẽ dùng. */
   tools: string[];
+  /** Lượt AI đã dùng hôm nay / hạn mức theo gói (chỉ có trong phản hồi POST /runs). */
+  aiQuota?: { used: number; limit: number };
 }
 
 export type AgentKeyName = 'planner' | 'calendar' | 'cashflow' | 'skill' | 'goal';

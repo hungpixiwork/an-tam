@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import type { AppEnv, Env } from './env';
+import type { AppEnv, Env, JobMessage } from './env';
 import { ApiError } from './lib/http';
 import { requireAuth } from './middleware/auth';
+import { clientIp, rateLimit } from './middleware/rateLimit';
 import { auth } from './routes/auth';
 import { common } from './routes/common';
 import { overview } from './routes/overview';
@@ -34,7 +35,10 @@ import { audit } from './routes/audit';
 import { integrations } from './routes/integrations';
 import { webhooks } from './routes/webhooks';
 import { health, APP_VERSION, BUILD_TIME } from './routes/health';
+import { plan } from './routes/plan';
 import { runMonitor } from './jobs/monitor';
+import { consumeJobs } from './jobs/handlers';
+import { refreshMarket } from './market/refresh';
 
 const app = new Hono<AppEnv>();
 
@@ -76,6 +80,9 @@ app.all('/assets/*', async (c) => {
 });
 
 // ── Công khai (trước requireAuth) ──
+// Chống dò mật khẩu / tạo tài khoản hàng loạt: đếm theo IP
+app.use('/api/auth/login', rateLimit('RL_AUTH', clientIp));
+app.use('/api/auth/register', rateLimit('RL_AUTH', clientIp));
 app.route('/api/auth', auth);
 app.route('/api/health', health);
 app.route('/api/webhooks', webhooks);
@@ -92,6 +99,8 @@ app.get('/api/version', (c) =>
 
 // Mọi API còn lại yêu cầu đăng nhập
 app.use('/api/*', requireAuth);
+// Lượt chạy agent tốn AI: đếm theo người dùng
+app.use('/api/agent/runs', rateLimit('RL_AI', (c) => c.get('userId')));
 app.route('/api/onboarding', onboarding);
 app.route('/api/profile', profile);
 app.route('/api/holdings', holdings);
@@ -123,16 +132,23 @@ app.route('/api/agents', agents);
 app.route('/api/agent', agent);
 app.route('/api/audit', audit);
 app.route('/api/integrations', integrations);
+app.route('/api/plan', plan);
 app.route('/api', settings);
 app.route('/api', common);
 
 app.notFound((c) => c.json({ success: false, error: { code: 'not_found', message: 'API không tồn tại' } }, 404));
 
 /** Khớp "triggers.crons" trong wrangler.jsonc (worker entry không export hằng số — workerd coi named export là entrypoint). Hằng ngày: "0 1 * * *". */
-const CRON_FREQUENT = '*/15 * * * *';
+const CRON_FREQUENT = '5 * * * *';
 
-/** Mỗi 15 phút: automation / đồng bộ lịch / dọn dữ liệu hết hạn — các wave sau gắn job vào đây. */
-async function runFrequent(_env: Env): Promise<void> {
+/** Mỗi giờ: cập nhật giá thị trường một lần; automation / đồng bộ lịch / dọn dữ liệu hết hạn — các wave sau gắn job vào đây. */
+async function runFrequent(env: Env): Promise<void> {
+  try {
+    await refreshMarket(env);
+    // TODO(wave 2): đẩy 'user.refresh' vào env.JOBS cho người đang giữ mã có giá vừa đổi (updated)
+  } catch (err) {
+    console.error('refreshMarket', err);
+  }
   // TODO(wave 2–3): worker/jobs/{automation,sync,purge}.ts
 }
 
@@ -142,4 +158,6 @@ export default {
     // Cron lạ (vd. wrangler dev --test-scheduled) chạy job hằng ngày như trước
     ctx.waitUntil(controller.cron === CRON_FREQUENT ? runFrequent(env) : runMonitor(env));
   },
-} satisfies ExportedHandler<Env>;
+  // Consumer Queue an-tam-jobs (wrangler.jsonc → queues.consumers)
+  queue: (batch: MessageBatch<JobMessage>, env: Env) => consumeJobs(batch, env),
+} satisfies ExportedHandler<Env, JobMessage>;
