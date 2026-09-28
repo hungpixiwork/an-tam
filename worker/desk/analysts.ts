@@ -297,21 +297,25 @@ export const maxRisk = (a: DeskRiskLevel, b: DeskRiskLevel): DeskRiskLevel => (R
 const bump = (r: DeskRiskLevel): DeskRiskLevel => RISK_ORDER[Math.min(2, RISK_ORDER.indexOf(r) + 1)];
 
 /** Kết luận do code tính — nền cho AI, và là kết luận dùng luôn khi không có AI. */
-export function codeVerdict(analysts: DeskAnalystReport[], m: TechnicalMetrics): DeskVerdict {
+export function codeVerdict(analysts: DeskAnalystReport[], m: TechnicalMetrics | null): DeskVerdict {
   const live = analysts.filter((a) => a.available);
   const total = live.reduce((s, a) => s + a.score, 0);
+  const chg20 = m?.chg20 ?? null;
+  const maTrend = m?.maTrend ?? 0;
+  const vol20 = m?.vol20 ?? null;
+  const drawdown = m?.drawdown ?? null;
   let trend: DeskTrend;
-  if (m.chg20 !== null && m.chg20 > 0.03 && m.maTrend >= 0) trend = 'tang';
-  else if (m.chg20 !== null && m.chg20 < -0.03 && m.maTrend <= 0) trend = 'giam';
+  if (chg20 !== null && chg20 > 0.03 && maTrend >= 0) trend = 'tang';
+  else if (chg20 !== null && chg20 < -0.03 && maTrend <= 0) trend = 'giam';
   else trend = total >= 2 ? 'tang' : total <= -2 ? 'giam' : 'di_ngang';
 
-  let risk: DeskRiskLevel = m.vol20 === null ? 'vua' : m.vol20 > 0.025 ? 'cao' : m.vol20 > 0.012 ? 'vua' : 'thap';
-  if (m.drawdown !== null && m.drawdown >= 0.2) risk = bump(risk);
+  let risk: DeskRiskLevel = vol20 === null ? 'vua' : vol20 > 0.025 ? 'cao' : vol20 > 0.012 ? 'vua' : 'thap';
+  if (drawdown !== null && drawdown >= 0.2) risk = bump(risk);
   if (total <= -3) risk = bump(risk);
 
   const sign = trend === 'tang' ? 1 : trend === 'giam' ? -1 : 0;
   const agree = live.filter((a) => Math.sign(a.score) === sign).length;
-  const confidence = Math.round(Math.min(0.9, Math.max(0.2, 0.2 + 0.55 * (agree / 4) + 0.15 * (live.length / 4))) * 100) / 100;
+  const confidence = Math.round(Math.min(0.9, Math.max(0.2, 0.2 + 0.55 * (agree / (live.length || 1)) + 0.15 * (live.length / 4))) * 100) / 100;
 
   // Lý do: dữ kiện cùng chiều kết luận trước, rồi dữ kiện còn lại
   const facts = live.flatMap((a) => a.facts);

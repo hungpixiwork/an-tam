@@ -1,17 +1,27 @@
-import { Suspense } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Suspense, useEffect } from 'react';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/app/auth';
 import { useLocale } from '@/app/locale';
 import { Logo } from '@/components/layout/Sidebar';
 import { LanguageSelector } from '@/components/LanguageSelector';
+import { mcpReturnPath } from '@/features/auth/mcpReturn';
+
+function ReturnToMcp({ path }: { path: string }) {
+  useEffect(() => { window.location.replace(path); }, [path]);
+  return <div className="min-h-screen bg-canvas" aria-busy="true" />;
+}
 
 /** Khung trang đăng nhập / đăng ký: form bên trái, minh họa bên phải. */
 export function AuthLayout() {
   const { me, loading } = useAuth();
+  const location = useLocation();
   const { t } = useLocale();
 
   if (loading) return <div className="min-h-screen bg-canvas" aria-busy="true" />;
-  if (me) return <Navigate to={me.onboarded ? '/' : '/bat-dau'} replace />;
+  if (me) {
+    const mcpNext = mcpReturnPath(location.search, window.location.origin);
+    return mcpNext ? <ReturnToMcp path={mcpNext} /> : <Navigate to={me.onboarded ? '/' : '/bat-dau'} replace />;
+  }
 
   return (
     <div className="grid min-h-screen bg-canvas lg:grid-cols-[minmax(420px,520px)_1fr]">

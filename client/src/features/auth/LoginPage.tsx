@@ -6,12 +6,14 @@ import { useAuth } from '@/app/auth';
 import { useLocale } from '@/app/locale';
 import { Button } from '@/components/ui';
 import { Field, FormError } from './fields';
+import { mcpReturnPath } from './mcpReturn';
 
 export default function LoginPage() {
   const { login, demoLogin } = useAuth();
   const { t } = useLocale();
   const navigate = useNavigate();
   const location = useLocation();
+  const mcpNext = mcpReturnPath(location.search, window.location.origin);
   const rawFrom = (location.state as { from?: string } | null)?.from;
   const from = rawFrom && !rawFrom.startsWith('/dang-nhap') && !rawFrom.startsWith('/dang-ky') ? rawFrom : '/';
 
@@ -20,6 +22,10 @@ export default function LoginPage() {
   const [demoPending, setDemoPending] = useState(false);
 
   function handleNavigateAfterAuth(user: Me) {
+    if (mcpNext) {
+      window.location.replace(mcpNext);
+      return;
+    }
     if (!user.onboarded) {
       navigate('/bat-dau', { replace: true });
     } else {

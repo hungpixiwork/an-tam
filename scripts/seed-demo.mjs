@@ -191,7 +191,7 @@ function currentMonthTransactions() {
   return [
     { kind: 'income', amount: 22 * M, category: 'salary', note: 'Lương – Công ty TNHH ABC', occurredOn: day(5) },
     { kind: 'income', amount: 2_500 * K, category: 'invest_income', note: 'Lãi quỹ & cổ tức', occurredOn: day(20) },
-    { kind: 'income', amount: 3_650 * K, category: 'business', note: 'Dự án freelance', occurredOn: ago(1) }, // + 350k hoàn tiền qua SePay = 4tr
+    { kind: 'income', amount: 4 * M, category: 'business', note: 'Dự án làm thêm', occurredOn: ago(1) },
     e(4_280 * K, 'food', 'Đi chợ & siêu thị', day(3)),
     e(600 * K, 'food', 'Cà phê, trà sữa', day(8), 'regret'),
     e(600 * K, 'food', 'Cà phê, trà sữa', day(19), 'regret'),
@@ -200,7 +200,7 @@ function currentMonthTransactions() {
     e(600 * K, 'food', 'Đặt món qua ứng dụng', day(21), 'regret'),
     e(70 * K, 'food', 'Phở Bát Đàn', ago(0), 'useful'),
     e(3_160 * K, 'housing', 'Tiền nhà', day(1)),
-    e(2_336 * K, 'transport', 'Xăng xe & gửi xe', day(6)), // + 64k Grab qua SePay
+    e(2_400 * K, 'transport', 'Xăng xe & gửi xe', day(6)),
     e(120 * K, 'transport', 'Grab', ago(3), 'useful'),
     e(1_650 * K, 'shopping', 'Mua sắm đồ dùng', day(4), 'useful'),
     e(450 * K, 'shopping', 'Shopee', ago(2), 'useful'),
@@ -252,7 +252,7 @@ async function billsAndBudget() {
   for (const b of BILLS) {
     const { id } = await post('/bills', b);
     // Tháng này đã trả hết (bảo hiểm trả sớm trước hạn)
-    const paidDay = Math.min(b.name === 'Bảo hiểm sức khỏe' ? dom - 4 : b.dayOfMonth, dom);
+    const paidDay = Math.max(1, Math.min(b.name === 'Bảo hiểm sức khỏe' ? dom - 4 : b.dayOfMonth, dom));
     if (paidDay >= 1) await post(`/bills/${id}/paid`, { occurredOn: `${thisMonth}-${String(paidDay).padStart(2, '0')}` });
   }
 }
@@ -447,11 +447,12 @@ async function bankAndAudit() {
   await post('/integrations/sepay/link', { bankCode: 'VCB', accountNumber: DEMO_ACCOUNT });
   const key = await sepayKey();
   if (!key) throw new Error('Thiếu SEPAY_WEBHOOK_KEY (.dev.vars)');
-  const yesterday = new Date(Date.parse(`${today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  // Webhook vẫn được demo qua API thật nhưng nằm ở tháng trước, không làm lệch tổng tháng này.
+  const bankDay = new Date(Date.parse(`${thisMonth}-01T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
   const run = Date.now();
   const events = [
-    { id: run, transactionDate: `${yesterday} 18:42:10`, content: 'GRAB thanh toan chuyen di', transferType: 'out', transferAmount: 64 * K },
-    { id: run + 1, transactionDate: `${today} 08:12:30`, content: 'Hoan tien bao hiem suc khoe', transferType: 'in', transferAmount: 350 * K },
+    { id: run, transactionDate: `${bankDay} 18:42:10`, content: 'GRAB thanh toan chuyen di', transferType: 'out', transferAmount: 64 * K },
+    { id: run + 1, transactionDate: `${bankDay} 08:12:30`, content: 'Hoan tien bao hiem suc khoe', transferType: 'in', transferAmount: 350 * K },
   ];
   for (const e of events) {
     const res = await fetch(`${API}/api/webhooks/sepay`, {
@@ -558,6 +559,9 @@ try {
   }
   const o = await get('/overview');
   const l = await get('/ledger/dashboard');
+  if (l.totals.income !== 28_500_000 || l.totals.expense !== 21_000_000) {
+    throw new Error(`Demo thu/chi không khớp: ${l.totals.income}/${l.totals.expense}; cần 28500000/21000000`);
+  }
   console.log(
     `\nĐiểm An Tâm ${o.peace.score} (${o.peaceDelta >= 0 ? '+' : ''}${o.peaceDelta ?? '—'}) · an toàn ${o.safeMonths.months} tháng · dòng tiền ${o.cashflow6m.net.toLocaleString('vi-VN')}đ` +
       ` · tiết kiệm ${Math.round((o.savingsRateVsPeers.rate ?? 0) * 100)}% · tài sản ròng ${o.netWorthBreakdown.net.toLocaleString('vi-VN')}đ · ${o.todayEvents.length} việc hôm nay` +

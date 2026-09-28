@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { deskRisk, type DeskRiskInput } from '../shared/engine/deskRisk';
+import type { DeskAnalystReport } from '../shared/types/api/desk';
+import { codeVerdict } from '../worker/desk/analysts';
+import { hasTechnicalDesk } from '../worker/desk/pipeline';
 
 const base: DeskRiskInput = {
   symbol: 'FPT', name: 'Cổ phiếu FPT', verdict: { trend: 'giam', risk: 'cao' },
@@ -17,5 +20,22 @@ describe('deskRisk', () => {
     expect(small.stance).toBe('binh_tinh');
     expect(small.suggestedActions).toEqual([]);
     expect(big.text + small.text).not.toMatch(/\bmua\b/i);
+  });
+});
+
+describe('bàn phân tích vàng', () => {
+  it('bỏ kỹ thuật cho mọi loại vàng và kết luận được khi không có chỉ số kỹ thuật', () => {
+    expect(hasTechnicalDesk('SJC', null)).toBe(false);
+    expect(hasTechnicalDesk('XAU', 'gold_world')).toBe(false);
+    expect(hasTechnicalDesk('FPT', 'stock')).toBe(true);
+    const analysts: DeskAnalystReport[] = [
+      { key: 'news', label: 'Tin tức', score: 1, facts: [{ text: 'Tin tích cực', tone: 'good' }], note: '', available: true },
+      { key: 'fundamentals', label: 'Cơ bản', score: 1, facts: [], note: '', available: true },
+      { key: 'macro', label: 'Vĩ mô', score: 0, facts: [], note: '', available: true },
+    ];
+    const verdict = codeVerdict(analysts, null);
+    expect(verdict.trend).toBe('tang');
+    expect(verdict.risk).toBe('vua');
+    expect(verdict.reasons).toContain('Tin tích cực');
   });
 });

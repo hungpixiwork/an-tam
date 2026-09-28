@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import type { Env } from '../env';
+import type { QuoteKind } from '../../shared/types/market';
 import type { DeskAnalystReport, DeskDebate, DeskDebateRound, DeskReport, DeskTone, DeskVerdict } from '../../shared/types/api/desk';
 import {
   codeVerdict, fetchRatios, fundamentalsReport, macroReport, maxRisk, newsReport, keywordLabel, safeText,
@@ -63,12 +64,15 @@ export async function latestReport(db: D1Database, symbol: string): Promise<Desk
 
 // ─── Bước 1: nhóm phân tích ───
 
-async function runTechnical(env: Env, p: DeskParams): Promise<Analysed> {
-  const kind = await symbolKind(env.DB, p.symbol);
+async function runTechnical(env: Env, p: DeskParams, kind: QuoteKind | null): Promise<Analysed> {
   const bars = await historyAsOf(env.DB, p.symbol, p.day);
   const { report, metrics } = technicalReport(kind, bars);
   return { report, model: null, metrics, priceAt: metrics.last };
 }
+
+/** Vàng chưa có chuỗi giá đủ tin cậy cho phân tích kỹ thuật. */
+export const hasTechnicalDesk = (symbol: string, kind: QuoteKind | null) =>
+  symbol.toUpperCase() !== 'SJC' && kind !== 'gold_vn' && kind !== 'gold_world';
 
 const LabelsSchema = z.object({ labels: z.array(z.enum(['good', 'bad', 'neutral'])) });
 
@@ -183,17 +187,17 @@ export async function runDeskPipeline(env: Env, p: DeskParams, step: StepRunner 
   const existing = await step('kiểm tra báo cáo hôm nay', async () => (await loadReport(env.DB, p.symbol, p.day)) !== null);
   if (existing) return { report: (await loadReport(env.DB, p.symbol, p.day))!, created: false };
 
+  const kind = await step('loại tài sản', () => symbolKind(env.DB, p.symbol));
   const [tech, news, fund, macro] = await Promise.all([
-    step('phân tích kỹ thuật', () => runTechnical(env, p)),
+    hasTechnicalDesk(p.symbol, kind) ? step('phân tích kỹ thuật', () => runTechnical(env, p, kind)) : Promise.resolve(null),
     step('phân tích tin tức', () => runNews(env, p)),
     step('chỉ số cơ bản', () => runFundamentals(env, p)),
     step('vĩ mô', () => runMacro(env, p)),
   ]);
-  const analysts = [tech.report, news.report, fund.report, macro.report];
+  const analysts = [tech?.report, news.report, fund.report, macro.report].filter((a): a is DeskAnalystReport => !!a);
   const models = new Set<string>();
-  for (const a of [tech, news, fund, macro]) if (a.model) models.add(a.model);
+  for (const a of [tech, news, fund, macro]) if (a?.model) models.add(a.model);
 
-  const kind = await step('loại tài sản', () => symbolKind(env.DB, p.symbol));
   const name = symbolName(p.symbol, kind);
 
   // Bước 2: tranh luận, mỗi phe một bước; vòng sau mỗi phe thấy lời phe kia vòng trước
@@ -213,7 +217,7 @@ export async function runDeskPipeline(env: Env, p: DeskParams, step: StepRunner 
   const debate: DeskDebate = { rounds };
 
   // Bước 3: người tổng hợp (kèm bài học lần trước của mã, giống bộ nhớ của TradingAgents)
-  const base = codeVerdict(analysts, tech.metrics!);
+  const base = codeVerdict(analysts, tech?.metrics ?? null);
   const synth = await step('người tổng hợp', async () => {
     const lesson = await lastLesson(env.DB, p.symbol, p.day);
     return synthesize(env, p, name, analysts, debate, base, lesson);
@@ -224,7 +228,7 @@ export async function runDeskPipeline(env: Env, p: DeskParams, step: StepRunner 
   const created = await step('lưu báo cáo', async () => {
     const res = await env.DB.prepare(
       `INSERT OR IGNORE INTO desk_reports (symbol, day, analysts_json, debate_json, verdict_json, price_at, model) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(p.symbol, p.day, JSON.stringify(analysts), JSON.stringify(debate), JSON.stringify(synth.verdict), tech.priceAt ?? null, model).run();
+    ).bind(p.symbol, p.day, JSON.stringify(analysts), JSON.stringify(debate), JSON.stringify(synth.verdict), tech?.priceAt ?? null, model).run();
     return (res.meta.changes ?? 0) > 0;
   });
   return { report: (await loadReport(env.DB, p.symbol, p.day))!, created };

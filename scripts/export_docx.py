@@ -1,5 +1,7 @@
+import argparse
 import os
 import re
+from pathlib import Path
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -7,8 +9,9 @@ from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
 
-DOCX_PATH = r"d:\07-Competitions-Hackathons\an-tam\.agents\submission\Ho-so-du-an-An-Tam-v2.docx"
-AGENTS_DIR = r"d:\07-Competitions-Hackathons\an-tam\.agents"
+PROJECT_DIR = Path(__file__).resolve().parents[1]
+AGENTS_DIR = str(PROJECT_DIR / ".agents")
+DEFAULT_OUTPUT = PROJECT_DIR / ".agents" / "submission" / "Ho-so-du-an-An-Tam-v3.docx"
 
 # Màu chủ đạo theo phong cách Light Mode thanh lịch
 COLOR_PRIMARY = RGBColor(27, 58, 92)      # Navy đậm #1B3A5C
@@ -501,6 +504,9 @@ def build_executive_summary(doc):
     doc.add_page_break()
 
 def main():
+    parser = argparse.ArgumentParser(description="Xuất hồ sơ dự án An Tâm từ các tài liệu .agents")
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="Đường dẫn DOCX đầu ra")
+    args = parser.parse_args()
     doc = Document()
     
     # Thiết lập lề trang chuẩn (Normal: 1 inch / 2.54 cm)
@@ -535,6 +541,10 @@ def main():
         ("Phần 9: Ý tưởng & Quyết định Kiến trúc Dự án", os.path.join(AGENTS_DIR, "ideas.md")),
     ]
 
+    missing = [filepath for _, filepath in files[1:] if filepath and not os.path.isfile(filepath)]
+    if missing:
+        raise FileNotFoundError("Thiếu tài liệu nguồn: " + ", ".join(missing))
+
     for idx, (title, _) in enumerate(files):
         p = doc.add_paragraph()
         p.paragraph_format.space_before = Pt(3)
@@ -555,9 +565,7 @@ def main():
 
     # 4. Từng file chi tiết
     for idx, (title, filepath) in enumerate(files[1:], start=1):
-        if not filepath or not os.path.exists(filepath):
-            continue
-        
+        assert filepath is not None
         # Section Header
         p_sec = doc.add_paragraph()
         p_sec.paragraph_format.space_before = Pt(16)
@@ -575,8 +583,10 @@ def main():
         parse_markdown_to_docx(doc, content, skip_h1=True)
         doc.add_page_break()
 
-    doc.save(DOCX_PATH)
-    print(f"Export successful: {DOCX_PATH}")
+    output = args.output.resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(str(output))
+    print(f"Export successful: {output}")
 
 if __name__ == "__main__":
     main()

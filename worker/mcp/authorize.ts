@@ -57,15 +57,10 @@ export const authorizeApp = new Hono<AppEnv>()
       const name = clientLabel(client, req);
       const userId = await readSession(c);
       if (!userId) {
-        // Chưa đăng nhập: mở trang đăng nhập của app, đăng nhập xong quay lại trang này bấm "Tiếp tục".
+        // Cùng thẻ để sau đăng nhập tải lại /authorize qua Worker, không đi qua SPA router.
         const back = new URL(c.req.url);
         const self = `${back.pathname}${back.search}`;
-        return page(
-          'Đăng nhập An Tâm',
-          `<h1>Đăng nhập An Tâm để kết nối</h1><p><strong>${esc(name)}</strong> muốn kết nối với tài khoản An Tâm của bạn.</p>
-<p class="muted">Bạn chưa đăng nhập. Hãy đăng nhập (mở ở thẻ mới), rồi quay lại đây và bấm “Tiếp tục”.</p>
-<div class="row"><a class="btn primary" href="/dang-nhap?next=${encodeURIComponent(self)}" target="_blank" rel="noopener">Đăng nhập</a><a class="btn" href="${esc(self)}">Tiếp tục</a></div>`,
-        );
+        return c.redirect(`/dang-nhap?next=${encodeURIComponent(self)}`, 302);
       }
       const { plan } = await userPlan(c.env.DB, userId);
       const redirectHost = new URL(req.redirectUri).hostname;
