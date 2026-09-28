@@ -52,7 +52,7 @@ export default function WorkspacePage() {
             pending={start.isPending}
             onSubmit={(prompt) => {
               setMessage(null);
-              start.mutate(prompt, { onSuccess: (r) => setRunId(r.id), onError: fail });
+              start.mutate(prompt, { onSuccess: (r) => setRunId(r.runId), onError: fail });
             }}
           />
           {run ? (

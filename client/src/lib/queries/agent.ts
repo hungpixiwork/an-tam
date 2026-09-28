@@ -27,9 +27,11 @@ export const useAgentRun = (id: string | null) =>
 
 export const usePendingActions = () => useQuery({ queryKey: ['agent-actions', 'pending'], queryFn: () => api.get<AgentActionView[]>('/agent/actions?status=pending') });
 
+export interface StartRunResponse { runId: string; status: 'running' }
+
 export function useStartRun() {
   const refresh = useRefreshAgents();
-  return useMutation({ mutationFn: (prompt: string) => api.post<AgentRunView>('/agent/runs', { prompt }), onSuccess: refresh });
+  return useMutation({ mutationFn: (prompt: string) => api.post<StartRunResponse>('/agent/runs', { prompt }), onSuccess: refresh });
 }
 
 export function useApproveBatch() {

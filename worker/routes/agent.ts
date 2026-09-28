@@ -2,7 +2,6 @@
 // Lệnh ghi đổi trạng thái (approve / reject / request-changes / approve-batch) bắt buộc Idempotency-Key.
 
 import { Hono } from 'hono';
-import { deskHookFor } from '../desk/agentHook';
 import { z } from 'zod';
 import type { AppEnv } from '../env';
 import type { AgentInfo, ApproveBatchResult } from '../../shared/types/api';
@@ -10,10 +9,8 @@ import { AGENT_KEYS } from '../../shared/agent/tools';
 import { ApiError, notFound, ok } from '../lib/http';
 import { body, dateString } from '../lib/validate';
 import { idempotent } from '../lib/idempotency';
-import { latestRunId, listActions, loadRunView, runAgent } from '../agents/runner';
+import { latestRunId, listActions, loadRunView } from '../agents/runner';
 import { approveAndExecute, decline } from '../agents/executor';
-import { usedToday, userPlan } from '../lib/usage';
-import { PLANS } from '../../shared/plans';
 
 const runSchema = z.object({ prompt: z.string().trim().min(3, 'Vui lòng nhập yêu cầu').max(500), weekStart: dateString.optional() });
 const noteSchema = z.object({ note: z.string().trim().max(300).default('') });
@@ -51,9 +48,9 @@ export const agent = new Hono<AppEnv>()
   .post('/runs', body(runSchema), async (c) => {
     const { prompt, weekStart } = c.req.valid('json');
     const userId = c.get('userId');
-    const id = await runAgent(c.env, userId, { prompt, weekStart }, { deskHook: deskHookFor(c.env, userId) });
-    const [view, { plan }, used] = await Promise.all([loadRunView(c.env.DB, userId, id), userPlan(c.env.DB, userId), usedToday(c.env.DB, userId)]);
-    return ok(c, { ...view, aiQuota: { used, limit: PLANS[plan].aiPerDay } }, 201);
+    const { submitAgentRun } = await import('../agents/coordinator');
+    const runId = await submitAgentRun(c.env, userId, { prompt, weekStart });
+    return ok(c, { runId, status: 'running' as const }, 202);
   })
   .get('/runs/latest', async (c) => {
     const id = await latestRunId(c.env.DB, c.get('userId'));
@@ -99,6 +96,7 @@ export const agent = new Hono<AppEnv>()
     const run = await db.prepare('SELECT prompt_masked FROM agent_runs WHERE id = ? AND user_id = ?').bind(row.run_id, userId).first<{ prompt_masked: string }>();
     if (!run) throw notFound('Không tìm thấy lượt chạy');
     const base = run.prompt_masked.split(' · Điều chỉnh: ')[0];
-    const runId = await runAgent(c.env, userId, { prompt: base, note: note || undefined }, { deskHook: deskHookFor(c.env, userId) });
+    const { submitAgentRun } = await import('../agents/coordinator');
+    const runId = await submitAgentRun(c.env, userId, { prompt: base, note: note || undefined });
     return ok(c, { runId });
   });

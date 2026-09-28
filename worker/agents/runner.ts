@@ -11,7 +11,7 @@ import {
   planAlert, planDesk, planLifeDecision, planRun, type ActionDraft, type PlannerContext, type PlanResult, type StepDraft,
 } from '../../shared/agent/planner';
 import { previewAction } from '../../shared/agent/actions';
-import { AGENT_KEYS, TOOL_KEYS } from '../../shared/agent/tools';
+import { TOOL_KEYS } from '../../shared/agent/tools';
 import { addDays, weekStartOf } from '../../shared/engine/scheduler';
 import { PLANS } from '../../shared/plans';
 import { classifyLLM, narrateReply } from './llm';
@@ -20,8 +20,9 @@ import { loadSignals } from '../routes/signals';
 import { userPlan } from '../lib/usage';
 import { loadBills, loadEventsBetween } from '../routes/calendar';
 import { syncInfo } from '../integrations/google/sync';
-import { writeAudit, maskSummary } from '../lib/audit';
+import { batchWithAudit, maskSummary } from '../lib/audit';
 import { notFound } from '../lib/http';
+import { coordinateRoles } from './roles';
 
 export const ACTION_TTL_MS = 24 * 3_600_000;
 const vnNow = () => new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 16);
@@ -123,81 +124,99 @@ async function buildPlan(
     actions.push(...(desk?.actions ?? []));
     replies.push(desk?.reply ?? p.reply);
   }
-  const agents = AGENT_KEYS.filter((k) => k === 'planner' || actions.some((a) => a.agent === k) || steps.some((s) => s.agent === k));
   const intents = weekPlan ? [...weekPlan.intents, ...intent.intents.filter((i) => SPECIAL.has(i))] : intent.intents;
-  return { agents, intents, steps, actions, reply: replies.join(' ') };
+  return { ...coordinateRoles({ agents: [], intents, steps, actions }), reply: replies.join(' ') };
 }
 
-export async function runAgent(env: Env, userId: string, input: RunInput, hooks: RunHooks = {}): Promise<string> {
+/** D1 là nguồn chính; chỉ tạo lượt chạy sau khi payload hàng đợi đã được mã hóa. */
+export async function createRun(db: D1Database, userId: string, input: RunInput, runId = crypto.randomUUID()): Promise<string> {
+  const masked = sanitizePrompt(input.prompt);
+  const note = input.note ? sanitizePrompt(input.note) : undefined;
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare('INSERT INTO agent_runs (id, user_id, source, prompt_masked, agents_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(runId, userId, input.source ?? 'user', note ? `${masked} · Điều chỉnh: ${note}` : masked, '["planner"]', 'running', now, now),
+    db.prepare("INSERT INTO agent_steps (id, run_id, user_id, idx, agent, kind, title, detail_masked, status, started_at, finished_at) VALUES (?, ?, ?, 0, 'planner', 'plan', 'Đã nhận yêu cầu của bạn', ?, 'done', ?, ?)")
+      .bind(crypto.randomUUID(), runId, userId, note ? `"${masked}" · Điều chỉnh: ${note}` : `"${masked}"`, now, now),
+  ]);
+  return runId;
+}
+
+/** Chỉ được gọi từ hàng đợi tuần tự của UserCoordinatorAgent. Replay đọc trạng thái D1 rồi bỏ qua. */
+export async function executeRun(env: Env, userId: string, runId: string, input: RunInput, hooks: RunHooks = {}): Promise<void> {
   const db = env.DB;
   const masked = sanitizePrompt(input.prompt);
   const note = input.note ? sanitizePrompt(input.note) : undefined;
-  const runId = crypto.randomUUID();
   const source = input.source ?? 'user';
   const started = new Date();
   const at = (i: number) => new Date(started.getTime() + i).toISOString();
 
-  // Lượt mới thay thế đề xuất cũ của agent còn chờ duyệt
+  const run = await db.prepare('SELECT status FROM agent_runs WHERE id = ? AND user_id = ?').bind(runId, userId).first<{ status: string }>();
+  if (!run || run.status !== 'running') return;
+  // Khi thực sự bắt đầu xử lý, lượt mới thay thế đề xuất cũ còn chờ duyệt.
   await db.batch([
     db.prepare(`UPDATE agent_actions SET status = 'expired', updated_at = ? WHERE user_id = ? AND status = 'pending' AND run_id IS NOT NULL`).bind(at(0), userId),
-    db.prepare(`UPDATE agent_runs SET status = 'cancelled', updated_at = ? WHERE user_id = ? AND status IN ('running', 'awaiting_approval')`).bind(at(0), userId),
-    db.prepare('INSERT INTO agent_runs (id, user_id, source, prompt_masked, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .bind(runId, userId, source, note ? `${masked} · Điều chỉnh: ${note}` : masked, 'running', at(0), at(0)),
-    db.prepare("INSERT INTO agent_steps (id, run_id, user_id, idx, agent, kind, title, detail_masked, status, started_at, finished_at) VALUES (?, ?, ?, 0, 'planner', 'plan', 'Đã nhận yêu cầu của bạn', ?, 'done', ?, ?)")
-      .bind(crypto.randomUUID(), runId, userId, note ? `"${masked}" · Điều chỉnh: ${note}` : `"${masked}"`, at(0), at(0)),
+    db.prepare(`UPDATE agent_runs SET status = 'cancelled', updated_at = ? WHERE user_id = ? AND id <> ? AND status = 'awaiting_approval'`).bind(at(0), userId, runId),
   ]);
 
-  try {
-    // AI và luật đọc câu có ký hiệu (AMT_1, DUR_1…) — số thật chỉ nằm trong `ph.map`, không lưu
-    const ph = maskWithPlaceholders(input.prompt);
-    const rules = parseIntentRules(note ? `${ph.masked} ${note}` : ph.masked);
-    const llm = await classifyLLM(env, ph.masked, userId);
-    const intent: IntentResult = mergeIntents(llm?.intents ?? null, rules);
-    const params = mergeParams(llm ? paramsFromLLM(llm, ph.map) : null, parseParamsRules(ph.masked, ph.map, intent.intents));
-    const weekStart = targetWeek(masked, input.weekStart);
-    const ctx = await loadContext(env, userId, weekStart, note);
-    const plan = await buildPlan(env, userId, ctx, intent, params, ph.masked, hooks);
-    const reply = await narrateReply(env, userId, plan.reply);
-    const created = new Date();
-    const expires = new Date(created.getTime() + ACTION_TTL_MS).toISOString();
-    const actionSource = source === 'user' ? 'agent' : source;
+  // AI và luật đọc câu có ký hiệu (AMT_1, DUR_1…) — số thật chỉ nằm trong `ph.map`, không lưu
+  const ph = maskWithPlaceholders(input.prompt);
+  const rules = parseIntentRules(note ? `${ph.masked} ${note}` : ph.masked);
+  const llm = await classifyLLM(env, ph.masked, userId);
+  const intent: IntentResult = mergeIntents(llm?.intents ?? null, rules);
+  const params = mergeParams(llm ? paramsFromLLM(llm, ph.map) : null, parseParamsRules(ph.masked, ph.map, intent.intents));
+  const weekStart = targetWeek(masked, input.weekStart);
+  const ctx = await loadContext(env, userId, weekStart, note);
+  const plan = await buildPlan(env, userId, ctx, intent, params, ph.masked, hooks);
+  const reply = await narrateReply(env, userId, plan.reply);
+  const created = new Date();
+  const expires = new Date(created.getTime() + ACTION_TTL_MS).toISOString();
+  const actionSource = source === 'user' ? 'agent' : source;
 
-    await db.batch([
-      ...plan.steps.map((s, i) =>
-        db.prepare("INSERT INTO agent_steps (id, run_id, user_id, idx, agent, kind, title, detail_masked, status, started_at, finished_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'done', ?, ?)")
-          .bind(crypto.randomUUID(), runId, userId, i + 1, s.agent, s.kind, s.title, s.detail ?? null, at(i + 1), at(i + 1)),
+  await batchWithAudit(db, [
+    ...plan.steps.map((s, i) =>
+      db.prepare("INSERT INTO agent_steps (id, run_id, user_id, idx, agent, kind, title, detail_masked, status, started_at, finished_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'done', ?, ?)")
+        .bind(crypto.randomUUID(), runId, userId, i + 1, s.agent, s.kind, s.title, s.detail ?? null, at(i + 1), at(i + 1)),
+    ),
+    ...plan.actions.map((a, i) =>
+      db.prepare(
+        `INSERT INTO agent_actions (id, user_id, run_id, source, agent, type, title, payload_json, preview_json, integration, risk, status, requires_approval, created_at, updated_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), userId, runId, actionSource, a.agent, a.type, a.title, JSON.stringify(a.payload), JSON.stringify(previewAction(a.type, a.payload)),
+        a.integration, a.risk, new Date(created.getTime() + i).toISOString(), created.toISOString(), expires,
       ),
-      ...plan.actions.map((a, i) =>
-        db.prepare(
-          `INSERT INTO agent_actions (id, user_id, run_id, source, agent, type, title, payload_json, preview_json, integration, risk, status, requires_approval, created_at, updated_at, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1, ?, ?, ?)`,
-        ).bind(
-          crypto.randomUUID(), userId, runId, actionSource, a.agent, a.type, a.title, JSON.stringify(a.payload), JSON.stringify(previewAction(a.type, a.payload)),
-          a.integration, a.risk, new Date(created.getTime() + i).toISOString(), created.toISOString(), expires,
-        ),
-      ),
-      db.prepare('UPDATE agent_runs SET intent = ?, agents_json = ?, status = ?, updated_at = ?, completed_at = ? WHERE id = ?').bind(
-        JSON.stringify({ intents: plan.intents, source: intent.source, weekStart, reply: reply.text, narrated: reply.narrated }),
-        JSON.stringify(plan.agents),
-        plan.actions.length ? 'awaiting_approval' : 'completed',
-        created.toISOString(),
-        plan.actions.length ? null : created.toISOString(),
-        runId,
-      ),
-    ]);
-    await writeAudit(db, {
-      userId, actor: source === 'mcp' ? 'mcp' : 'agent', agent: 'planner', action: 'agent.plan', entityType: 'agent_run', entityId: runId, runId,
-      summaryMasked: maskSummary(`Lập kế hoạch từ lệnh: "${masked}" — ${plan.actions.length} hành động chờ duyệt`),
-      dataLabel: 'Lịch, thu chi, mục tiêu (đã ẩn số liệu)', status: 'completed',
-    }, { salt: env.AUDIT_HASH_SALT });
-  } catch (err) {
-    await db.batch([
-      db.prepare("UPDATE agent_runs SET status = 'failed', error = ?, updated_at = ? WHERE id = ?").bind('Không lập được kế hoạch', new Date().toISOString(), runId),
-      db.prepare("INSERT INTO agent_steps (id, run_id, user_id, idx, agent, kind, title, status) VALUES (?, ?, ?, 99, 'planner', 'error', 'Không lập được kế hoạch', 'failed')").bind(crypto.randomUUID(), runId, userId),
-    ]);
-    console.error('runAgent', err);
-  }
-  return runId;
+    ),
+    db.prepare("UPDATE agent_runs SET intent = ?, agents_json = ?, status = ?, updated_at = ?, completed_at = ? WHERE id = ? AND user_id = ? AND status = 'running'").bind(
+      JSON.stringify({ intents: plan.intents, source: intent.source, weekStart, reply: reply.text, narrated: reply.narrated }),
+      JSON.stringify(plan.agents),
+      plan.actions.length ? 'awaiting_approval' : 'completed',
+      created.toISOString(),
+      plan.actions.length ? null : created.toISOString(),
+      runId, userId,
+    ),
+  ], {
+    userId, actor: source === 'mcp' ? 'mcp' : 'agent', agent: 'planner', action: 'agent.plan', entityType: 'agent_run', entityId: runId, runId,
+    summaryMasked: maskSummary(`Lập kế hoạch từ lệnh: "${masked}" — ${plan.actions.length} hành động chờ duyệt`),
+    dataLabel: 'Lịch, thu chi, mục tiêu (đã ẩn số liệu)', status: 'completed',
+  }, { salt: env.AUDIT_HASH_SALT });
+}
+
+/** Lỗi cuối cùng được ghi rõ vào D1; replay sau đó không thể tạo lại hành động. */
+export async function failRun(env: Env, userId: string, runId: string): Promise<void> {
+  const db = env.DB;
+  const row = await db.prepare('SELECT status FROM agent_runs WHERE id = ? AND user_id = ?').bind(runId, userId).first<{ status: string }>();
+  if (row?.status !== 'running') return;
+  const now = new Date().toISOString();
+  await batchWithAudit(db, [
+    db.prepare("UPDATE agent_runs SET status = 'failed', error = ?, updated_at = ?, completed_at = ? WHERE id = ? AND user_id = ? AND status = 'running'")
+      .bind('Không lập được kế hoạch', now, now, runId, userId),
+    db.prepare("INSERT OR IGNORE INTO agent_steps (id, run_id, user_id, idx, agent, kind, title, status, started_at, finished_at) VALUES (?, ?, ?, 99, 'planner', 'error', 'Không lập được kế hoạch', 'failed', ?, ?)")
+      .bind(crypto.randomUUID(), runId, userId, now, now),
+  ], {
+    userId, actor: 'agent', agent: 'planner', action: 'agent.plan', entityType: 'agent_run', entityId: runId, runId,
+    summaryMasked: 'Không lập được kế hoạch', status: 'failed',
+  }, { salt: env.AUDIT_HASH_SALT });
 }
 
 /* ───────── Đọc ───────── */
