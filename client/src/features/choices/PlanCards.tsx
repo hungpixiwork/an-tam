@@ -8,6 +8,7 @@ import type { DecisionMode, LifeChoiceDetail, LifeChoiceTask, LifeChoiceTaskCate
 import { Button, FormAlert, TextInput, cx } from '@/components/ui';
 import { useAddChoiceTask, useToggleChoiceTask } from '@/lib/queries';
 import { useLocale } from '@/app/locale';
+import { ApplyAction } from '@/components/actions/ActionCard';
 
 const COLUMNS: { key: LifeChoiceTaskCategory; icon: LucideIcon; head: string; box: string }[] = [
   { key: 'finance', icon: Coins, head: 'bg-[#EAF7F0] text-[#126349]', box: 'accent-[#1FA16B]' },
@@ -114,6 +115,9 @@ export function CompanionCard({ detail, mode }: { detail: LifeChoiceDetail; mode
                 </span>
                 <span className={cx('min-w-0', task.done && 'text-ink-soft')}>{task.title}</span>
               </button>
+              {!task.done && (task.action || task.link) && (
+                <ApplyAction compact className="ml-7 mt-0.5" action={task.action ?? undefined} to={task.link} title={task.title} choiceId={detail.id} />
+              )}
             </li>
           ))}
           {!today.length && <li className="text-[12.5px] text-ink-soft">{t('choices.today.empty')}</li>}

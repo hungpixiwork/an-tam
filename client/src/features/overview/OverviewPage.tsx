@@ -9,6 +9,7 @@ import { KpiRow } from './KpiRow';
 import { SuggestionsCard } from './SuggestionsCard';
 import { TodayCalendarCard } from './TodayCalendarCard';
 import { LifeChoiceCard, NetWorthCard, ResourcesCard } from './BottomRow';
+import { DecisionStrip } from '@/components/actions/DecisionStrip';
 
 export default function OverviewPage() {
   const { me } = useAuth();
@@ -38,6 +39,7 @@ export default function OverviewPage() {
           </ButtonLink>
         )}
       </HeroBanner>
+      <DecisionStrip domain="all" />
 
       {/* H2 — 4 chỉ số */}
       <KpiRow data={data} />

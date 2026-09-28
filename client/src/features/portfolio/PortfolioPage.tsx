@@ -13,6 +13,8 @@ import { KpiRow } from './KpiRow';
 import { AllocationCard, EmployerCard, RiskGaugeCard } from './RiskRow';
 import { SectorCard } from './SectorCard';
 import { WhatIfCard } from './WhatIfCard';
+import { DecisionStrip } from '@/components/actions/DecisionStrip';
+import { useFocusParam } from '@/lib/useFocusParam';
 
 export default function PortfolioPage() {
   const { t } = useLocale();
@@ -25,6 +27,8 @@ export default function PortfolioPage() {
   const sectorRef = useRef<HTMLDivElement>(null);
   const holdingsRef = useRef<HTMLDivElement>(null);
   const whatIfRef = useRef<HTMLDivElement>(null);
+  // ?focus=employer (từ gợi ý "Giảm tài sản tập trung") → tới khối thử phân bổ lại
+  useFocusParam(!risk.isPending && !holdings.isPending);
 
   if (risk.isPending || holdings.isPending) return <PageSkeleton />;
   if (risk.error || holdings.error) return <ErrorState error={risk.error ?? holdings.error} onRetry={() => (risk.refetch(), holdings.refetch())} />;
@@ -48,6 +52,7 @@ export default function PortfolioPage() {
         </Link>
       </header>
 
+      <DecisionStrip domain="portfolio" />
       <KpiRow nw={data.netWorth} />
 
       <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-[1.6fr_1fr_1fr]">
@@ -65,7 +70,7 @@ export default function PortfolioPage() {
 
       <SectorCard ref={sectorRef} risk={data} />
 
-      <div ref={whatIfRef} className="scroll-mt-24">
+      <div ref={whatIfRef} id="focus-employer" className="scroll-mt-24">
         <WhatIfCard />
       </div>
 

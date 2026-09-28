@@ -68,7 +68,7 @@ export default function ChoicesPage() {
         <div className="min-w-0 space-y-2.5">
           <ChainPlans detail={d} />
           <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-            <ConditionsCard preview={preview.data} />
+            <ConditionsCard preview={preview.data} choiceId={d.id} />
             <OutcomesCard preview={preview.data} />
           </div>
         </div>

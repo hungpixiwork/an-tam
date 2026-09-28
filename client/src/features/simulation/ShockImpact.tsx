@@ -10,6 +10,8 @@ import {
 import type { DecisionGoalTile, DecisionMode, DecisionRange, DecisionSimulationResult } from '@shared/types/api/decision';
 import { formatVnd } from '@shared/format';
 import { cx } from '@/components/ui';
+import { ActionDiffLine, ApplyAction } from '@/components/actions/ActionCard';
+import { useAppliedSteps } from '@/lib/queries';
 import { useLocale } from '@/app/locale';
 
 const MODE_COLOR: Record<DecisionMode, string> = { bull: '#1FA16B', base: '#2F6FE0', bear: '#F28C28' };
@@ -225,11 +227,15 @@ export function ChoiceImpact({ r }: { r: DecisionSimulationResult }) {
   );
 }
 
+const MONEY_KEYS = new Set(['amount', 'saving']);
+
 export function StepsList({ r, children }: { r: DecisionSimulationResult; children?: ReactNode }) {
   const { t } = useLocale();
+  const applied = useAppliedSteps(r.choiceId);
+  const done = new Set(applied.data?.map((a) => a.stepKey));
   const fmt = (p: Record<string, number>) => {
     const out: Record<string, string | number> = {};
-    for (const [k, v] of Object.entries(p)) out[k] = k === 'amount' ? formatVnd(v) : v;
+    for (const [k, v] of Object.entries(p)) out[k] = MONEY_KEYS.has(k) ? formatVnd(v) : v;
     return out;
   };
   return (
@@ -238,9 +244,14 @@ export function StepsList({ r, children }: { r: DecisionSimulationResult; childr
         {r.steps.map((s, i) => (
           <li key={s.key} className="flex items-start gap-3">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#EDF4FF] text-[13px] font-bold text-accent-700">{i + 1}</span>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[13px] font-bold text-ink">{t(`simulation.steps.${s.key}`)}</p>
               <p className="text-[12px] leading-snug text-ink-soft">{t(`simulation.steps.${s.key}_body`, fmt(s.params))}</p>
+              {s.action && !done.has(s.key) && <ActionDiffLine action={s.action} className="mt-1" />}
+              <ApplyAction
+                className="mt-1.5" compact action={s.action} to={s.to} title={t(`simulation.steps.${s.key}`)}
+                stepKey={s.key} choiceId={r.choiceId} applied={done.has(s.key)}
+              />
             </div>
           </li>
         ))}

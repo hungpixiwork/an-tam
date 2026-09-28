@@ -129,6 +129,8 @@ const messages: Record<string, string> = {
   "simulation.agent.status_done": "Updated in Life choices.",
   "simulation.agent.status_rejected": "You declined this suggestion.",
   "simulation.agent.status_other": "This suggestion is no longer active.",
+  "simulation.steps.cut_budget": "Set next month's budget",
+  "simulation.steps.cut_budget_body": "Spend at most {amount} ({pct}% less), saving about {saving} more.",
 };
 
 export default messages;

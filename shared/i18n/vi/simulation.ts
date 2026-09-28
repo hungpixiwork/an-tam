@@ -129,6 +129,8 @@ const messages: Record<string, string> = {
   "simulation.agent.status_done": "Đã cập nhật vào Lựa chọn cuộc đời.",
   "simulation.agent.status_rejected": "Bạn đã không cập nhật đề xuất này.",
   "simulation.agent.status_other": "Đề xuất không còn hiệu lực.",
+  "simulation.steps.cut_budget": "Đặt ngân sách tháng sau",
+  "simulation.steps.cut_budget_body": "Chi tối đa {amount} ({pct}% ít hơn), để dành thêm khoảng {saving}.",
 };
 
 export default messages;

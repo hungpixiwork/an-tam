@@ -1,5 +1,11 @@
 import { lazy } from 'react';
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, useLocation } from 'react-router-dom';
+
+/** Chuyển hướng giữ nguyên ?query và #hash (link cũ /ke-hoach?focus=… vẫn tới đúng khối). */
+function KeepQuery({ to }: { to: string }) {
+  const { search, hash } = useLocation();
+  return <Navigate to={`${to}${search}${hash}`} replace />;
+}
 import { AppShell } from '@/layouts/AppShell';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { OnboardingLayout } from '@/layouts/OnboardingLayout';
@@ -63,8 +69,8 @@ export const router = createBrowserRouter([
           { path: '/cong-dong', element: <CommunityPage /> },
           { path: '/cai-dat', element: <SettingsPage /> },
           // Trang cũ đã gộp vào trang mới (file giữ lại cho các wave sau)
-          { path: '/muc-tieu', element: <Navigate to="/quy-an-toan" replace /> },
-          { path: '/ke-hoach', element: <Navigate to="/quy-an-toan" replace /> },
+          { path: '/muc-tieu', element: <KeepQuery to="/quy-an-toan" /> },
+          { path: '/ke-hoach', element: <KeepQuery to="/quy-an-toan" /> },
           { path: '/ai-theo-doi', element: <Navigate to="/nhat-ky-ai" replace /> },
           { path: '/thoi-quen', element: <Navigate to="/thu-chi?tab=thoi-quen" replace /> },
         ],

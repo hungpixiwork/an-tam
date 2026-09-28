@@ -1,6 +1,6 @@
 // Trang 3 — Quỹ an toàn & mục tiêu (mockup 3). Số liệu từ GET /api/safety (engine buildSafety).
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Goal } from '@shared/types/domain';
 import { ErrorState, HeroBanner, PageSkeleton } from '@/components/ui';
 import { useAllocation, useSafety } from '@/lib/queries';
@@ -10,6 +10,8 @@ import { GoalsSection } from './GoalsSection';
 import { AdviceSection } from './AdviceSection';
 import { GoalFormModal } from './GoalFormModal';
 import { AllocationModal } from './AllocationModal';
+import { DecisionStrip } from '@/components/actions/DecisionStrip';
+import { useFocusParam } from '@/lib/useFocusParam';
 
 export default function SafetyPage() {
   const { t } = useLocale();
@@ -17,6 +19,9 @@ export default function SafetyPage() {
   const allocation = useAllocation();
   const [editing, setEditing] = useState<{ goal: Goal | null; key: number } | null>(null);
   const [planOpen, setPlanOpen] = useState(false);
+  const focus = useFocusParam(!isPending);
+  // ?focus=plan (từ gợi ý "Quỹ cần có") → mở luôn kế hoạch chia tiền để dành
+  useEffect(() => { if (focus === 'plan' && allocation.data) setPlanOpen(true); }, [focus, allocation.data]);
   if (isPending) return <PageSkeleton />;
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />;
 
@@ -36,7 +41,8 @@ export default function SafetyPage() {
         visualWidth="52%"
         className="!min-h-[124px] [&>div]:py-5 [&_h2+p]:text-[15px] [&_h2+p]:text-ink-soft"
       />
-      <FundRow data={data} onAdjust={() => open(emergency)} />
+      <DecisionStrip domain="safety" />
+      <div id="focus-reserve" className="scroll-mt-24"><FundRow data={data} onAdjust={() => open(emergency)} /></div>
       <GoalsSection data={data} plan={allocation.data?.savingsPlan} onEdit={open} onAdd={() => open(null)} onPlan={() => setPlanOpen(true)} />
       <AdviceSection data={data} />
       {planOpen && allocation.data && <AllocationModal plan={allocation.data.savingsPlan} onClose={() => setPlanOpen(false)} />}

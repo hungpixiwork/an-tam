@@ -9,10 +9,14 @@ import { JobsCard, OpportunitiesCard } from './OpportunityCards';
 import { CareerCard } from './CareerCard';
 import { RoadmapCard } from './RoadmapCard';
 import { WeekPlanCard } from './WeekPlanCard';
+import { DecisionStrip } from '@/components/actions/DecisionStrip';
+import { useFocusParam } from '@/lib/useFocusParam';
 
 export default function EarnPage() {
   const { t } = useLocale();
   const { data, error, refetch, isPending } = useEarnDashboard();
+  // ?focus=side (từ gợi ý "Xây nguồn thu nhập phụ") → tới khối cơ hội làm thêm
+  useFocusParam(!isPending, { side: 'co-hoi' });
   if (isPending) return <PageSkeleton />;
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />;
 
@@ -29,6 +33,7 @@ export default function EarnPage() {
         visualWidth="56%"
         className="min-h-[182px]"
       />
+      <DecisionStrip domain="earn" />
 
       <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-[973fr_420fr]">
         <div className="min-w-0 space-y-3.5">

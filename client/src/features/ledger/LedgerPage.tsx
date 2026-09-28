@@ -18,6 +18,7 @@ import { SavingsBanner } from './SavingsBanner';
 import { AddTransactionModal } from './TransactionForm';
 import { SplitModal } from './SplitModal';
 import { BudgetModal } from './BudgetModal';
+import { DecisionStrip } from '@/components/actions/DecisionStrip';
 import TransactionsTab from './TransactionsTab';
 import HabitsTab from './HabitsTab';
 
@@ -29,7 +30,8 @@ export default function LedgerPage() {
   const [params, setParams] = useSearchParams();
   const raw = params.get('tab');
   const tab: Tab = raw === 'giao-dich' || raw === 'thoi-quen' ? raw : 'tong-quan';
-  const [modal, setModal] = useState<ModalKind>(null);
+  // ?modal=budget (từ gợi ý "Đặt ngân sách tháng sau") → mở luôn hộp ngân sách
+  const [modal, setModal] = useState<ModalKind>(() => (params.get('modal') === 'budget' ? 'budget' : null));
   const setTab = (k: Tab) => setParams(k === 'tong-quan' ? {} : { tab: k }, { replace: true });
 
   const tabs: { key: Tab; label: string }[] = [
@@ -74,6 +76,7 @@ export default function LedgerPage() {
           </Button>
         </div>
       </header>
+      <DecisionStrip domain="ledger" />
 
       {tab === 'tong-quan' && <Dashboard onBudget={() => setModal('budget')} onAdd={() => setModal('add')} onAll={() => setTab('giao-dich')} />}
       {tab === 'giao-dich' && <TransactionsTab />}

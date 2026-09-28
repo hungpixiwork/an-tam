@@ -5,6 +5,8 @@ import type { LifeChoiceCondition, LifeChoicePreview } from '@shared/types/api';
 import { formatVnd } from '@shared/format';
 import { ProgressBar, cx } from '@/components/ui';
 import { useLocale } from '@/app/locale';
+import { ApplyAction } from '@/components/actions/ActionCard';
+import { useAppliedSteps } from '@/lib/queries';
 import { num } from './shared';
 
 const COND: Record<LifeChoiceCondition['key'], { icon: LucideIcon; color: string; tone: string }> = {
@@ -16,8 +18,9 @@ const COND: Record<LifeChoiceCondition['key'], { icon: LucideIcon; color: string
 
 const safetyLabel = (score: number) => (score >= 75 ? 'good' : score >= 50 ? 'fair' : 'low');
 
-export function ConditionsCard({ preview }: { preview: LifeChoicePreview | undefined }) {
+export function ConditionsCard({ preview, choiceId }: { preview: LifeChoicePreview | undefined; choiceId: string }) {
   const { t, locale } = useLocale();
+  const applied = new Set(useAppliedSteps(choiceId).data?.map((a) => a.stepKey));
   if (!preview) return null;
   const value = (c: LifeChoiceCondition) =>
     c.key === 'fund' ? formatVnd(c.need)
@@ -52,6 +55,9 @@ export function ConditionsCard({ preview }: { preview: LifeChoicePreview | undef
                 <span className="text-[11px] font-semibold tabular-nums text-ink-soft">{Math.round(c.progress * 100)}%</span>
               </div>
               <p className="mt-1 text-[11px] leading-snug text-ink-soft">{foot(c)}</p>
+              {c.progress < 1 && (
+                <ApplyAction compact className="mt-1.5" action={c.action} to={c.to} title={t(`choices.cond.${c.key}`)} stepKey={`cond_${c.key}`} choiceId={choiceId} applied={applied.has(`cond_${c.key}`)} />
+              )}
             </div>
           );
         })}

@@ -123,16 +123,20 @@ async function prepare(env: Env, userId: string, row: Row, type: ActionType): Pr
     }
     case 'holding.rebalance': {
       const p = payload as ReturnType<typeof ACTION_TYPES['holding.rebalance']['schema']['parse']>;
-      const from = await db.prepare('SELECT value FROM holdings WHERE id = ? AND user_id = ?').bind(p.fromId, userId).first<{ value: number }>();
-      const to = await db.prepare('SELECT value FROM holdings WHERE id = ? AND user_id = ?').bind(p.toId, userId).first<{ value: number }>();
+      type H = { value: number; quantity: number | null };
+      const from = await db.prepare('SELECT value, quantity FROM holdings WHERE id = ? AND user_id = ?').bind(p.fromId, userId).first<H>();
+      const to = await db.prepare('SELECT value, quantity FROM holdings WHERE id = ? AND user_id = ?').bind(p.toId, userId).first<H>();
       if (!from || !to) throw new Error('Khoản tài sản không còn tồn tại');
       if (from.value < p.amount) throw new Error('Giá trị hiện tại nhỏ hơn số tiền cần chuyển');
+      // Khoản định giá theo thị trường (có số lượng) → giảm số lượng theo tỷ lệ, không chỉ sửa giá trị
+      const keep = from.value > 0 ? 1 - p.amount / from.value : 0;
+      const qtyAfter = from.quantity != null ? Math.round(from.quantity * keep * 1e6) / 1e6 : null;
       return {
         statements: [
-          db.prepare('UPDATE holdings SET value = value - ? WHERE id = ? AND user_id = ?').bind(p.amount, p.fromId, userId),
+          db.prepare('UPDATE holdings SET value = value - ?, quantity = COALESCE(?, quantity) WHERE id = ? AND user_id = ?').bind(p.amount, qtyAfter, p.fromId, userId),
           db.prepare('UPDATE holdings SET value = value + ? WHERE id = ? AND user_id = ?').bind(p.amount, p.toId, userId),
         ],
-        result: { fromId: p.fromId, toId: p.toId, amount: p.amount },
+        result: { fromId: p.fromId, toId: p.toId, amount: p.amount, qtyBefore: from.quantity },
         summary: `Chuyển ${formatVndFull(p.amount)} từ ${p.fromName} sang ${p.toName}`,
         refresh: `Giảm tài sản tập trung: ${p.fromName} −${formatVndFull(p.amount)}, ${p.toName} +${formatVndFull(p.amount)}.`,
       };
@@ -322,7 +326,7 @@ function undoStatements(db: D1Database, userId: string, id: string, type: Action
     case 'holding.rebalance':
       return {
         statements: [
-          db.prepare('UPDATE holdings SET value = value + ? WHERE id = ? AND user_id = ?').bind(p.amount, p.fromId, userId),
+          db.prepare('UPDATE holdings SET value = value + ?, quantity = COALESCE(?, quantity) WHERE id = ? AND user_id = ?').bind(p.amount, (result.qtyBefore as number | null | undefined) ?? null, p.fromId, userId),
           db.prepare('UPDATE holdings SET value = MAX(0, value - ?) WHERE id = ? AND user_id = ?').bind(p.amount, p.toId, userId),
         ],
         summary: `Hoàn tác chuyển ${formatVndFull(p.amount)} từ ${p.fromName}`,

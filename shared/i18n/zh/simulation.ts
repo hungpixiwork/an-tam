@@ -129,6 +129,8 @@ const messages: Record<string, string> = {
   "simulation.agent.status_done": "已更新到人生选择。",
   "simulation.agent.status_rejected": "你已拒绝此建议。",
   "simulation.agent.status_other": "此建议已失效。",
+  "simulation.steps.cut_budget": "设定下月预算",
+  "simulation.steps.cut_budget_body": "最多花 {amount}（少 {pct}%），多存约 {saving}。",
 };
 
 export default messages;

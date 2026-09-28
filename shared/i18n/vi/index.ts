@@ -21,8 +21,9 @@ import audit from './audit';
 import portfolio from './portfolio';
 import onboarding from './onboarding';
 import simulation from './simulation';
+import action from './action';
 
-export const namespaces = { app, nav, topbar, sidebar, auth, locale, home, common, category, spending, ledger, earn, error, overview, safety, calendar, choices, workspace, audit, portfolio, onboarding, simulation } as const;
+export const namespaces = { app, nav, topbar, sidebar, auth, locale, home, common, category, spending, ledger, earn, error, overview, safety, calendar, choices, workspace, audit, portfolio, onboarding, simulation, action } as const;
 
 const messages: Record<string, string> = Object.assign({}, ...Object.values(namespaces));
 
