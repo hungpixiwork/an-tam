@@ -14,7 +14,7 @@ export function AuditHero() {
           <h2 className="text-[26px] font-extrabold leading-tight tracking-tight text-ink md:text-[31px]">{t('audit.hero.title')}</h2>
           <p className="mt-2 text-[15px] leading-relaxed text-ink-soft md:text-[16px]">{t('audit.hero.subtitle')}</p>
         </div>
-        <div className="flex max-w-[420px] shrink-0 items-start gap-3.5 rounded-2xl bg-white/95 px-5 py-4 shadow-soft ring-1 ring-black/[0.03] backdrop-blur-sm lg:mr-[10%]">
+        <div className="flex max-w-[420px] shrink-0 items-start gap-3.5 rounded-2xl border border-line bg-white px-5 py-4 shadow-soft lg:mr-[10%]">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-success-50 text-success-600">
             <ShieldCheck className="h-7 w-7" strokeWidth={2.2} aria-hidden />
           </span>

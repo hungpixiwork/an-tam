@@ -42,11 +42,13 @@ export default function LedgerPage() {
 
   return (
     <div className="space-y-3.5">
-      {/* Tiêu đề + 3 nút */}
-      <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 pb-1">
+      {/* ── Tiêu đề + Tabs + Actions Toolbar ── */}
+      <header className="flex flex-col gap-3 pb-1 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <h1 className="text-[28px] font-extrabold leading-tight tracking-tight text-ink">{t('ledger.page_title')}</h1>
+          <div className="flex flex-wrap items-center justify-between gap-2 md:justify-start md:gap-x-4">
+            <h1 className="text-[20px] font-extrabold leading-tight tracking-tight text-ink md:text-[28px]">
+              {t('ledger.page_title')}
+            </h1>
             <nav role="tablist" aria-label={t('ledger.page_title')} className="flex gap-1 rounded-xl bg-slate-100 p-1">
               {tabs.map((x) => (
                 <button
@@ -55,27 +57,33 @@ export default function LedgerPage() {
                   role="tab"
                   aria-selected={tab === x.key}
                   onClick={() => setTab(x.key)}
-                  className={cx('rounded-lg px-2.5 py-1 text-[12.5px] font-semibold', tab === x.key ? 'bg-white text-ink shadow-sm' : 'text-ink-soft hover:text-ink')}
+                  className={cx(
+                    'rounded-lg px-2.5 py-1 text-[12px] font-semibold md:text-[12.5px]',
+                    tab === x.key ? 'bg-white text-ink shadow-sm' : 'text-ink-soft hover:text-ink',
+                  )}
                 >
                   {x.label}
                 </button>
               ))}
             </nav>
           </div>
-          <p className="mt-1 text-[15px] text-ink-soft">{t('ledger.page_subtitle')}</p>
+          <p className="hidden text-[14px] text-ink-soft md:mt-1 md:block">{t('ledger.page_subtitle')}</p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button icon={Plus} onClick={() => setModal('add')} className="h-12 px-6">
+
+        {/* ── Action Buttons ── */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:gap-2.5 md:overflow-visible md:pb-0">
+          <Button icon={Plus} onClick={() => setModal('add')} className="h-9 shrink-0 px-3 text-[12px] md:h-11 md:px-4 md:text-[13.5px]">
             {t('ledger.btn.add')}
           </Button>
-          <Button variant="soft" icon={Users} onClick={() => setModal('split')} className="h-12 px-6">
+          <Button variant="soft" icon={Users} onClick={() => setModal('split')} className="h-9 shrink-0 px-3 text-[12px] md:h-11 md:px-4 md:text-[13.5px]">
             {t('ledger.btn.split')}
           </Button>
-          <Button variant="soft" icon={Target} onClick={() => setModal('budget')} className="h-12 px-6">
+          <Button variant="soft" icon={Target} onClick={() => setModal('budget')} className="h-9 shrink-0 px-3 text-[12px] md:h-11 md:px-4 md:text-[13.5px]">
             {t('ledger.btn.budget')}
           </Button>
         </div>
       </header>
+
       <DecisionStrip domain="ledger" />
 
       {tab === 'tong-quan' && <Dashboard onBudget={() => setModal('budget')} onAdd={() => setModal('add')} onAll={() => setTab('giao-dich')} />}
@@ -95,18 +103,34 @@ function Dashboard({ onBudget, onAdd, onAll }: { onBudget: () => void; onAdd: ()
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />;
 
   return (
-    <>
+    <div className="space-y-3.5 sm:space-y-4">
       <KpiRow data={data} onBudget={onBudget} onAdd={onAdd} />
-      <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-[536fr_456fr_396fr]">
-        <CashflowChartCard months={data.months} onAdd={onAdd} />
-        <CategoryDonutCard data={data} onAll={onAll} />
-        <AdviceCard advice={data.advice} month={data.month} className="md:col-span-2 xl:col-span-1" />
+
+      {/* Row 1: Dòng tiền (5) + Cơ cấu chi (4) + Gợi ý AI (3) */}
+      <div className="grid grid-cols-1 gap-3.5 sm:gap-4 md:grid-cols-2 xl:grid-cols-12">
+        <div className="min-w-0 md:col-span-1 xl:col-span-5">
+          <CashflowChartCard months={data.months} onAdd={onAdd} />
+        </div>
+        <div className="min-w-0 md:col-span-1 xl:col-span-4">
+          <CategoryDonutCard data={data} onAll={onAll} />
+        </div>
+        <div className="min-w-0 md:col-span-2 xl:col-span-3">
+          <AdviceCard advice={data.advice} month={data.month} />
+        </div>
       </div>
-      <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-[482fr_514fr_394fr]">
-        <RecentTransactionsCard items={data.recent} today={data.today} onAll={onAll} onAdd={onAdd} />
-        <BillsCard bills={data.bills} />
-        <SavingsBanner className="md:col-span-2 xl:col-span-1" />
+
+      {/* Row 2: Giao dịch gần đây (5) + Hóa đơn (4) + Tiết kiệm (3) */}
+      <div className="grid grid-cols-1 gap-3.5 sm:gap-4 md:grid-cols-2 xl:grid-cols-12">
+        <div className="min-w-0 md:col-span-1 xl:col-span-5">
+          <RecentTransactionsCard items={data.recent} today={data.today} onAll={onAll} onAdd={onAdd} />
+        </div>
+        <div className="min-w-0 md:col-span-1 xl:col-span-4">
+          <BillsCard bills={data.bills} />
+        </div>
+        <div className="min-w-0 md:col-span-2 xl:col-span-3">
+          <SavingsBanner />
+        </div>
       </div>
-    </>
+    </div>
   );
 }

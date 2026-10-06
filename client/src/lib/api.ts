@@ -16,20 +16,22 @@ type Json = object;
 async function request<T>(method: string, path: string, body?: Json, extraHeaders?: Record<string, string>): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, {
+    const init: RequestInit = {
       method,
-      credentials: 'same-origin',
       headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...extraHeaders },
       body: body ? JSON.stringify(body) : undefined,
-    });
+    };
+    (init as any).credentials = 'same-origin';
+    res = await fetch(`/api${path}`, init);
   } catch {
     throw new ApiError(0, 'network', 'Không kết nối được máy chủ. Kiểm tra mạng và thử lại.');
   }
-  const json = await res.json().catch(() => null);
+  const json: any = await res.json().catch(() => null);
   if (!res.ok || !json?.success) {
     if (res.status === 401 && !path.startsWith('/auth/')) {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('auth:expired'));
+      const g = globalThis as any;
+      if (typeof g !== 'undefined' && typeof g.window !== 'undefined' && typeof g.window.dispatchEvent === 'function') {
+        g.window.dispatchEvent(new CustomEvent('auth:expired'));
       }
     }
     throw new ApiError(res.status, json?.error?.code ?? 'unknown', json?.error?.message ?? 'Đã có lỗi xảy ra, vui lòng thử lại');

@@ -11,8 +11,32 @@ export function Journey({ detail }: { detail: LifeChoiceDetail }) {
   const done = [true, detail.tasks.some((x) => x.done), !!detail.simulated, detail.status === 'done'];
   const current = done.findIndex((d) => !d);
   return (
-    <nav aria-label={t('choices.journey.title')} className="px-1">
-      <ol className="grid grid-cols-2 gap-y-3 md:grid-cols-4">
+    <nav aria-label={t('choices.journey.title')} className="rounded-xl border border-line-subtle bg-white p-2 md:p-3">
+      {/* ── Mobile View: Compact Horizontal Stepper ── */}
+      <div className="flex items-center justify-between gap-1 md:hidden">
+        {done.map((isDone, i) => {
+          const active = i === current;
+          return (
+            <div key={i} className="flex flex-1 items-center gap-1.5">
+              <span
+                className={cx(
+                  'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold',
+                  isDone ? 'bg-[#0B7A55] text-white' : active ? 'bg-[#0B7A55] text-white ring-2 ring-[#DDF1E7]' : 'bg-[#E9EEF3] text-[#5B6B7C]',
+                )}
+              >
+                {isDone && !active ? <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden /> : i + 1}
+              </span>
+              <span className="truncate text-[11.5px] font-medium text-ink">
+                {t(`choices.journey.step${i + 1}`)}
+              </span>
+              {i < 3 && <span className="mx-0.5 h-px flex-1 bg-[#E2E8F0]" aria-hidden />}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Desktop View ── */}
+      <ol className="hidden grid-cols-4 md:grid">
         {done.map((isDone, i) => {
           const active = i === current;
           return (

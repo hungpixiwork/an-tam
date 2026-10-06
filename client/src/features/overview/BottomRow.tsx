@@ -79,21 +79,22 @@ export function ResourcesCard({ rings }: { rings: ResourceRings }) {
   const { t } = useLocale();
   return (
     <SectionCard title={t('overview.res.title')}>
-      <ul className="grid grid-cols-3 gap-2 pt-1">
+      <ul className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-1">
         {RINGS.map((r) => {
           const v = rings[r.key];
           const label = t(`overview.res.${r.key}`);
           return (
             <li key={r.key} className="min-w-0">
               {v === null ? (
-                <ProgressRing value={0} tone="gray" icon={r.icon} label={label} valueLabel="—" status={{ label: t('overview.res.no_data'), tone: 'gray' }} size={100} />
+                <ProgressRing value={0} tone="gray" icon={r.icon} label={label} valueLabel="—" status={{ label: t('overview.res.no_data'), tone: 'gray' }} size={88} stroke={8} />
               ) : (
                 <ProgressRing
                   value={v}
                   tone={r.tone}
                   icon={r.icon}
                   label={label}
-                  size={100}
+                  size={88}
+                  stroke={8}
                   status={v >= ON_TRACK ? { label: t('overview.res.on_track'), tone: 'green' } : { label: t(`overview.res.${r.key}_low`), tone: r.lowTone }}
                 />
               )}

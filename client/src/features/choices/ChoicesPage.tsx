@@ -29,17 +29,27 @@ export default function ChoicesPage() {
   const preview = { data: detail.data?.previews?.[mode] };
 
   const hero = (
-    <HeroBanner
-      title={t('choices.hero.title')}
-      description={t('choices.hero.subtitle')}
-      quote={t('choices.hero.quote')}
-      quoteClassName="w-[240px] self-start xl:mr-[20%] [&_blockquote]:text-[13px]"
-      image="/hero-lake-city.jpg"
-      imageAlt={t('choices.hero.image_alt')}
-      imagePosition="right 55%"
-      visualWidth="56%"
-      className="min-h-[108px]"
-    />
+    <>
+      <div className="hidden md:block">
+        <HeroBanner
+          title={t('choices.hero.title')}
+          description={t('choices.hero.subtitle')}
+          quote={t('choices.hero.quote')}
+          quoteClassName="w-[240px] self-start xl:mr-[20%] [&_blockquote]:text-[13px]"
+          image="/hero-lake-city.jpg"
+          imageAlt={t('choices.hero.image_alt')}
+          imagePosition="right 55%"
+          visualWidth="56%"
+          className="min-h-[108px]"
+        />
+      </div>
+      <div className="flex items-center justify-between gap-3 pb-0.5 md:hidden">
+        <div>
+          <h1 className="text-[20px] font-extrabold text-ink">{t('choices.hero.title')}</h1>
+          <p className="text-[12px] text-ink-soft">{t('choices.hero.subtitle')}</p>
+        </div>
+      </div>
+    </>
   );
   const modal = creating && (
     <NewChoiceModal initial={creating} onClose={() => setCreating(null)} onCreated={(id) => { pick(id); setCreating(null); }} />

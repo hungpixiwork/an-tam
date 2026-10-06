@@ -31,6 +31,14 @@ export function useUpdateCalendarEvent() {
   });
 }
 
+export function useCreateCalendarEvent() {
+  const refresh = useRefreshCalendar();
+  return useMutation({
+    mutationFn: (body: CalendarEventInput) => api.post<{ id: string }>('/calendar/events', body),
+    onSuccess: refresh,
+  });
+}
+
 export function useDeleteCalendarEvent() {
   const refresh = useRefreshCalendar();
   return useMutation({ mutationFn: (id: string) => api.del<null>(`/calendar/events/${id}`), onSuccess: refresh });

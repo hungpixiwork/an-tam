@@ -1,38 +1,43 @@
-import { lazy } from 'react';
-import { createBrowserRouter, Navigate, useLocation } from 'react-router-dom';
-
-/** Chuyển hướng giữ nguyên ?query và #hash (link cũ /ke-hoach?focus=… vẫn tới đúng khối). */
-function KeepQuery({ to }: { to: string }) {
-  const { search, hash } = useLocation();
-  return <Navigate to={`${to}${search}${hash}`} replace />;
-}
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppShell } from '@/layouts/AppShell';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { OnboardingLayout } from '@/layouts/OnboardingLayout';
 import { RouteErrorBoundary } from '@/components/ErrorBoundary';
 import { retryDynamicImport } from '@/lib/chunkRecovery';
+import { MAU } from '@/duong-dan';
+import type { RoutesCuaSlice } from '@/routes-type';
 
-function safeLazy<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) {
-  return lazy(() => retryDynamicImport(factory));
-}
+import { tongQuanRoutes } from '@/features/overview/routes';
+import { quyAnToanRoutes } from '@/features/safety/routes';
+import { danhMucRoutes } from '@/features/portfolio/routes';
+import { tangThuNhapRoutes } from '@/features/earn/routes';
+import { luaChonRoutes } from '@/features/choices/routes';
+import { thuChiRoutes } from '@/features/ledger/routes';
+import { moPhongRoutes } from '@/features/simulation/routes';
+import { lichAiRoutes } from '@/features/calendar/routes';
+import { workspaceRoutes } from '@/features/workspace/routes';
+import { auditRoutes } from '@/features/audit/routes';
+import { congDongRoutes } from '@/features/community/routes';
+import { caiDatRoutes } from '@/features/settings/routes';
+import { authRoutes } from '@/features/auth/routes';
+import { onboardingRoutes } from '@/features/onboarding/routes';
 
-const OnboardingPage = safeLazy(() => import('@/features/onboarding/OnboardingPage'));
-const LedgerPage = safeLazy(() => import('@/features/ledger/LedgerPage'));
-const OverviewPage = safeLazy(() => import('@/features/overview/OverviewPage'));
-const SimulationPage = safeLazy(() => import('@/features/simulation/SimulationPage'));
-const SimulationResultPage = safeLazy(() => import('@/features/simulation/SimulationResultPage'));
-const PortfolioPage = safeLazy(() => import('@/features/portfolio/PortfolioPage'));
-const SafetyPage = safeLazy(() => import('@/features/safety/SafetyPage'));
-const CalendarPage = safeLazy(() => import('@/features/calendar/CalendarPage'));
-const ChoicesPage = safeLazy(() => import('@/features/choices/ChoicesPage'));
-const WorkspacePage = safeLazy(() => import('@/features/workspace/WorkspacePage'));
-const AuditPage = safeLazy(() => import('@/features/audit/AuditPage'));
-const CommunityPage = safeLazy(() => import('@/features/community/CommunityPage'));
-const SettingsPage = safeLazy(() => import('@/features/settings/SettingsPage'));
-const EarnPage = safeLazy(() => import('@/features/earn/EarnPage'));
-const LoginPage = safeLazy(() => import('@/features/auth/LoginPage'));
-const RegisterPage = safeLazy(() => import('@/features/auth/RegisterPage'));
-const PixelGallery = safeLazy(() => import('@/features/dev/PixelGallery'));
+const CAC_SLICE_CO_THANH: RoutesCuaSlice[] = [
+  tongQuanRoutes,
+  quyAnToanRoutes,
+  danhMucRoutes,
+  tangThuNhapRoutes,
+  luaChonRoutes,
+  thuChiRoutes,
+  moPhongRoutes,
+  lichAiRoutes,
+  workspaceRoutes,
+  auditRoutes,
+  congDongRoutes,
+  caiDatRoutes,
+];
+
+const CAC_ROUTE_CO_THANH = CAC_SLICE_CO_THANH.flatMap((s) => s.coThanh ?? []);
 
 export const router = createBrowserRouter([
   {
@@ -41,42 +46,31 @@ export const router = createBrowserRouter([
       {
         element: <AuthLayout />,
         errorElement: <RouteErrorBoundary />,
-        children: [
-          { path: '/dang-nhap', element: <LoginPage /> },
-          { path: '/dang-ky', element: <RegisterPage /> },
-        ],
+        children: authRoutes.khongThanh ?? [],
       },
-      { 
-        element: <OnboardingLayout />, 
+      {
+        element: <OnboardingLayout />,
         errorElement: <RouteErrorBoundary />,
-        children: [{ path: '/bat-dau', element: <OnboardingPage /> }] 
+        children: onboardingRoutes.khongThanh ?? [],
       },
       {
         element: <AppShell />,
         errorElement: <RouteErrorBoundary />,
-        children: [
-          { path: '/', element: <OverviewPage /> },
-          { path: '/thu-chi', element: <LedgerPage /> },
-          { path: '/quy-an-toan', element: <SafetyPage /> },
-          { path: '/tang-thu-nhap', element: <EarnPage /> },
-          { path: '/lua-chon', element: <ChoicesPage /> },
-          { path: '/lich-ai', element: <CalendarPage /> },
-          { path: '/mo-phong', element: <SimulationPage /> },
-          { path: '/mo-phong/ket-qua/:runId', element: <SimulationResultPage /> },
-          { path: '/danh-muc', element: <PortfolioPage /> },
-          { path: '/ai-workspace', element: <WorkspacePage /> },
-          { path: '/nhat-ky-ai', element: <AuditPage /> },
-          { path: '/cong-dong', element: <CommunityPage /> },
-          { path: '/cai-dat', element: <SettingsPage /> },
-          // Trang cũ đã gộp vào trang mới (file giữ lại cho các wave sau)
-          { path: '/muc-tieu', element: <KeepQuery to="/quy-an-toan" /> },
-          { path: '/ke-hoach', element: <KeepQuery to="/quy-an-toan" /> },
-          { path: '/ai-theo-doi', element: <Navigate to="/nhat-ky-ai" replace /> },
-          { path: '/thoi-quen', element: <Navigate to="/thu-chi?tab=thoi-quen" replace /> },
-        ],
+        children: CAC_ROUTE_CO_THANH,
       },
-      ...(import.meta.env.DEV ? [{ path: '/dev/pixel', element: <PixelGallery />, errorElement: <RouteErrorBoundary /> }] : []),
-      { path: '*', element: <Navigate to="/" replace /> },
+      ...(import.meta.env.DEV
+        ? [
+            {
+              path: MAU.devPixel,
+              lazy: async () => {
+                const mod = await retryDynamicImport(() => import('@/features/dev/PixelGallery'));
+                return { Component: mod.default };
+              },
+              errorElement: <RouteErrorBoundary />,
+            },
+          ]
+        : []),
+      { path: '*', element: <Navigate to={MAU.tongQuan} replace /> },
     ],
   },
 ]);

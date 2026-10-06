@@ -38,20 +38,20 @@ export function CashflowChartCard({ months, onAdd }: { months: LedgerDashboard['
       {!has ? (
         <EmptyState compact icon={BarChart3} title={t('ledger.chart.empty')} body={t('ledger.chart.empty_body')} action={<Button size="sm" onClick={onAdd}>{t('ledger.btn.add')}</Button>} />
       ) : (
-        <div className="h-[236px]" role="img" aria-label={t('ledger.chart.title')}>
+        <div className="h-[210px] sm:h-[220px] w-full min-w-0" role="img" aria-label={t('ledger.chart.title')}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={rows} margin={{ top: 6, right: 4, bottom: 0, left: -8 }} barGap={2} barCategoryGap="30%">
+            <ComposedChart data={rows} margin={{ top: 6, right: 4, bottom: 0, left: -10 }} barGap={2} barCategoryGap="28%">
               <CartesianGrid vertical={false} stroke="#EEF1F5" />
-              <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: '#E5E9F0' }} tick={{ fontSize: 12, fill: '#64748B' }} />
-              <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: '#64748B' }} tickFormatter={(v: number) => axisMoney(v, unit)} width={44} ticks={ticks} domain={[ticks[0], ticks[ticks.length - 1]]} />
+              <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: '#E5E9F0' }} tick={{ fontSize: 11.5, fill: '#64748B' }} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11.5, fill: '#64748B' }} tickFormatter={(v: number) => axisMoney(v, unit)} width={42} ticks={ticks} domain={[ticks[0], ticks[ticks.length - 1]]} />
               <Tooltip
                 cursor={{ fill: 'rgba(15,23,42,0.04)' }}
                 formatter={(v, name) => [formatVndFull(Number(v)), t(`ledger.chart.${String(name)}`)]}
-                contentStyle={{ borderRadius: 12, border: '1px solid #E5E9F0', fontSize: 12.5 }}
+                contentStyle={{ borderRadius: 12, border: '1px solid #E5E9F0', fontSize: 12 }}
               />
-              <Bar dataKey="income" fill={C.income} radius={[4, 4, 0, 0]} maxBarSize={16} isAnimationActive={false} />
-              <Bar dataKey="expense" fill={C.expense} radius={[4, 4, 0, 0]} maxBarSize={16} isAnimationActive={false} />
-              <Line dataKey="net" stroke={C.net} strokeWidth={2} dot={{ r: 4, fill: C.net, stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 5 }} isAnimationActive={false} />
+              <Bar dataKey="income" fill={C.income} radius={[4, 4, 0, 0]} maxBarSize={14} isAnimationActive={false} />
+              <Bar dataKey="expense" fill={C.expense} radius={[4, 4, 0, 0]} maxBarSize={14} isAnimationActive={false} />
+              <Line dataKey="net" stroke={C.net} strokeWidth={2} dot={{ r: 3.5, fill: C.net, stroke: '#fff', strokeWidth: 1.5 }} activeDot={{ r: 4.5 }} isAnimationActive={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>

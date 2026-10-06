@@ -41,7 +41,7 @@ function PromoCard({ onClick }: { onClick: () => void }) {
       <div className="relative px-5 pt-5">
         <p className="text-[16px] font-bold leading-snug text-ink">{t('sidebar.promo_title')}</p>
       </div>
-      <p className="absolute bottom-4 left-4 right-16 rounded-lg bg-white/75 px-2.5 py-1.5 text-[11.5px] leading-snug text-ink-soft backdrop-blur-sm">{t('sidebar.promo_subtitle')}</p>
+      <p className="absolute bottom-4 left-4 right-16 rounded-lg bg-white px-2.5 py-1.5 text-[11.5px] font-medium leading-snug text-ink shadow-sm">{t('sidebar.promo_subtitle')}</p>
       <span className="absolute bottom-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white text-ink shadow-lift transition-transform group-hover:translate-x-0.5">
         <ArrowRight className="h-5 w-5" aria-hidden />
         <span className="sr-only">{t('sidebar.explore_lessons')}</span>

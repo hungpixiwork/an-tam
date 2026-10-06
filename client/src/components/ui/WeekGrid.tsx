@@ -53,6 +53,7 @@ export interface WeekGridProps {
   /** Ghi đè/bổ sung màu theo loại. */
   categoryStyles?: Partial<Record<string, WeekCategoryStyle>>;
   onEventClick?: (event: WeekEvent) => void;
+  onSlotClick?: (date: string, hour: number) => void;
   /** Chú giải dưới lưới. */
   legend?: { category: string; label: ReactNode }[];
   /** Chiều cao 1 giờ (px). */
@@ -99,29 +100,64 @@ export function layoutDayEvents(events: WeekEvent[]): Map<string, { lane: number
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-/** Lịch tuần với khối sự kiện định vị tuyệt đối, tô màu theo loại, cột hôm nay nổi bật; cuộn ngang trên màn nhỏ. */
-export function WeekGrid({ days, events, startHour = 7, endHour = 22, categoryStyles, onEventClick, legend, hourHeight = 48, todayIndex, ariaLabel, className }: WeekGridProps) {
+/** Lịch tuần chuẩn Google Calendar: week strip với badge ngày hôm nay, vạch chỉ giờ hiện tại đỏ, event góc bo nhẹ. */
+export function WeekGrid({
+  days,
+  events,
+  startHour = 7,
+  endHour = 22,
+  categoryStyles,
+  onEventClick,
+  onSlotClick,
+  legend,
+  hourHeight = 48,
+  todayIndex,
+  ariaLabel,
+  className,
+}: WeekGridProps) {
   const styles: Record<string, WeekCategoryStyle> = { ...WEEK_CATEGORY_STYLES, ...(categoryStyles as Record<string, WeekCategoryStyle>) };
   const hours = Array.from({ length: Math.max(1, endHour - startHour) + 1 }, (_, i) => startHour + i);
   const bodyHeight = (endHour - startHour) * hourHeight;
   const rangeStart = startHour * 60;
   const rangeEnd = endHour * 60;
   const isToday = (i: number) => days[i]?.isToday ?? i === todayIndex;
-  const cols = `56px repeat(${days.length}, minmax(96px, 1fr))`;
+  const cols = `44px repeat(${days.length}, minmax(88px, 1fr))`;
+
+  // Tính giờ hiện tại theo giờ Việt Nam
+  const now = new Date(Date.now() + 7 * 3_600_000);
+  const currentMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const showCurrentTime = currentMinutes >= rangeStart && currentMinutes <= rangeEnd;
+  const currentTimeTop = ((currentMinutes - rangeStart) / 60) * hourHeight + 6;
 
   return (
-    <div className={cx('min-w-0', className)}>
-      <div className="overflow-x-auto rounded-xl border border-line" role="region" aria-label={ariaLabel} tabIndex={0}>
-        <div style={{ minWidth: 56 + days.length * 96 }}>
-          {/* Header ngày */}
-          <div className="grid border-b border-line bg-white" style={{ gridTemplateColumns: cols }}>
-            <div />
-            {days.map((d, i) => (
-              <div key={d.date} className={cx('border-l border-line px-1 py-2 text-center', isToday(i) && 'bg-accent-50')} aria-current={isToday(i) ? 'date' : undefined}>
-                <p className={cx('text-[13px] font-bold', isToday(i) ? 'text-accent-600' : 'text-ink')}>{d.label}</p>
-                {d.sub && <p className={cx('text-[12px]', isToday(i) ? 'text-accent-600' : 'text-ink-soft')}>{d.sub}</p>}
-              </div>
-            ))}
+    <div className={cx('min-w-0 select-none', className)}>
+      <div className="overflow-x-auto rounded-xl border border-line/80 bg-white" role="region" aria-label={ariaLabel} tabIndex={0}>
+        <div style={{ minWidth: 44 + days.length * 88 }}>
+          {/* Header ngày / Week Strip */}
+          <div className="sticky top-0 z-10 grid border-b border-line bg-white/95 backdrop-blur-none" style={{ gridTemplateColumns: cols }}>
+            <div className="flex items-center justify-center text-[10px] font-semibold text-ink-mute">GMT+7</div>
+            {days.map((d, i) => {
+              const active = isToday(i);
+              const dayNum = d.date.slice(8, 10);
+              return (
+                <div key={d.date} className={cx('border-l border-line/60 py-2 text-center', active && 'bg-primary-50/30')} aria-current={active ? 'date' : undefined}>
+                  <p className={cx('text-[11px] font-bold uppercase tracking-wider', active ? 'text-primary-700' : 'text-ink-soft')}>
+                    {d.label}
+                  </p>
+                  <div className="mt-0.5 flex justify-center">
+                    {active ? (
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary-700 text-[14px] font-bold text-white shadow-sm">
+                        {Number(dayNum)}
+                      </span>
+                    ) : (
+                      <span className="inline-flex h-7 w-7 items-center justify-center text-[14px] font-semibold text-ink">
+                        {Number(dayNum)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Thân lưới */}
@@ -129,19 +165,42 @@ export function WeekGrid({ days, events, startHour = 7, endHour = 22, categorySt
             {/* Cột giờ */}
             <div className="relative">
               {hours.map((h, i) => (
-                <span key={h} className="absolute right-2 -translate-y-1/2 text-[11.5px] text-ink-soft tabular-nums" style={{ top: i * hourHeight + 6 }}>
+                <span key={h} className="absolute right-2 -translate-y-1/2 text-[11px] font-medium text-ink-mute tabular-nums" style={{ top: i * hourHeight + 6 }}>
                   {pad(h)}:00
                 </span>
               ))}
             </div>
+
+            {/* Các cột ngày */}
             {days.map((d, di) => {
               const dayEvents = events.filter((e) => e.dayIndex === di);
               const lanes = layoutDayEvents(dayEvents);
+              const active = isToday(di);
+
               return (
-                <div key={d.date} className={cx('relative border-l border-line', isToday(di) && 'bg-accent-50/50')}>
+                <div key={d.date} className={cx('relative border-l border-line/60', active && 'bg-primary-50/15')}>
+                  {/* Đường kẻ giờ ngang */}
                   {hours.map((h, i) => (
-                    <span key={h} className="absolute inset-x-0 border-t border-dashed border-line" style={{ top: i * hourHeight + 6 }} aria-hidden />
+                    <button
+                      key={h}
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => onSlotClick?.(d.date, h)}
+                      aria-label={`Thêm lịch ngày ${d.date} lúc ${h}:00`}
+                      className="absolute inset-x-0 border-t border-line/50 hover:bg-slate-50/60 transition-colors"
+                      style={{ top: i * hourHeight + 6, height: hourHeight }}
+                    />
                   ))}
+
+                  {/* Vạch chỉ giờ hiện tại */}
+                  {active && showCurrentTime && (
+                    <div className="pointer-events-none absolute inset-x-0 z-20 flex items-center" style={{ top: currentTimeTop }}>
+                      <span className="h-2.5 w-2.5 -ml-1 rounded-full bg-danger-500 shadow-sm" />
+                      <span className="h-[2px] flex-1 bg-danger-500" />
+                    </div>
+                  )}
+
+                  {/* Sự kiện trong ngày */}
                   {dayEvents.map((ev) => {
                     const s = Math.max(rangeStart, toMinutes(ev.start));
                     const e = Math.min(rangeEnd, Math.max(toMinutes(ev.end), s + 15));
@@ -152,21 +211,36 @@ export function WeekGrid({ days, events, startHour = 7, endHour = 22, categorySt
                     const st = styles[ev.category] ?? WEEK_CATEGORY_STYLES.work;
                     const Icon = ev.icon;
                     const label = ev.ariaLabel ?? `${typeof ev.title === 'string' ? ev.title : ''} ${ev.start}–${ev.end}`;
-                    const compact = height < 40;
-                    const tight = height < 60;
+                    const compact = height < 36;
+                    const tight = height < 54;
+
                     const content = (
-                      <>
+                      <div className="flex h-full flex-col justify-between overflow-hidden">
                         <span className="flex min-w-0 items-start gap-1 font-semibold leading-tight text-ink">
-                          {Icon && <Icon className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />}
-                          <span className={cx('min-w-0', compact ? 'truncate' : tight ? 'line-clamp-1' : 'line-clamp-2')}>{ev.title}</span>
+                          {Icon && <Icon className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />}
+                          <span className={cx('min-w-0 text-[11.5px]', compact ? 'truncate' : tight ? 'line-clamp-1' : 'line-clamp-2')}>
+                            {ev.title}
+                          </span>
                         </span>
-                        {!compact && <span className="mt-0.5 block text-[11px] text-ink-soft tabular-nums">{ev.start} – {ev.end}</span>}
-                      </>
+                        {!compact && <span className="mt-0.5 block text-[10.5px] font-medium text-ink-soft tabular-nums">{ev.start} – {ev.end}</span>}
+                      </div>
                     );
-                    const cls = cx('absolute overflow-hidden rounded-lg border-l-[3px] px-1.5 py-1 text-left text-[11.5px] shadow-sm', st.block);
-                    const pos = { top, height, left: `calc(${(lane / n) * 100}% + 3px)`, width: `calc(${100 / n}% - 6px)` };
+
+                    const cls = cx('absolute z-10 overflow-hidden rounded-md border-l-[3.5px] px-1.5 py-1 text-left shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-transform active:scale-[0.98]', st.block);
+                    const pos = { top, height, left: `calc(${(lane / n) * 100}% + 2px)`, width: `calc(${100 / n}% - 4px)` };
+
                     return onEventClick ? (
-                      <button key={ev.id} type="button" onClick={() => onEventClick(ev)} aria-label={label} className={cx(cls, 'hover:brightness-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-600')} style={pos}>
+                      <button
+                        key={ev.id}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEventClick(ev);
+                        }}
+                        aria-label={label}
+                        className={cx(cls, 'hover:brightness-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-600')}
+                        style={pos}
+                      >
                         {content}
                       </button>
                     ) : (

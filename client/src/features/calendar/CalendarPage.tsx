@@ -36,17 +36,19 @@ export default function CalendarPage() {
   return (
     <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-[minmax(0,978fr)_minmax(340px,420fr)]">
       <div className="min-w-0 space-y-3.5">
-        <HeroBanner
-          title={t('calendar.hero.title')}
-          subtitle={t('calendar.hero.subtitle')}
-          description={t('calendar.hero.description')}
-          quote={t('calendar.hero.quote')}
-          quoteClassName="w-[256px] self-start xl:mr-0 [&_blockquote]:text-[13.5px]"
-          image="/hero-lake-city.jpg"
-          imagePosition="right 60%"
-          visualWidth="42%"
-          className="min-h-[140px] [&_h2]:md:text-[30px]"
-        />
+        <div className="hidden md:block">
+          <HeroBanner
+            title={t('calendar.hero.title')}
+            subtitle={t('calendar.hero.subtitle')}
+            description={t('calendar.hero.description')}
+            quote={t('calendar.hero.quote')}
+            quoteClassName="w-[256px] self-start xl:mr-0 [&_blockquote]:text-[13.5px]"
+            image="/hero-lake-city.jpg"
+            imagePosition="right 60%"
+            visualWidth="42%"
+            className="min-h-[140px] [&_h2]:md:text-[30px]"
+          />
+        </div>
         <WeekCalendarCard data={data} anchor={anchor} view={view} onAnchor={setAnchor} onView={setView} />
       </div>
       <aside className="min-w-0 space-y-3.5" aria-label={t('calendar.ai.title')}>

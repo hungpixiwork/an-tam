@@ -41,7 +41,7 @@ function FundSummary({ data }: { data: SafetyData }) {
             {t('safety.fund.title')} <span className="font-semibold">{t('safety.fund.title_sub')}</span>
             <InfoTip text={t('safety.fund.info')} />
           </h2>
-          <p className="mt-0.5 truncate text-[13px] text-ink-soft">{t('safety.fund.desc')}</p>
+          <p className="mt-0.5 text-[12.5px] sm:text-[13px] text-ink-soft leading-relaxed">{t('safety.fund.desc')}</p>
         </div>
       </div>
       {!data.ready ? (

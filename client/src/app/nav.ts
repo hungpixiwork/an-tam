@@ -1,4 +1,5 @@
 import { Bot, CalendarDays, ChartColumn, FileText, House, NotebookPen, PieChart, Settings, ShieldCheck, Target, TrendingUp, type LucideIcon } from 'lucide-react';
+import { DUONG_DAN } from '@/duong-dan';
 
 export interface NavItem {
   key: string;
@@ -12,23 +13,23 @@ export interface NavItem {
 
 /** 11 mục sidebar theo mockup 2026-09. Placeholder ô tìm kiếm: i18n `topbar.search.<key>`. */
 export const NAV: NavItem[] = [
-  { key: 'overview', to: '/', label: 'Tổng quan', title: 'Tổng quan', icon: House },
-  { key: 'ledger', to: '/thu-chi', label: 'Sổ thu chi', title: 'Sổ thu chi & dòng tiền', icon: NotebookPen },
-  { key: 'safety', to: '/quy-an-toan', label: 'Quỹ an toàn', title: 'Quỹ an toàn & mục tiêu', icon: ShieldCheck },
-  { key: 'earn', to: '/tang-thu-nhap', label: 'Tăng thu nhập', title: 'Tăng thu nhập & phát triển kỹ năng', icon: TrendingUp },
-  { key: 'choices', to: '/lua-chon', label: 'Mục tiêu & Lựa chọn', title: 'Lựa chọn cuộc đời', icon: Target },
-  { key: 'calendar', to: '/lich-ai', label: 'Lịch AI', title: 'Lịch AI & kế hoạch tự động', icon: CalendarDays },
-  { key: 'simulation', to: '/mo-phong', label: 'Mô phỏng', title: 'Mô phỏng cú sốc kép', icon: ChartColumn },
-  { key: 'portfolio', to: '/danh-muc', label: 'Danh mục', title: 'Danh mục & rủi ro tập trung', icon: PieChart },
-  { key: 'workspace', to: '/ai-workspace', label: 'AI Workspace', title: 'AI Workspace · MCP · Agents', icon: Bot },
-  { key: 'audit', to: '/nhat-ky-ai', label: 'Nhật ký AI', title: 'Nhật ký AI, kiểm toán & quyền riêng tư', icon: FileText },
-  { key: 'settings', to: '/cai-dat', label: 'Cài đặt', title: 'Cài đặt & quyền riêng tư', icon: Settings },
+  { key: 'overview', to: DUONG_DAN.tongQuan(), label: 'Tổng quan', title: 'Tổng quan', icon: House },
+  { key: 'ledger', to: DUONG_DAN.thuChi(), label: 'Sổ thu chi', title: 'Sổ thu chi & dòng tiền', icon: NotebookPen },
+  { key: 'safety', to: DUONG_DAN.quyAnToan(), label: 'Quỹ an toàn', title: 'Quỹ an toàn & mục tiêu', icon: ShieldCheck },
+  { key: 'earn', to: DUONG_DAN.tangThuNhap(), label: 'Tăng thu nhập', title: 'Tăng thu nhập & phát triển kỹ năng', icon: TrendingUp },
+  { key: 'choices', to: DUONG_DAN.luaChon(), label: 'Mục tiêu & Lựa chọn', title: 'Lựa chọn cuộc đời', icon: Target },
+  { key: 'calendar', to: DUONG_DAN.lichAi(), label: 'Lịch AI', title: 'Lịch AI & kế hoạch tự động', icon: CalendarDays },
+  { key: 'simulation', to: DUONG_DAN.moPhong(), label: 'Mô phỏng', title: 'Mô phỏng cú sốc kép', icon: ChartColumn },
+  { key: 'portfolio', to: DUONG_DAN.danhMuc(), label: 'Danh mục', title: 'Danh mục & rủi ro tập trung', icon: PieChart },
+  { key: 'workspace', to: DUONG_DAN.aiWorkspace(), label: 'AI Workspace', title: 'AI Workspace · MCP · Agents', icon: Bot },
+  { key: 'audit', to: DUONG_DAN.nhatKyAi(), label: 'Nhật ký AI', title: 'Nhật ký AI, kiểm toán & quyền riêng tư', icon: FileText },
+  { key: 'settings', to: DUONG_DAN.caiDat(), label: 'Cài đặt', title: 'Cài đặt & quyền riêng tư', icon: Settings },
 ];
 
 /** Route không nằm trên sidebar nhưng vẫn có tiêu đề riêng. */
 const EXTRA_TITLES: { prefix: string; key: string; fallback: string }[] = [
   { prefix: '/mo-phong/ket-qua', key: 'nav.simulation.result', fallback: 'Kết quả mô phỏng' },
-  { prefix: '/cong-dong', key: 'nav.community.title', fallback: 'Học tài chính' },
+  { prefix: DUONG_DAN.congDong(), key: 'nav.community.title', fallback: 'Học tài chính' },
 ];
 
 const BY_LENGTH = [...NAV].sort((a, b) => b.to.length - a.to.length);

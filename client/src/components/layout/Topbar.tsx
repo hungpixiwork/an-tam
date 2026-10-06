@@ -190,7 +190,7 @@ export function Topbar({ title, onMenu }: { title: string; onMenu: () => void })
   const { t } = useLocale();
 
   return (
-    <header className="sticky top-0 z-20 flex h-[72px] items-center gap-2.5 border-b border-line bg-white/95 px-4 backdrop-blur md:gap-3 md:px-6">
+    <header className="sticky top-0 z-20 flex h-[72px] items-center gap-2.5 border-b border-line bg-white px-4 md:gap-3 md:px-6">
       <button type="button" onClick={onMenu} className="rounded-lg p-2 text-ink-soft hover:bg-slate-100 lg:hidden" aria-label={t('nav.open_menu')}>
         <Menu className="h-6 w-6" aria-hidden />
       </button>

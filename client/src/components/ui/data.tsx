@@ -36,6 +36,7 @@ export function ScoreRing({ score, max = 100, size = 128, stroke = 14, color, ch
   const c = 2 * Math.PI * r;
   const frac = Math.min(1, Math.max(0, score / max));
   const col = color ?? scoreColor((score / max) * 100);
+  const isSmall = size < 110;
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }} role="img" aria-label={label ?? `${score}/${max}`}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
@@ -52,11 +53,11 @@ export function ScoreRing({ score, max = 100, size = 128, stroke = 14, color, ch
           className="transition-[stroke-dasharray] duration-700"
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center p-1 text-center">
         {children ?? (
           <span className="font-bold text-ink">
-            <span className="text-[32px] leading-none">{score}</span>
-            <span className="text-base text-ink-soft">/{max}</span>
+            <span className={cx(isSmall ? 'text-[20px]' : 'text-[28px] sm:text-[32px]', 'leading-none tabular-nums')}>{score}</span>
+            <span className={cx(isSmall ? 'text-xs' : 'text-sm sm:text-base', 'text-ink-soft')}>/{max}</span>
           </span>
         )}
       </div>

@@ -7,6 +7,8 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
 import { PageSkeleton } from '@/components/ui';
 
+import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
+
 /** Khung cho mọi màn cần đăng nhập: Sidebar + Topbar + nội dung. */
 export function AppShell() {
   const { me, loading } = useAuth();
@@ -33,11 +35,12 @@ export function AppShell() {
       <Sidebar open={drawer} onClose={() => setDrawer(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar title={title} onMenu={() => setDrawer(true)} />
-        <main className="flex-1 min-w-0 p-4 md:px-5 md:py-3">
+        <main className="mx-auto w-full max-w-[1480px] flex-1 min-w-0 p-3 pb-28 md:p-6 md:pb-6">
           <Suspense fallback={<PageSkeleton />}>
             <Outlet />
           </Suspense>
         </main>
+        <MobileBottomNav onOpenMenu={() => setDrawer(true)} />
       </div>
     </div>
   );

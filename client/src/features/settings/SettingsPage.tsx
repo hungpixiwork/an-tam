@@ -7,6 +7,7 @@ import { Select } from '@/components/ui/core';
 import { useDeleteAccount, useSettings, useUpdateSettings, type Settings } from '@/lib/queries';
 import { useLocale } from '@/app/locale';
 import { FinanceBasicsCard, PasswordCard, ProfileCard } from './AccountCards';
+import { LocalStorageCard } from './LocalStorageCard';
 
 export default function SettingsPage() {
   const { data: settings, error, refetch, isPending } = useSettings();
@@ -36,9 +37,9 @@ export default function SettingsPage() {
         <PasswordCard />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.15fr]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.15fr_1fr]">
+        <LocalStorageCard />
         <PrivacyCard />
-        <DataUsedCard />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.15fr]">
@@ -46,7 +47,10 @@ export default function SettingsPage() {
           <LocaleCard />
           <TransparencyCard />
         </div>
-        <NotificationsCard settings={settings} />
+        <div className="space-y-4">
+          <DataUsedCard />
+          <NotificationsCard settings={settings} />
+        </div>
       </div>
 
       <CommitmentBanner />

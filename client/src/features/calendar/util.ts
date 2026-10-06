@@ -25,21 +25,58 @@ export const addMonthsTo = (day: string, n: number) => {
   return new Date(Date.UTC(x.getUTCFullYear(), x.getUTCMonth() + n, 1)).toISOString().slice(0, 10);
 };
 
-/** "Th 2" / "Mon" / "周一". */
-export const weekdayShort = (day: string, locale: string) => cap(fmt(locale, { weekday: 'short' }).format(d(day))).replace(/^Thứ /, 'Th ');
+/** "T2" / "Mon" / "周一". */
+export const weekdayShort = (day: string, locale: string) => {
+  if (locale === 'vi') {
+    const wd = d(day).getUTCDay();
+    return wd === 0 ? 'CN' : `T${wd + 1}`;
+  }
+  return cap(fmt(locale, { weekday: 'short' }).format(d(day))).replace(/^Thứ /, 'Th ');
+};
+
 /** "28/09". */
 export const ddmm = (day: string) => `${day.slice(8, 10)}/${day.slice(5, 7)}`;
-/** "28 Thg 9" / "Sep 28". */
-const dayMonth = (day: string, locale: string) => fmt(locale, { day: 'numeric', month: 'short' }).format(d(day)).replace(/thg/i, 'Thg');
+/** "6" */
+export const dayNumber = (day: string) => Number(day.slice(8, 10));
 
-/** "Th 2, 28 Thg 9 – CN, 4 Thg 10, 2026". */
+/**
+ * Định dạng ngày tự nhiên chuẩn Google Calendar tiếng Việt:
+ * Tuần cùng tháng: "5 – 11 tháng 10, 2026"
+ * Tuần khác tháng: "28 thg 9 – 4 thg 10, 2026"
+ * Ngày đơn: "Thứ Ba, 6 tháng 10, 2026"
+ */
 export function rangeLabel(from: string, to: string, locale: string) {
+  if (locale === 'vi') {
+    const dFrom = d(from);
+    const dTo = d(to);
+    const mFrom = dFrom.getUTCMonth() + 1;
+    const mTo = dTo.getUTCMonth() + 1;
+    const yFrom = dFrom.getUTCFullYear();
+    const yTo = dTo.getUTCFullYear();
+    const dayF = dFrom.getUTCDate();
+    const dayT = dTo.getUTCDate();
+
+    if (from === to) {
+      const fullDay = fmt('vi', { weekday: 'long' }).format(dFrom);
+      return `${cap(fullDay)}, ${dayF} tháng ${mFrom}, ${yFrom}`;
+    }
+    if (mFrom === mTo && yFrom === yTo) {
+      return `${dayF} – ${dayT} tháng ${mFrom}, ${yFrom}`;
+    }
+    if (yFrom === yTo) {
+      return `${dayF} thg ${mFrom} – ${dayT} thg ${mTo}, ${yFrom}`;
+    }
+    return `${dayF}/${mFrom}/${yFrom} – ${dayT}/${mTo}/${yTo}`;
+  }
+
   const a = `${weekdayShort(from, locale)}, ${dayMonth(from, locale)}`;
   if (from === to) return `${a}, ${from.slice(0, 4)}`;
   return `${a} – ${weekdayShort(to, locale)}, ${dayMonth(to, locale)}, ${to.slice(0, 4)}`;
 }
 
-/** "Tháng 9, 2026". */
+const dayMonth = (day: string, locale: string) => fmt(locale, { day: 'numeric', month: 'short' }).format(d(day)).replace(/thg/i, 'Thg');
+
+/** "Tháng 10, 2026". */
 export const monthLabel = (day: string, locale: string) => cap(fmt(locale, { month: 'long', year: 'numeric' }).format(d(day)));
 
 /** "2 phút trước". */

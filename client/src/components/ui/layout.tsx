@@ -214,7 +214,7 @@ export function ListRow({ icon, iconTone = 'blue', title, subtitle, value, value
 /** Thẻ trích dẫn trắng với dấu “ lớn (góc hero banner). `text` hỗ trợ xuống dòng bằng \n. */
 export function QuoteCard({ text, className }: { text: ReactNode; className?: string }) {
   return (
-    <figure className={cx('flex gap-3 rounded-2xl bg-white/95 px-5 py-4 shadow-soft ring-1 ring-black/[0.03] backdrop-blur-sm', className)}>
+    <figure className={cx('flex gap-3 rounded-2xl border border-line bg-white px-5 py-4 shadow-soft', className)}>
       <Quote className="h-6 w-6 shrink-0 rotate-180 fill-accent-600 text-accent-600" aria-hidden />
       <blockquote className="whitespace-pre-line text-[14px] font-medium leading-relaxed text-ink">{text}</blockquote>
     </figure>

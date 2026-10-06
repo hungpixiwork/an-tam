@@ -15,7 +15,13 @@ export interface HoldingInput {
   inPortfolio?: boolean;
 }
 
-export interface WhatIfRequest { preset: WhatIfPresetKey; amount: number; holdingMonths: number }
+export interface WhatIfRequest {
+  preset: WhatIfPresetKey;
+  amount: number;
+  holdingMonths: number;
+  sourceOfFunds?: 'investable_cash' | 'sell_holding' | 'emergency_reserve';
+  sourceHoldingId?: string;
+}
 
 /* ───────── 07 · Danh mục & rủi ro tập trung ───────── */
 export const usePortfolio = () => useQuery({ queryKey: qk.portfolio, queryFn: () => api.get<PortfolioAnalysis>('/portfolio') });

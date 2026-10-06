@@ -57,14 +57,14 @@ export function HeroBanner({
           )}
         </div>
       )}
-      <div className="relative flex items-start gap-6 px-6 py-6 md:px-8 md:py-7">
+      <div className="relative flex items-start gap-4 px-4 py-4 sm:gap-6 sm:px-8 sm:py-7">
         <div className="min-w-0 max-w-[760px] flex-1">
-          {eyebrow && <p className="mb-2 text-[15px] font-medium text-ink">{text(eyebrow)}</p>}
-          <H className="text-[26px] font-extrabold leading-tight tracking-tight text-ink md:text-[32px]">{text(title)}</H>
-          {highlight && <p className="mt-1.5 text-[18px] font-bold leading-snug text-ink md:text-[22px]">{text(highlight)}</p>}
-          {subtitle && <p className="mt-2 text-[15px] leading-relaxed text-ink md:text-[16px]">{text(subtitle)}</p>}
-          {description && <p className="mt-2 max-w-[620px] text-[14px] leading-relaxed text-ink-soft">{text(description)}</p>}
-          {children && <div className="mt-4 flex flex-wrap items-center gap-2.5">{children}</div>}
+          {eyebrow && <p className="mb-1.5 text-[13.5px] sm:text-[15px] font-medium text-ink">{text(eyebrow)}</p>}
+          <H className="text-[21px] font-extrabold leading-tight tracking-tight text-ink sm:text-[28px] md:text-[32px]">{text(title)}</H>
+          {highlight && <p className="mt-1 text-[15px] font-bold leading-snug text-primary-700 sm:text-[18px] md:text-[22px]">{text(highlight)}</p>}
+          {subtitle && <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink sm:text-[15px] md:text-[16px]">{text(subtitle)}</p>}
+          {description && <p className="mt-1.5 max-w-[620px] text-[13px] leading-relaxed text-ink-soft sm:text-[14px]">{text(description)}</p>}
+          {children && <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4 sm:gap-2.5">{children}</div>}
         </div>
         {quote && <QuoteCard text={text(quote)} className={cx('hidden shrink-0 lg:flex', quoteClassName ?? 'w-[300px] xl:mr-[14%]')} />}
       </div>

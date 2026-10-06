@@ -20,14 +20,14 @@ export function KpiRow({ nw }: { nw: PortfolioRisk['netWorth'] }) {
   const delta = nw.deltaPct === null ? null : Math.round(nw.deltaPct * 100);
   const value = (v: number) => formatVndFull(v);
   return (
-    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 xl:grid-cols-4">
       <KpiCard
         icon={Wallet}
         tone="blue"
         label={t('portfolio.kpi.net')}
         value={value(nw.net)}
-        className="relative pr-5"
-        children={<div className="absolute right-5 top-5">{delta !== null && <PctBadge value={`${Math.abs(delta)}%`} tone={delta >= 0 ? 'green' : 'red'} icon={delta >= 0 ? ArrowUp : ArrowDown} />}</div>}
+        valueClassName="text-[17px] sm:text-[21px]"
+        badge={delta !== null ? <PctBadge value={`${Math.abs(delta)}%`} tone={delta >= 0 ? 'green' : 'red'} icon={delta >= 0 ? ArrowUp : ArrowDown} /> : undefined}
         footnote={delta !== null ? t('portfolio.kpi.net_note', { n: nw.compareMonths }) : t('portfolio.kpi.net_nohistory')}
       />
       <KpiCard
@@ -35,8 +35,8 @@ export function KpiRow({ nw }: { nw: PortfolioRisk['netWorth'] }) {
         tone="green"
         label={t('portfolio.kpi.invested')}
         value={value(nw.invested)}
-        className="relative pr-5"
-        children={<div className="absolute right-5 top-5">{<PctBadge value={`${pctOf(nw.invested, nw.totalAssets)}%`} tone="green" />}</div>}
+        valueClassName="text-[17px] sm:text-[21px]"
+        badge={<PctBadge value={`${pctOf(nw.invested, nw.totalAssets)}%`} tone="green" />}
         footnote={t('portfolio.kpi.invested_note')}
       />
       <KpiCard
@@ -44,8 +44,8 @@ export function KpiRow({ nw }: { nw: PortfolioRisk['netWorth'] }) {
         tone="sky"
         label={t('portfolio.kpi.other')}
         value={value(nw.other)}
-        className="relative pr-5"
-        children={<div className="absolute right-5 top-5">{<PctBadge value={`${pctOf(nw.other, nw.totalAssets)}%`} tone="sky" />}</div>}
+        valueClassName="text-[17px] sm:text-[21px]"
+        badge={<PctBadge value={`${pctOf(nw.other, nw.totalAssets)}%`} tone="sky" />}
         footnote={t('portfolio.kpi.other_note')}
       />
       <KpiCard
@@ -53,8 +53,8 @@ export function KpiRow({ nw }: { nw: PortfolioRisk['netWorth'] }) {
         tone="violet"
         label={t('portfolio.kpi.debt')}
         value={value(nw.debt)}
-        className="relative pr-5"
-        children={<div className="absolute right-5 top-5">{<PctBadge value={`${pctOf(nw.debt, nw.totalAssets)}%`} tone="violet" />}</div>}
+        valueClassName="text-[17px] sm:text-[21px]"
+        badge={<PctBadge value={`${pctOf(nw.debt, nw.totalAssets)}%`} tone="violet" />}
         footnote={t('portfolio.kpi.debt_note')}
       />
     </div>

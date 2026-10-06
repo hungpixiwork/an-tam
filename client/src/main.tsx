@@ -8,6 +8,7 @@ import { router } from '@/app/router';
 import { ApiError } from '@/lib/api';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { triggerChunkReloadGuard } from '@/lib/chunkRecovery';
+import { AppProvider } from '@/state';
 import './index.css';
 
 // Xử lý lỗi preload từ Vite (Xóa bỏ reload loop vô điều kiện)
@@ -42,7 +43,9 @@ createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <LocaleProvider>
-            <RouterProvider router={router} />
+            <AppProvider>
+              <RouterProvider router={router} />
+            </AppProvider>
           </LocaleProvider>
         </AuthProvider>
       </QueryClientProvider>

@@ -1,51 +1,54 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Bill, BudgetInfo, LedgerData, LedgerDashboard, PayoutAccountData, SplitResult } from '@shared/types/api';
-import type { Transaction } from '@shared/types/domain';
+import type { Bill, PayoutAccountData, SplitResult } from '../../../../shared/types/api';
+import type { Transaction } from '../../../../shared/types/domain';
 import { api } from '../api';
 import { qk, useInvalidateFinance } from './keys';
+
+import { ledgerRepository } from '../repository/ledgerRepository';
 
 export type TransactionInput = Omit<Transaction, 'id'>;
 
 /* ───────── Sổ thu chi ───────── */
 export const useTransactions = (month: string) =>
-  useQuery({ queryKey: qk.transactions(month), queryFn: () => api.get<LedgerData>(`/transactions?month=${month}`), placeholderData: (prev) => prev });
+  useQuery({ queryKey: qk.transactions(month), queryFn: () => ledgerRepository.getTransactions(month), placeholderData: (prev) => prev });
 
 export function useSaveTransaction() {
   const refresh = useInvalidateFinance();
   return useMutation({
-    mutationFn: ({ id, ...t }: TransactionInput & { id?: string }) => (id ? api.patch<null>(`/transactions/${id}`, t) : api.post<{ id: string }>('/transactions', t)),
+    mutationFn: ({ id, ...t }: TransactionInput & { id?: string }) => (id ? ledgerRepository.updateTransaction(id, t) : ledgerRepository.createTransaction(t)),
     onSuccess: refresh,
   });
 }
 
 export function useDeleteTransaction() {
   const refresh = useInvalidateFinance();
-  return useMutation({ mutationFn: (id: string) => api.del<null>(`/transactions/${id}`), onSuccess: refresh });
+  return useMutation({ mutationFn: (id: string) => ledgerRepository.deleteTransaction(id), onSuccess: refresh });
 }
 
 /* ───────── Trang Sổ thu chi: dashboard, ngân sách, hóa đơn, chia tiền ───────── */
-export const useLedgerDashboard = () => useQuery({ queryKey: qk.ledgerDashboard, queryFn: () => api.get<LedgerDashboard>('/ledger/dashboard') });
+export const useLedgerDashboard = (month?: string) =>
+  useQuery({ queryKey: month ? [...qk.ledgerDashboard, month] : qk.ledgerDashboard, queryFn: () => ledgerRepository.getDashboard(month) });
 
 export function useSaveBudget() {
   const refresh = useInvalidateFinance();
-  return useMutation({ mutationFn: ({ month, limit }: { month: string; limit: number }) => api.put<BudgetInfo>(`/budgets/${month}`, { limit }), onSuccess: refresh });
+  return useMutation({ mutationFn: ({ month, limit }: { month: string; limit: number }) => ledgerRepository.saveBudget(month, limit), onSuccess: refresh });
 }
 
 export type BillInput = Pick<Bill, 'name' | 'amount' | 'category' | 'dayOfMonth' | 'autoRenew' | 'icon'>;
 
 export function useSaveBill() {
   const refresh = useInvalidateFinance();
-  return useMutation({ mutationFn: ({ id, ...b }: BillInput & { id?: string }) => (id ? api.patch<null>(`/bills/${id}`, b) : api.post<{ id: string }>('/bills', b)), onSuccess: refresh });
+  return useMutation({ mutationFn: ({ id, ...b }: BillInput & { id?: string }) => ledgerRepository.saveBill({ ...b, id }), onSuccess: refresh });
 }
 
 export function useDeleteBill() {
   const refresh = useInvalidateFinance();
-  return useMutation({ mutationFn: (id: string) => api.del<null>(`/bills/${id}`), onSuccess: refresh });
+  return useMutation({ mutationFn: (id: string) => ledgerRepository.deleteBill(id), onSuccess: refresh });
 }
 
 export function usePayBill() {
   const refresh = useInvalidateFinance();
-  return useMutation({ mutationFn: (id: string) => api.post<null>(`/bills/${id}/paid`, {}), onSuccess: refresh });
+  return useMutation({ mutationFn: (id: string) => ledgerRepository.payBill(id), onSuccess: refresh });
 }
 
 export const usePayoutAccount = () => useQuery({ queryKey: qk.payoutAccount, queryFn: () => api.get<PayoutAccountData | null>('/settings/payout-account') });

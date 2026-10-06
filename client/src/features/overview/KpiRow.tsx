@@ -71,7 +71,7 @@ export function KpiRow({ data }: { data: OverviewData }) {
   const months = decimal(safeMonths.months, locale);
 
   return (
-    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 xl:grid-cols-4">
       <KpiCard
         icon={ShieldCheck}
         tone="green"

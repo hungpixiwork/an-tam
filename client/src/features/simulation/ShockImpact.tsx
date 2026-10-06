@@ -42,12 +42,12 @@ function DeltaChip({ children, bad = true }: { children: ReactNode; bad?: boolea
 
 function ImpactTile({ icon: Icon, tone, label, value, chip, sub }: { icon: LucideIcon; tone: string; label: string; value: ReactNode; chip?: ReactNode; sub: string }) {
   return (
-    <div className="flex min-w-0 items-start gap-3 rounded-xl border border-line p-3">
-      <span className={cx('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', tone)}><Icon className="h-5 w-5" aria-hidden /></span>
+    <div className="flex min-w-0 items-start gap-3 rounded-xl border border-line p-3.5">
+      <span className={cx('flex h-12 w-12 shrink-0 items-center justify-center rounded-xl', tone)}><Icon className="h-6 w-6" aria-hidden /></span>
       <div className="min-w-0">
-        <p className="text-[12px] text-ink-soft">{label}</p>
-        <div className="flex flex-wrap items-center gap-1.5 text-[19px] font-extrabold leading-tight text-ink">{value}{chip}</div>
-        <p className="mt-0.5 text-[11.5px] leading-snug text-ink-soft">{sub}</p>
+        <p className="text-[13px] font-semibold text-ink-soft">{label}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[22px] font-extrabold leading-tight text-ink">{value}{chip}</div>
+        <p className="mt-1 text-[12px] leading-relaxed text-ink-soft">{sub}</p>
       </div>
     </div>
   );

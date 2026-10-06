@@ -37,18 +37,20 @@ export default function PortfolioPage() {
 
   return (
     <div className="space-y-3.5">
-      <header className="flex flex-wrap items-start justify-between gap-3 pt-1">
+      <header className="flex flex-wrap items-center justify-between gap-3 pt-0.5">
         <div className="min-w-0">
-          <h1 className="text-[30px] font-extrabold leading-tight tracking-tight text-ink">{t('portfolio.hero.title')}</h1>
-          <p className="mt-1 text-[14.5px] text-ink-soft">{t('portfolio.hero.subtitle')}</p>
+          <h1 className="text-[20px] font-extrabold leading-tight tracking-tight text-ink md:text-[30px]">
+            {t('portfolio.hero.title')}
+          </h1>
+          <p className="hidden text-[14px] text-ink-soft md:mt-1 md:block">{t('portfolio.hero.subtitle')}</p>
         </div>
         <Link
           to="/cong-dong"
-          className="inline-flex items-center gap-2.5 rounded-xl border border-line bg-white px-4 py-2.5 text-[13px] font-semibold text-accent-600 shadow-card hover:bg-accent-50"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-white px-2.5 text-[12px] font-semibold text-accent-600 shadow-sm hover:bg-accent-50 md:h-10 md:rounded-xl md:px-4 md:text-[13px] md:shadow-card"
         >
-          <BookOpen className="h-5 w-5" aria-hidden />
-          {t('portfolio.learn')}
-          <ArrowRight className="h-4 w-4" aria-hidden />
+          <BookOpen className="h-4 w-4" aria-hidden />
+          <span>{t('portfolio.learn')}</span>
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
         </Link>
       </header>
 

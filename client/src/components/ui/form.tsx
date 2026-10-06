@@ -105,7 +105,7 @@ export function Segmented<T extends string>({ value, onChange, options, label, c
             aria-checked={active}
             onClick={() => onChange(o.value)}
             className={cx(
-              'h-9 flex-1 rounded-lg px-3 text-sm font-semibold transition-colors',
+              'h-9 flex-1 whitespace-nowrap rounded-lg px-2 text-xs sm:text-sm font-semibold transition-colors',
               active
                 ? cx('bg-white shadow-sm', o.tone === 'green' ? 'text-success-600' : o.tone === 'red' ? 'text-danger-600' : 'text-accent-700')
                 : 'text-ink-soft hover:text-ink',

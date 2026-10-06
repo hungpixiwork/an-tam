@@ -49,17 +49,19 @@ export function SituationCard({ detail, preview, choices, onPick, onNew, onEdit 
         <MenuButton items={menu} label={t('choices.build.menu')} className="ml-auto" />
       </div>
 
-      <div className="mt-3 flex flex-wrap items-start gap-3">
-        <IconTile icon={GraduationCap} tone="blue" size="lg" className="h-14 w-14" />
-        <div className="min-w-0 flex-1">
-          <h3 className="text-[18px] font-extrabold leading-tight text-ink">{detail.title}</h3>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <span className="rounded-md bg-[#EDF4FF] px-2 py-0.5 text-[12px] font-semibold text-accent-700">{t(`choices.kind.${detail.kind}`)}</span>
-            {detail.incomeUpliftPct > 0 && <span className="rounded-md bg-[#F4F0FF] px-2 py-0.5 text-[12px] font-semibold text-violet-700">{t('choices.build.tag_growth')}</span>}
-            {option && <span className="inline-flex items-center gap-1 rounded-md bg-[#F2F5F8] px-2 py-0.5 text-[12px] text-ink-soft"><Clock3 className="h-3 w-3" aria-hidden />{t('choices.detail.months', { n: option.durationMonths })}</span>}
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+          <IconTile icon={GraduationCap} tone="blue" size="md" className="h-12 w-12 sm:h-14 sm:w-14 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[17px] sm:text-[19px] font-extrabold leading-tight text-ink">{detail.title}</h3>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <span className="rounded-md bg-[#EDF4FF] px-2 py-0.5 text-[12px] font-semibold text-accent-700">{t(`choices.kind.${detail.kind}`)}</span>
+              {detail.incomeUpliftPct > 0 && <span className="rounded-md bg-[#F4F0FF] px-2 py-0.5 text-[12px] font-semibold text-violet-700">{t('choices.build.tag_growth')}</span>}
+              {option && <span className="inline-flex items-center gap-1 rounded-md bg-[#F2F5F8] px-2 py-0.5 text-[12px] text-ink-soft"><Clock3 className="h-3 w-3" aria-hidden />{t('choices.detail.months', { n: option.durationMonths })}</span>}
+            </div>
           </div>
         </div>
-        <Button variant="white" size="sm" icon={Pencil} onClick={onEdit}>{t('choices.situation.edit')}</Button>
+        <Button variant="white" size="sm" icon={Pencil} onClick={onEdit} className="self-start shrink-0">{t('choices.situation.edit')}</Button>
       </div>
       <p className="mt-3 text-[13.5px] leading-relaxed text-ink-soft">{detail.description}</p>
 

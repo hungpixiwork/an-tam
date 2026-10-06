@@ -30,17 +30,29 @@ export default function SafetyPage() {
 
   return (
     <div className="space-y-3.5">
-      <HeroBanner
-        title={t('safety.hero.title')}
-        subtitle={t('safety.hero.subtitle')}
-        quote={t('safety.hero.quote')}
-        quoteClassName="w-[350px] self-start xl:mr-[9%] [&_blockquote]:text-[13.5px]"
-        image="/hero-lake-city.jpg"
-        imageAlt={t('safety.hero.image_alt')}
-        imagePosition="right 45%"
-        visualWidth="52%"
-        className="!min-h-[124px] [&>div]:py-5 [&_h2+p]:text-[15px] [&_h2+p]:text-ink-soft"
-      />
+      {/* ── Desktop Hero Banner (Ẩn trên Mobile) ── */}
+      <div className="hidden md:block">
+        <HeroBanner
+          title={t('safety.hero.title')}
+          subtitle={t('safety.hero.subtitle')}
+          quote={t('safety.hero.quote')}
+          quoteClassName="w-[350px] self-start xl:mr-[9%] [&_blockquote]:text-[13.5px]"
+          image="/hero-lake-city.jpg"
+          imageAlt={t('safety.hero.image_alt')}
+          imagePosition="right 45%"
+          visualWidth="52%"
+          className="!min-h-[124px] [&>div]:py-5 [&_h2+p]:text-[15px] [&_h2+p]:text-ink-soft"
+        />
+      </div>
+
+      {/* ── Mobile Compact Header ── */}
+      <div className="flex items-center justify-between gap-3 pb-0.5 md:hidden">
+        <div>
+          <h1 className="text-[20px] font-extrabold text-ink">{t('safety.hero.title')}</h1>
+          <p className="text-[12px] text-ink-soft">{t('safety.hero.subtitle')}</p>
+        </div>
+      </div>
+
       <DecisionStrip domain="safety" />
       <div id="focus-reserve" className="scroll-mt-24"><FundRow data={data} onAdjust={() => open(emergency)} /></div>
       <GoalsSection data={data} plan={allocation.data?.savingsPlan} onEdit={open} onAdd={() => open(null)} onPlan={() => setPlanOpen(true)} />

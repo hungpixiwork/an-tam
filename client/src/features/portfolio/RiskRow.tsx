@@ -75,9 +75,9 @@ export function AllocationCard({ risk, plan, onPick }: { risk: PortfolioRisk; pl
       ) : (
         <>
           <div className="flex flex-col items-center gap-6 sm:flex-row">
-            <DonutChart data={rows.map((a) => ({ key: a.category, value: a.value, color: CATEGORY_COLOR[a.category] }))} size={168} thickness={30}>
-              <span className="text-[30px] font-extrabold leading-none text-ink tabular-nums">{Math.round(total / 1_000_000).toLocaleString('vi-VN')}</span>
-              <span className="mt-1 text-[13px] text-ink-soft">{t('portfolio.alloc.unit')}</span>
+            <DonutChart data={rows.map((a) => ({ key: a.category, value: a.value, color: CATEGORY_COLOR[a.category] }))} size={168} thickness={24}>
+              <span className="text-[26px] sm:text-[28px] font-extrabold leading-none text-ink tabular-nums">{Math.round(total / 1_000_000).toLocaleString('vi-VN')}</span>
+              <span className="mt-1 text-[12px] sm:text-[13px] text-ink-soft">{t('portfolio.alloc.unit')}</span>
             </DonutChart>
             <ul className="w-full min-w-0 flex-1 space-y-1">
               {rows.map((a) => (

@@ -33,31 +33,30 @@ export interface KpiCardProps {
   className?: string;
 }
 
-/** Thẻ chỉ số: icon tile + nhãn + giá trị lớn + delta/badge + progress + chú thích (mockup Tổng quan, Sổ thu chi, Danh mục). */
 export function KpiCard({ icon, tone = 'green', label, value, unit, delta, badge, progress, footnote, aside, valueClassName, info, sub, children, className }: KpiCardProps) {
   return (
-    <section className={cx('flex min-w-0 flex-col rounded-2xl border border-line bg-white p-5 shadow-card', className)}>
-      <div className="flex items-start gap-4">
-        <IconTile icon={icon} tone={tone} size="lg" className="h-14 w-14 rounded-2xl" />
+    <section className={cx('flex min-w-0 flex-col justify-between rounded-2xl border border-line bg-white p-3 sm:p-5 shadow-card', className)}>
+      <div className="flex items-start gap-2 sm:gap-3.5">
+        <IconTile icon={icon} tone={tone} size="sm" className="h-9 w-9 sm:h-12 sm:w-12 shrink-0 rounded-xl" />
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-[14px] font-semibold text-ink">
-            <span className="truncate">{label}</span>
+          <p className="flex items-center gap-1 text-[12px] sm:text-[14px] font-semibold leading-tight text-ink">
+            <span>{label}</span>
             {info && (
               <span title={info} className="inline-flex shrink-0 text-ink-mute" aria-label={info} role="img">
-                <Info className="h-3.5 w-3.5" aria-hidden />
+                <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden />
               </span>
             )}
           </p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-            <p className={cx('whitespace-nowrap font-extrabold leading-none tracking-tight text-ink tabular-nums', valueClassName ?? 'text-[26px]')}>
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+            <p className={cx('whitespace-nowrap font-extrabold leading-none tracking-tight text-ink tabular-nums', valueClassName ?? 'text-[17px] sm:text-[23px]')}>
               {value}
-              {unit && <span className="ml-1 text-[15px] font-semibold text-ink-soft">{unit}</span>}
+              {unit && <span className="ml-0.5 text-[11px] sm:text-[14px] font-semibold text-ink-soft">{unit}</span>}
             </p>
-            {delta && <DeltaBadge value={delta.value} goodWhenUp={delta.goodWhenUp} className="h-6 text-xs" />}
+            {delta && <DeltaBadge value={delta.value} goodWhenUp={delta.goodWhenUp} className="h-4 sm:h-5 text-[10px] sm:text-xs px-1.5" />}
             {badge}
-            {aside && <div className="ml-auto shrink-0">{aside}</div>}
+            {aside && <div className="ml-auto shrink-0 hidden sm:block">{aside}</div>}
           </div>
-          {sub && <div className="mt-2 text-[12.5px] text-ink-soft">{sub}</div>}
+          {sub && <div className="mt-1 text-[10.5px] sm:text-[12px] text-ink-soft leading-tight">{sub}</div>}
         </div>
       </div>
       {progress && (
@@ -65,10 +64,10 @@ export function KpiCard({ icon, tone = 'green', label, value, unit, delta, badge
           value={progress.value}
           color={progress.color ?? TONE_HEX[progress.tone ?? tone]}
           label={progress.label}
-          className="mt-4"
+          className="mt-3 sm:mt-4"
         />
       )}
-      {footnote && <div className="mt-3 text-[12.5px] leading-relaxed text-ink-soft">{footnote}</div>}
+      {footnote && <div className="mt-2.5 sm:mt-3 text-[11.5px] sm:text-[12.5px] leading-relaxed text-ink-soft">{footnote}</div>}
       {children}
     </section>
   );

@@ -52,24 +52,31 @@ export default function DoubleShockPage({ choiceId: requested, initialMode, onCh
 
   return (
     <div className="space-y-2.5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      {/* ── Header ── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-0.5">
         <div className="min-w-0">
-          <h1 className="text-[26px] font-extrabold leading-tight text-ink">{t('simulation.title')}</h1>
-          <p className="mt-1 text-[13.5px] text-ink-soft">{t('simulation.subtitle')}</p>
+          <h1 className="text-[20px] font-extrabold leading-tight text-ink md:text-[26px]">{t('simulation.title')}</h1>
+          <p className="hidden text-[13.5px] text-ink-soft md:mt-1 md:block">{t('simulation.subtitle')}</p>
         </div>
-        <Link to={`/lua-chon?id=${encodeURIComponent(choiceId)}`} className="inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-white px-3.5 text-[13px] font-bold text-accent-700 shadow-sm hover:bg-accent-50">
-          <ArrowLeft className="h-4 w-4" aria-hidden />{t('simulation.back')}
+        <Link
+          to={`/lua-chon?id=${encodeURIComponent(choiceId)}`}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-white px-3 text-[12px] font-bold text-accent-700 shadow-sm hover:bg-accent-50 md:h-10 md:rounded-xl md:px-3.5 md:text-[13px]"
+        >
+          <ArrowLeft className="h-3.5 w-3.5 md:h-4 md:w-4" aria-hidden />
+          {t('simulation.back')}
         </Link>
       </div>
 
-      <section className="flex flex-wrap items-center gap-4 rounded-2xl border border-line bg-white px-4 py-3 shadow-card" aria-label={t('simulation.choice.label')}>
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#EDF4FF] text-accent-600"><GraduationCap className="h-6 w-6" aria-hidden /></span>
-        <div className="min-w-0">
-          <p className="text-[12.5px] font-semibold text-ink-soft">{t('simulation.choice.label')}:</p>
-          <p className="text-[17px] font-extrabold text-ink">{d.title}</p>
-          {option.title !== d.title && <p className="text-[12px] text-ink-soft">{t('simulation.choice.option', { title: option.title })}</p>}
+      {/* ── Choice Summary Bar ── */}
+      <section className="flex flex-wrap items-center gap-3 rounded-xl border border-line-subtle bg-white px-3 py-2.5 shadow-sm md:gap-4 md:rounded-2xl md:px-4 md:py-3 md:shadow-card" aria-label={t('simulation.choice.label')}>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#EDF4FF] text-accent-600 md:h-12 md:w-12">
+          <GraduationCap className="h-5 w-5 md:h-6 md:w-6" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11.5px] font-semibold text-ink-soft md:text-[12.5px]">{t('simulation.choice.label')}:</p>
+          <p className="truncate text-[15px] font-extrabold text-ink md:text-[17px]">{d.title}</p>
+          {option.title !== d.title && <p className="text-[11.5px] text-ink-soft md:text-[12px]">{t('simulation.choice.option', { title: option.title })}</p>}
         </div>
-        <p className="hidden max-w-[420px] border-l border-line pl-4 text-[12.5px] text-ink-soft lg:block">{t('simulation.choice.hint')}</p>
         <div className="ml-auto flex items-center gap-2">
           {picking && (choices.data?.length ?? 0) > 1 ? (
             <Select
@@ -77,7 +84,7 @@ export default function DoubleShockPage({ choiceId: requested, initialMode, onCh
               onChange={(id) => { setPicking(false); onChangeChoice(id); }}
               label={t('simulation.choice.change')}
               options={(choices.data ?? []).map((c) => ({ value: c.id, label: c.title }))}
-              className="max-w-[260px]"
+              className="max-w-[200px] md:max-w-[260px]"
             />
           ) : (
             <Button variant="white" size="sm" icon={Repeat} onClick={() => ((choices.data?.length ?? 0) > 1 ? setPicking(true) : undefined)} disabled={(choices.data?.length ?? 0) < 2}>
@@ -92,7 +99,7 @@ export default function DoubleShockPage({ choiceId: requested, initialMode, onCh
       {current && (
         <div className="grid gap-2.5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <ShockSetup params={current} onChange={(p) => { setParams(p); setSavedId(null); }} mode={mode} onMode={setMode} onReset={() => setParams(null)} />
-          {r ? <EstimatedImpact r={r} /> : <div className="rounded-2xl border border-line bg-white p-4 shadow-card" role="status">{t('simulation.loading')}</div>}
+          {r ? <EstimatedImpact r={r} /> : <div className="rounded-xl border border-line bg-white p-4 shadow-sm" role="status">{t('simulation.loading')}</div>}
         </div>
       )}
 
@@ -108,7 +115,7 @@ export default function DoubleShockPage({ choiceId: requested, initialMode, onCh
               <AgentPlanUpdate request={request} choiceId={choiceId} choiceTitle={d.title} />
             </StepsList>
           </div>
-          <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-[#F4F0FF] px-4 py-2.5 text-[12.5px] text-violet-800">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl bg-[#F4F0FF] px-3.5 py-2.5 text-[12px] text-violet-800 md:rounded-2xl md:px-4 md:text-[12.5px]">
             <Lightbulb className="h-4 w-4 shrink-0" aria-hidden />
             <span className="min-w-0 flex-1">{t('simulation.footer')}</span>
             <Button variant="white" size="sm" icon={Save} onClick={save} disabled={run.isPending}>{t('simulation.save')}</Button>
