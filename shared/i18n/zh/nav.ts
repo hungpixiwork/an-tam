@@ -33,6 +33,7 @@ const messages: Record<string, string> = {
   "nav.workspace.title": "AI 工作台 · MCP · 智能体",
   "nav.audit": "AI 日志",
   "nav.audit.title": "AI 日志、审计与隐私",
+  "nav.menu_more": "全部",
   "nav.main_aria": "主导航",
   "nav.close_menu": "关闭菜单",
   "nav.open_menu": "打开菜单",

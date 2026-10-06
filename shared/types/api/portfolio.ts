@@ -11,19 +11,26 @@ export interface SectorExposureItem {
   level: ConcentrationLevel;
 }
 
+export type SourceOfFunds = 'investable_cash' | 'sell_holding' | 'emergency_reserve';
+
 export interface WhatIfInput {
   assetType: AssetCategory;
   sector: Sector;
   /** VND, số nguyên > 0. */
   amount: number;
   holdingMonths: number;
-  /** Lấy tiền từ tiền mặt / quỹ dự phòng (mặc định) hay tiền mới. */
+  /** Nguồn vốn cụ thể: tiền mặt khả dụng (mặc định), bán bớt tài sản, hoặc rút quỹ dự phòng. */
+  sourceOfFunds?: SourceOfFunds;
+  /** ID tài sản cần bán khi chọn sourceOfFunds = 'sell_holding'. */
+  sourceHoldingId?: string;
+  /** Cũ (tương thích ngược): lấy từ tiền mặt hay tiền mới. */
   fundedFrom?: 'cash' | 'new_money';
   /** Ngữ cảnh nghề nghiệp (tùy chọn). */
   humanCapital?: number;
   annualIncome?: number;
   occupationSector?: Sector;
-  /** Tài sản đa ngành (quỹ ETF toàn cầu): chia đều cho mọi ngành khi tính mức phụ thuộc. */
+  careerBeta?: number;
+  /** Tài sản đa ngành (quỹ ETF toàn cầu): áp dụng tỷ trọng ngành quan sát thực tế (SWDA). */
   diversified?: boolean;
 }
 
@@ -37,18 +44,42 @@ export interface WhatIfSnapshot {
   runwayMonths: number;
   /** Xác suất đạt mục tiêu trung bình 0..1; null nếu không có mục tiêu. */
   goalProbability: number | null;
+  /** Tỷ trọng cổ phiếu công ty đang làm việc. */
+  employerShare?: number;
+  /** Tỷ trọng ngành công nghệ (kể cả phần trong quỹ ETF). */
+  techShare?: number;
+  /** Mức độ chồng lấn nghề nghiệp & tài sản. */
+  careerOverlap?: number;
 }
 
 export interface WhatIfResult {
+  status: 'ok' | 'insufficient_funds';
+  shortfall?: number;
+  moneyConserved: boolean;
   before: WhatIfSnapshot;
   after: WhatIfSnapshot;
-  deltas: { concentration: number; sectorShare: number; runwayMonths: number; goalProbability: number | null };
+  deltas: {
+    concentration: number;
+    sectorShare: number;
+    runwayMonths: number;
+    goalProbability: number | null;
+    employerShare?: number;
+    techShare?: number;
+    careerOverlap?: number;
+  };
   projected: { expected: number; worstCase: number };
   explain: string[];
   /** Gợi ý ngắn, dễ hiểu cho người dùng. */
   advice: string;
-  /** Phần tiền lấy từ tiền chờ đầu tư / quỹ dự phòng. */
-  funding: { fromPortfolioCash: number; fromEmergency: number; newMoney: number };
+  /** Phần tiền lấy từ nguồn nào. */
+  funding: {
+    source: SourceOfFunds;
+    fromPortfolioCash: number;
+    fromHolding: number;
+    fromEmergency: number;
+    newMoney: number;
+    shortfall: number;
+  };
 }
 
 /** Các lựa chọn "Loại tài sản" của form Thử trước khi đầu tư. */

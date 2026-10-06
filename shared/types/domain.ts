@@ -17,9 +17,13 @@ export interface FinancialProfile {
   monthlyIncome: number;
   monthlyExpense: number;
   emergencyTargetMonths: number;
-  riskSelfScore: number;
+  riskSelfScore?: number;
+  essentialExpense?: number;
   birthYear?: number | null;
   retirementAge?: number;
+  careerBeta?: number;
+  occupationIsco?: string | null;
+  industry?: Sector | null;
 }
 
 export interface Holding {
@@ -74,6 +78,7 @@ export interface Liability {
   kind: LiabilityKind;
   balance: number;
   monthlyPayment: number;
+  requiredMonthly?: number;
   /** Lãi suất năm theo basis point (1250 = 12,5%). */
   rateBp: number;
 }
@@ -95,6 +100,8 @@ export interface Transaction {
   occurredOn: string;
   /** Intentional spending tag (optional). */
   valueTag?: SpendingTag;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /** Toàn bộ dữ liệu engine cần để tính cho 1 người dùng. */

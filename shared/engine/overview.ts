@@ -32,7 +32,7 @@ const kpi = (value: number, previous: number | null, compareLabel: string): Kpi 
   compareLabel,
 });
 
-const snapshotAt = (snapshots: Snapshot[], month: string) => snapshots.find((s) => s.month === month) ?? null;
+const snapshotAt = (snapshots: Snapshot[] | undefined, month: string) => snapshots?.find((s) => s.month === month) ?? null;
 
 export const setupStatus = (state: UserState): SetupStatus => ({
   profile: state.profile.monthlyIncome > 0 || state.profile.monthlyExpense > 0,
@@ -77,8 +77,9 @@ export function netWorthBreakdown(state: UserState): OverviewData['netWorthBreak
   const invested = sum(isInvestment);
   const cash = sum((h) => !isInvestment(h) && h.category === 'cash');
   const other = sum((h) => !isInvestment(h) && h.category !== 'cash');
+  const totalAssets = cash + invested + other;
   const debt = (state.liabilities ?? []).reduce((s, l) => s + l.balance, 0);
-  const net = cash + invested + other - debt;
+  const net = totalAssets - debt;
 
   let previous: number | null = null;
   const snap = snapshotAt(state.snapshots, addMonths(state.today, -NET_WORTH_COMPARE_MONTHS));
@@ -89,7 +90,7 @@ export function netWorthBreakdown(state: UserState): OverviewData['netWorthBreak
     if (months.length) previous = net - months.reduce((s, m) => s + m.income - m.expense, 0);
   }
   const deltaPct = previous !== null && previous > 0 && net > 0 ? (net - previous) / previous : null;
-  return { net, cash, invested, other, debt, deltaPct, compareMonths: NET_WORTH_COMPARE_MONTHS };
+  return { net, totalAssets, cash, invested, other, debt, deltaPct, compareMonths: NET_WORTH_COMPARE_MONTHS };
 }
 
 /** Dòng tiền tháng này + chuỗi 6 tháng (tháng không ghi sổ = null). */

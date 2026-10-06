@@ -4,6 +4,8 @@ import { configDefaults, defineConfig } from 'vitest/config';
 export default defineConfig({
   // worker/index.ts export class Workflow (import 'cloudflare:workers') — Node không có module này
   resolve: { alias: {
+    '@shared': fileURLToPath(new URL('./shared', import.meta.url)),
+    '@': fileURLToPath(new URL('./client/src', import.meta.url)),
     'cloudflare:workers': fileURLToPath(new URL('./worker/desk/cloudflare-workers.stub.ts', import.meta.url)),
     'cloudflare:email': fileURLToPath(new URL('./worker/agents/cloudflare-email.stub.ts', import.meta.url)),
   } },

@@ -38,6 +38,22 @@ export function formatVndFull(amount: number, opts: { sign?: boolean } = {}): st
   return `${prefix}${String(abs).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}đ`;
 }
 
+/** Định dạng gọn cho vùng hiển thị nhỏ (Donut, Card badge): 28500000 → "28,5 triệu", 128500000 → "128,5 triệu". */
+export function formatCompactVND(amount: number, opts: { sign?: boolean } = {}): string {
+  const abs = Math.abs(amount);
+  const prefix = amount < 0 ? '-' : opts.sign && amount > 0 ? '+' : '';
+  if (abs >= 1e9) {
+    return `${prefix}${trimDecimals(abs / 1e9, 1)} tỷ`;
+  }
+  if (abs >= 1e6) {
+    return `${prefix}${trimDecimals(abs / 1e6, 1)} triệu`;
+  }
+  if (abs >= 1e3) {
+    return `${prefix}${Math.round(abs / 1e3)} nghìn`;
+  }
+  return `${prefix}${Math.round(abs)} đ`;
+}
+
 /** 0.061 → "6%"; digits cho phép "1,5%". */
 export function formatPct(fraction: number, digits = 0, sign = false): string {
   const v = fraction * 100;

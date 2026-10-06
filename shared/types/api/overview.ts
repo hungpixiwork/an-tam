@@ -71,6 +71,7 @@ export interface OverviewData {
   todayEvents: CalendarEvent[];
   netWorthBreakdown: {
     net: number;
+    totalAssets: number;
     cash: number;
     invested: number;
     other: number;

@@ -33,6 +33,7 @@ const messages: Record<string, string> = {
   "nav.workspace.title": "AI Workspace · MCP · Agents",
   "nav.audit": "AI Log",
   "nav.audit.title": "AI Log, Audit & Privacy",
+  "nav.menu_more": "All",
   "nav.main_aria": "Main navigation",
   "nav.close_menu": "Close menu",
   "nav.open_menu": "Open menu",

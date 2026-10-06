@@ -16,7 +16,7 @@ import { humanCapital, presentValueIncome, RISK_FREE } from './humanCapital';
 import type { FinancialSignals } from '../types/api/signals';
 import { formatVnd } from '../format';
 import { addMonths, monthsBetween } from './month';
-import { mainGoal } from './goals';
+import { goalProbability, mainGoal } from './goals';
 
 export interface LifeChoiceReadiness {
   /** Quỹ dự phòng tối thiểu nên có trước khi bắt đầu = số tháng an toàn mục tiêu × chi tiêu tháng. */
@@ -246,13 +246,31 @@ export function evaluateLifeChoice(state: UserState, option: LifeChoiceOptionInp
   const prereqs = ctx.prereqsTotal > 0 ? FEASIBILITY_WEIGHTS.prereqs * (ctx.prereqsDone / ctx.prereqsTotal) : 0;
 
   const feasibility = Math.round(safety + goals + career + prereqs);
-  const verdict: LifeChoiceVerdict = feasibility >= 75 && shortfall === 0 ? 'go' : feasibility >= 50 ? 'conditional' : 'wait';
+  
+  // Gate check (Sheet 10 & Rule R-LIFE):
+  // 1. Mục tiêu ưu tiên phải có xác suất >= 50%
+  // 2. Không bị thiếu vốn (shortfall == 0)
+  // 3. Số tháng an toàn phải >= thời lượng + 3 tháng dự phòng (nếu có rút tiền dự phòng)
+  const mainG = mainGoal(state);
+  const mainGoalProb = mainG ? goalProbability(mainG, state) : 1;
+  const isGoalPass = mainGoalProb >= 0.50;
+  const isRunwayPass = monthsAfter >= (dur + 3) || working * incomeWorking >= dur * Ec;
+
+  let verdict: LifeChoiceVerdict = 'wait';
+  if (feasibility >= 75 && shortfall === 0 && isGoalPass && isRunwayPass) {
+    verdict = 'go';
+  } else if (feasibility >= 50 && shortfall === 0) {
+    verdict = 'conditional';
+  } else {
+    verdict = 'wait';
+  }
 
   const save = Math.max(0, savingsCapacity(state));
   const upliftPct = Math.max(0, ctx.incomeUpliftPct);
   const opportunities: TextKey[] = OPPORTUNITIES[ctx.kind].map((key) => ({ key, params: { pct: upliftPct } }));
   const risks: TextKey[] = [];
   if (shortfall > 0) risks.push({ key: 'shortfall', params: { amount: Math.round(shortfall) } });
+  if (!isGoalPass) risks.push({ key: 'goals_paused' });
   if (noIncome > 0) risks.push({ key: 'income_gap', params: { months: noIncome } });
   if (monthsAfter < targetMonths) risks.push({ key: 'low_safety', params: { months: monthsAfter } });
   if (goalsRatio < 1) risks.push({ key: 'goals_paused' });

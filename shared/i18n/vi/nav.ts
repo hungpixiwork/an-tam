@@ -33,6 +33,7 @@ const messages: Record<string, string> = {
   "nav.workspace.title": "AI Workspace · MCP · Agents",
   "nav.audit": "Nhật ký AI",
   "nav.audit.title": "Nhật ký AI, kiểm toán & quyền riêng tư",
+  "nav.menu_more": "Tất cả",
   "nav.main_aria": "Điều hướng chính",
   "nav.close_menu": "Đóng menu",
   "nav.open_menu": "Mở menu",

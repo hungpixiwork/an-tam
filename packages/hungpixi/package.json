@@ -1,0 +1,59 @@
+{
+  "name": "antam-ai",
+  "version": "1.0.0",
+  "description": "Official AI Agent SDK, Model Context Protocol (MCP) Server & Financial Intelligence Engine for An Tâm AI",
+  "main": "./dist/src/index.js",
+  "module": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "bin": {
+    "antam": "./dist/bin/cli.js",
+    "antam-ai": "./dist/bin/cli.js",
+    "hungpixi": "./dist/bin/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "antam",
+    "antam-ai",
+    "an-tam-ai",
+    "an-tam",
+    "hungpixi",
+    "ai-agent",
+    "agent-sdk",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "claude-desktop-mcp",
+    "chatgpt-actions",
+    "vercel-ai-sdk",
+    "langchain",
+    "personal-finance",
+    "financial-planning",
+    "peace-of-mind",
+    "vietnam-finance",
+    "smart-money",
+    "emergency-fund",
+    "human-capital"
+  ],
+  "author": "Hung Pixi & An Tâm AI Team",
+  "license": "MIT",
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.2"
+  }
+}

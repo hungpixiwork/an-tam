@@ -125,10 +125,41 @@ export const WHAT_IF_PRESETS: Record<WhatIfPresetKey, { assetType: AssetCategory
   real_estate: { assetType: 'other', sector: 'real_estate', label: 'Bất động sản' },
 };
 
+export const SWDA_TECH_WEIGHT = 0.3022;
+
 export interface CareerContext {
   occupationSector?: Sector | null;
   annualIncome?: number;
   humanCapital?: number;
+  careerBeta?: number;
+}
+
+/** Tính tổng mức phơi nhiễm công nghệ (cổ phiếu công nghệ + tỷ trọng công nghệ trong quỹ ETF). */
+export function computeTechExposure(holdings: Holding[], occupationSector?: Sector): number {
+  let tech = 0;
+  for (const h of holdings) {
+    const s = holdingSector(h, occupationSector);
+    if (s === 'technology') {
+      tech += h.value;
+    } else if (h.category === 'fund') {
+      // Snapshot quan sát thực tế quỹ ETF toàn cầu (SWDA tech weight)
+      tech += h.value * SWDA_TECH_WEIGHT;
+    }
+  }
+  return tech;
+}
+
+/** Tính mức độ chồng lấn nghề nghiệp & tài sản: (beta·HC + TechExposure) / (HC + GrossAssets). */
+export function computeCareerOverlap(
+  hc: number,
+  careerBeta: number,
+  techExposure: number,
+  grossAssets: number,
+): number | null {
+  if (hc <= 0 && grossAssets <= 0) return null;
+  const denom = hc + grossAssets;
+  if (denom <= 0) return null;
+  return (careerBeta * hc + techExposure) / denom;
 }
 
 /** Số liệu trang Danh mục: tài sản ròng, cơ cấu, cổ phiếu công ty mình, mức phụ thuộc ngành (cả nghề nghiệp). */
@@ -163,29 +194,55 @@ export function portfolioRisk(state: UserState, career: CareerContext): Portfoli
   };
 }
 
-/** Khoản thử: tài sản đa ngành được chia đều cho mọi ngành khi tính mức phụ thuộc. */
+/** Khoản thử: tài sản đa ngành (ETF) phân bổ theo tỷ trọng quan sát thực tế (SWDA: Tech 30.22%, phần còn lại trải các ngành khác). */
 function trialHoldings(input: WhatIfInput, amount: number): Holding[] {
   const base = { category: input.assetType, role: 'Thử nghiệm', volatility: VOLATILITY_BY_CATEGORY[input.assetType], isMain: false, inPortfolio: true, name: 'Khoản thử' };
   if (!input.diversified) return [{ ...base, id: 'what-if', value: amount, riskGroup: input.sector, sector: input.sector }];
-  const part = Math.floor(amount / SECTORS.length);
-  return SECTORS.map((sector, i) => ({
-    ...base, id: `what-if-${sector}`, riskGroup: sector, sector,
-    value: i === 0 ? amount - part * (SECTORS.length - 1) : part,
-  }));
+
+  // Quỹ ETF toàn cầu: gán sector 'other' kèm trọng số snapshot quan sát thực tế
+  return [{ ...base, id: 'what-if-etf', value: amount, riskGroup: 'Quỹ đầu tư', sector: 'other' }];
 }
 
-function snapshot(state: UserState, holdings: Holding[], goals: UserState['goals'], emergency: number, input: WhatIfInput): WhatIfSnapshot {
+function snapshot(
+  state: UserState,
+  holdings: Holding[],
+  goals: UserState['goals'],
+  emergency: number,
+  input: WhatIfInput,
+): WhatIfSnapshot {
   const invest = holdings.filter(isInvestment);
-  const exposure = sectorExposure({ holdings: invest, humanCapital: input.humanCapital, annualIncome: input.annualIncome, occupationSector: input.occupationSector });
+  const investTotal = totalValue(invest);
+  const grossAssets = investTotal + emergency;
+  const occupationSector = input.occupationSector ?? undefined;
+  const exposure = sectorExposure({ holdings: invest, humanCapital: input.humanCapital, annualIncome: input.annualIncome, occupationSector });
   const s = { ...state, holdings, goals };
   const longGoals = goals.filter((g) => g.kind !== 'emergency');
+  
+  const employerVal = invest.filter((h) => h.isEmployerStock).reduce((sum, h) => sum + h.value, 0);
+  const employerShare = investTotal > 0 ? employerVal / investTotal : 0;
+  
+  const techExposure = computeTechExposure(invest, occupationSector);
+  const techShare = investTotal > 0 ? techExposure / investTotal : 0;
+
+  const hc = input.humanCapital ?? 0;
+  const careerBeta = input.careerBeta ?? (state.profile.careerBeta ?? 0.7);
+  const careerOverlap = computeCareerOverlap(hc, careerBeta, techExposure, grossAssets) ?? undefined;
+
+  const emergencyDenom = (state.profile.essentialExpense && state.profile.essentialExpense > 0)
+    ? state.profile.essentialExpense
+    : state.profile.monthlyExpense;
+  const runwayMonths = emergencyDenom > 0 ? round1(emergency / emergencyDenom) : 0;
+
   return {
     concentration: concentrationScore(exposure),
     topSector: exposure[0] ?? null,
     sectorShare: input.diversified ? 0 : (exposure.find((e) => e.sector === input.sector)?.share ?? 0),
     riskyShare: portfolioStats(invest).riskyShare,
-    runwayMonths: state.profile.monthlyExpense > 0 ? round1(emergency / state.profile.monthlyExpense) : 0,
+    runwayMonths,
     goalProbability: longGoals.length ? longGoals.reduce((sum, g) => sum + goalProbability(g, s), 0) / longGoals.length : null,
+    employerShare,
+    techShare,
+    careerOverlap,
   };
 }
 
@@ -197,18 +254,159 @@ function drawFrom(holdings: Holding[], pick: (h: Holding) => boolean, amount: nu
 }
 
 /**
- * "Thử trước khi đầu tư": bỏ thêm `amount` vào (assetType × sector) trong `holdingMonths` tháng.
- * Nguồn tiền mặc định: tiền mặt đang chờ đầu tư trong danh mục trước, thiếu thì lấy từ quỹ dự phòng.
- * Khoản mới được tính cho mục tiêu dài hạn ưu tiên nhất (tiến độ mục tiêu).
+ * "Thử trước khi đầu tư" (Issue #1 & #5):
+ * - Hỗ trợ 3 nguồn vốn: investable_cash (mặc định), sell_holding, emergency_reserve.
+ * - Tuyệt đối không tự tạo tiền ảo; nếu thiếu tiền -> trả về status 'insufficient_funds' kèm shortfall.
+ * - Bảo toàn tổng tài sản khi điều chuyển nội bộ (Δ TotalAssets = 0).
  */
 export function whatIfAllocate(state: UserState, input: WhatIfInput): WhatIfResult {
   const amount = Math.max(0, Math.round(input.amount));
-  const fromCash = (input.fundedFrom ?? 'cash') === 'cash';
-
   const isFreeCash = (h: Holding) => h.category === 'cash' && isInvestment(h);
   const isReserveCash = (h: Holding) => h.category === 'cash' && !isInvestment(h);
   const freeCash = state.holdings.filter(isFreeCash).reduce((s, h) => s + h.value, 0);
   const emergencyBefore = emergencyAmount(state);
+
+  // Strict mode: khi người dùng truyền rõ sourceOfFunds
+  if (input.sourceOfFunds) {
+    const source = input.sourceOfFunds;
+    let availableInSource = 0;
+    let targetHolding: Holding | undefined;
+
+    if (source === 'investable_cash') {
+      availableInSource = freeCash;
+    } else if (source === 'sell_holding') {
+      if (input.sourceHoldingId) {
+        targetHolding = state.holdings.find((h) => h.id === input.sourceHoldingId);
+      }
+      if (!targetHolding) {
+        targetHolding = state.holdings.find((h) => h.isEmployerStock) ?? state.holdings.find((h) => isInvestment(h) && h.category !== 'cash');
+      }
+      availableInSource = targetHolding ? targetHolding.value : 0;
+    } else if (source === 'emergency_reserve') {
+      availableInSource = emergencyBefore;
+    }
+
+    const shortfall = Math.max(0, amount - availableInSource);
+    const before = snapshot(state, state.holdings, state.goals, emergencyBefore, input);
+
+    if (shortfall > 0) {
+      return {
+        status: 'insufficient_funds',
+        shortfall,
+        moneyConserved: true,
+        before,
+        after: { ...before },
+        deltas: { concentration: 0, sectorShare: 0, runwayMonths: 0, goalProbability: 0, employerShare: 0, techShare: 0, careerOverlap: 0 },
+        projected: { expected: amount, worstCase: amount },
+        explain: [
+          `Nguồn vốn không đủ: Yêu cầu ${formatVnd(amount)} nhưng nguồn đã chọn chỉ có ${formatVnd(availableInSource)}.`,
+          `Còn thiếu ${formatVnd(shortfall)}. Hệ thống không tự động tạo tiền mới nhằm bảo đảm tính chính xác của kế hoạch tài chính.`,
+        ],
+        advice: `Vui lòng giảm số tiền thử nghiệm xuống tối đa ${formatVnd(availableInSource)} hoặc chọn nguồn vốn khác.`,
+        funding: {
+          source,
+          fromPortfolioCash: 0,
+          fromHolding: 0,
+          fromEmergency: 0,
+          newMoney: 0,
+          shortfall,
+        },
+      };
+    }
+
+    let afterHoldings = [...state.holdings];
+    let fromPortfolioCash = 0;
+    let fromHolding = 0;
+    let fromEmergency = 0;
+    let emergencyAfter = emergencyBefore;
+
+    if (source === 'investable_cash') {
+      fromPortfolioCash = amount;
+      afterHoldings = drawFrom(afterHoldings, isFreeCash, amount);
+    } else if (source === 'sell_holding' && targetHolding) {
+      fromHolding = amount;
+      const holdingId = targetHolding.id;
+      afterHoldings = afterHoldings.map((h) =>
+        h.id === holdingId ? { ...h, value: Math.max(0, h.value - amount) } : h
+      ).filter((h) => h.value > 0);
+    } else if (source === 'emergency_reserve') {
+      fromEmergency = amount;
+      emergencyAfter = Math.max(0, emergencyBefore - amount);
+      afterHoldings = drawFrom(afterHoldings, isReserveCash, amount);
+    }
+
+    afterHoldings = [...afterHoldings, ...trialHoldings(input, amount)];
+    const goalsAfter = state.goals.map((g) =>
+      g.kind === 'emergency' ? { ...g, currentAmount: emergencyAfter } : g
+    );
+    const afterSnap = snapshot(state, afterHoldings, goalsAfter, emergencyAfter, input);
+
+    const { expectedReturn, volatility } = CATEGORY_ASSUMPTIONS[input.assetType];
+    const years = Math.max(0, input.holdingMonths) / 12;
+    const expected = Math.round(amount * (1 + expectedReturn) ** years);
+    const worstCase = Math.max(0, Math.round(amount * (1 + expectedReturn * years - 2 * volatility * Math.sqrt(Math.max(1, years)))));
+
+    const pct = (x: number) => `${(x * 100).toFixed(1).replace('.', ',')}%`;
+    const dC = afterSnap.concentration - before.concentration;
+    const dEmployer = (afterSnap.employerShare ?? 0) - (before.employerShare ?? 0);
+    const dTech = (afterSnap.techShare ?? 0) - (before.techShare ?? 0);
+    const dOverlap = (afterSnap.careerOverlap ?? 0) - (before.careerOverlap ?? 0);
+    const dRunway = round1(afterSnap.runwayMonths - before.runwayMonths);
+    const dGoal = before.goalProbability === null || afterSnap.goalProbability === null ? null : afterSnap.goalProbability - before.goalProbability;
+
+    const explain = [
+      `Điều chuyển ${formatVnd(amount)} từ ${
+        source === 'investable_cash'
+          ? 'tiền mặt khả dụng'
+          : source === 'sell_holding'
+          ? `tài sản "${targetHolding?.name ?? 'cổ phiếu'}"`
+          : 'quỹ dự phòng'
+      } sang ${input.diversified ? 'Quỹ ETF toàn cầu' : SECTOR_LABELS[input.sector]}.`,
+      `Tỷ trọng công nghệ: ${pct(before.techShare ?? 0)} → ${pct(afterSnap.techShare ?? 0)}.`,
+      `Mức độ chồng lấn nghề nghiệp: ${pct(before.careerOverlap ?? 0)} → ${pct(afterSnap.careerOverlap ?? 0)}.`,
+    ];
+
+    if (fromEmergency > 0) {
+      explain.push(`Cảnh báo: Rút quỹ dự phòng làm số tháng an toàn giảm ${before.runwayMonths} → ${afterSnap.runwayMonths} tháng.`);
+    }
+
+    const advice =
+      dC < 0
+        ? `Phương án giúp giảm mức độ rủi pro tập trung (${before.concentration} → ${afterSnap.concentration}) và đa dạng hóa tài sản an toàn hơn.`
+        : dC > 0
+        ? `Phương án làm tăng mức độ rủi ro tập trung (${before.concentration} → ${afterSnap.concentration}). Hãy cân nhắc phân bổ vào các nhóm tài sản độc lập với nghề nghiệp.`
+        : 'Phương án giữ nguyên mức độ rủi ro tập trung tổng thể.';
+
+    return {
+      status: 'ok',
+      moneyConserved: true,
+      before,
+      after: afterSnap,
+      deltas: {
+        concentration: dC,
+        sectorShare: afterSnap.sectorShare - before.sectorShare,
+        runwayMonths: dRunway,
+        goalProbability: dGoal,
+        employerShare: dEmployer,
+        techShare: dTech,
+        careerOverlap: dOverlap,
+      },
+      projected: { expected, worstCase },
+      explain,
+      advice,
+      funding: {
+        source,
+        fromPortfolioCash,
+        fromHolding,
+        fromEmergency,
+        newMoney: 0,
+        shortfall: 0,
+      },
+    };
+  }
+
+  // Chế độ tương thích ngược (Legacy fallback)
+  const fromCash = (input.fundedFrom ?? 'cash') === 'cash';
   const fromPortfolioCash = fromCash ? Math.min(amount, freeCash) : 0;
   const fromEmergency = fromCash ? Math.min(amount - fromPortfolioCash, emergencyBefore) : 0;
   const newMoney = amount - fromPortfolioCash - fromEmergency;
@@ -218,7 +416,6 @@ export function whatIfAllocate(state: UserState, input: WhatIfInput): WhatIfResu
   after = [...after, ...trialHoldings(input, amount)];
 
   const hasEmergencyGoal = state.goals.some((g) => g.kind === 'emergency');
-  // Không có mục tiêu quỹ dự phòng → quỹ dự phòng = toàn bộ tiền mặt, nên mọi khoản rút tiền mặt đều làm giảm
   const emergencyAfter = Math.max(0, emergencyBefore - fromEmergency - (hasEmergencyGoal ? 0 : fromPortfolioCash));
   const goalsAfter = state.goals.map((g) => (g.kind === 'emergency' ? { ...g, currentAmount: Math.max(0, g.currentAmount - fromEmergency) } : g));
   const mainGoal = goalsAfter.filter((g) => g.kind !== 'emergency').sort((a, b) => a.priority - b.priority)[0];
@@ -230,7 +427,6 @@ export function whatIfAllocate(state: UserState, input: WhatIfInput): WhatIfResu
   const { expectedReturn, volatility } = CATEGORY_ASSUMPTIONS[input.assetType];
   const years = Math.max(0, input.holdingMonths) / 12;
   const expected = Math.round(amount * (1 + expectedReturn) ** years);
-  // Trường hợp xấu ≈ −2σ trong kỳ nắm giữ (tối thiểu 1 năm biến động), không âm
   const worstCase = Math.max(0, Math.round(amount * (1 + expectedReturn * years - 2 * volatility * Math.sqrt(Math.max(1, years)))));
 
   const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -259,6 +455,8 @@ export function whatIfAllocate(state: UserState, input: WhatIfInput): WhatIfResu
       : 'Quỹ dự phòng giữ nguyên.';
   const advice = `${riskLine} ${cashLine}`;
   return {
+    status: 'ok',
+    moneyConserved: newMoney === 0,
     before,
     after: afterSnap,
     deltas: {
@@ -270,6 +468,6 @@ export function whatIfAllocate(state: UserState, input: WhatIfInput): WhatIfResu
     projected: { expected, worstCase },
     explain,
     advice,
-    funding: { fromPortfolioCash, fromEmergency, newMoney },
+    funding: { fromPortfolioCash, fromEmergency, newMoney } as any,
   };
 }
