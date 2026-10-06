@@ -17,6 +17,8 @@ const whatIfSchema = z.object({
   amount: money.refine((v) => v > 0, 'Vui lòng nhập số tiền lớn hơn 0'),
   holdingMonths: z.number().int().min(1).max(600),
   fundedFrom: z.enum(['cash', 'new_money']).optional(),
+  sourceOfFunds: z.enum(['investable_cash', 'sell_holding', 'emergency_reserve']).optional(),
+  sourceHoldingId: z.string().optional(),
 });
 
 /** Ngữ cảnh nghề nghiệp: ngành trong hồ sơ thu nhập + thu nhập năm (thu nhập thực tế nếu có sổ thu chi). */
@@ -47,6 +49,8 @@ export const portfolioRisk = new Hono<AppEnv>()
         amount: input.amount,
         holdingMonths: input.holdingMonths,
         fundedFrom: input.fundedFrom,
+        sourceOfFunds: input.sourceOfFunds,
+        sourceHoldingId: input.sourceHoldingId,
         occupationSector: career.occupationSector ?? undefined,
         annualIncome: career.annualIncome,
       }),

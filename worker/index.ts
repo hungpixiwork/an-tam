@@ -38,6 +38,7 @@ import { integrations } from './routes/integrations';
 import { webhooks } from './routes/webhooks';
 import { market } from './routes/market';
 import { alertRules } from './routes/alertRules';
+import { openapiRouter } from './routes/openapi';
 import { health, APP_VERSION, BUILD_TIME } from './routes/health';
 import { plan } from './routes/plan';
 import { signals } from './routes/signals';
@@ -101,6 +102,7 @@ app.use('/api/auth/register', rateLimit('RL_AUTH', clientIp));
 app.route('/api/auth', auth);
 app.route('/api/health', health);
 app.route('/api/webhooks', webhooks);
+app.route('/', openapiRouter);
 // Chặn mọi truy cập trực tiếp tới Durable Object; chỉ /api/agent/* qua Hono được dùng.
 app.all('/agents/*', (c) => c.text('Not Found', 404));
 
