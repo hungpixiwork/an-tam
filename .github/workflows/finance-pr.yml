@@ -1,0 +1,45 @@
+name: Finance PR
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  finance-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check Uyen PR file scope
+        if: github.event.pull_request.user.login == 'HoangHaUyen'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        shell: bash
+        run: |
+          disallowed=0
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              shared/data/*|shared/engine/*|tests/*|.agents/tasks/*|docs/finance/*) ;;
+              *) echo "Outside Uyen PR scope: $path"; disallowed=1 ;;
+            esac
+          done < <(git diff --name-only --no-renames -z "$BASE_SHA" HEAD)
+          exit "$disallowed"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Test finance engine
+        shell: bash
+        run: |
+          tests=(tests/engine.test.ts tests/analysis.test.ts tests/allocation.test.ts tests/concentration-hc.test.ts tests/ledger.test.ts tests/safety.test.ts tests/life-choice.test.ts tests/earn.test.ts tests/earn-dashboard.test.ts)
+          existing=()
+          for file in "${tests[@]}"; do
+            if [[ -f "$file" ]]; then existing+=("$file"); fi
+          done
+          npm test -- "${existing[@]}"

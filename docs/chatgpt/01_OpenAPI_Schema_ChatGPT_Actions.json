@@ -1,0 +1,196 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "An Tâm AI - Cố Vấn Tài Chính An Nhiên API",
+    "description": "API chính thức cho ChatGPT Custom GPT Actions kết nối với hệ sinh thái tài chính An Tâm AI.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://an-tam.ai"
+    }
+  ],
+  "paths": {
+    "/api/overview": {
+      "get": {
+        "operationId": "getFinancialOverview",
+        "summary": "Lấy bức tranh tài chính tổng quan",
+        "description": "Trả về Điểm An Tâm (0-100), Quỹ dự phòng an toàn (số tháng), Dòng tiền 6 tháng và các đề xuất hôm nay.",
+        "responses": {
+          "200": {
+            "description": "Dữ liệu tổng quan thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ledger/dashboard": {
+      "get": {
+        "operationId": "getMonthlyLedger",
+        "summary": "Lấy sổ thu chi và ngân sách theo tháng",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Tháng YYYY-MM"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dữ liệu sổ thu chi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agent/actions": {
+      "post": {
+        "operationId": "proposeFinancialAction",
+        "summary": "Đề xuất hành động tài chính chờ duyệt (Human-In-The-Loop)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["type", "payload"],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "calendar.create_events",
+                      "budget.set",
+                      "goal.update_progress",
+                      "reminder.create",
+                      "sheets.update_budget",
+                      "notion.weekly_report",
+                      "gmail.send"
+                    ]
+                  },
+                  "payload": {
+                    "type": "object"
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Đề xuất đã được lưu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/nlp/parse-transaction": {
+      "post": {
+        "operationId": "parseVietnameseTransactionText",
+        "summary": "Bóc tách câu lệnh chi tiêu tiếng Việt",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["text"],
+                "properties": {
+                  "text": { "type": "string", "example": "sáng nay ăn phở 45k" },
+                  "date": { "type": "string", "example": "2026-10-06" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Dữ liệu giao dịch bóc tách",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/smart-calendar/link": {
+      "post": {
+        "operationId": "createGoogleCalendarQuickLink",
+        "summary": "Sinh link Google Calendar 1-chạm",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "startsAt"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "startsAt": { "type": "string" },
+                  "durationMinutes": { "type": "integer", "default": 30 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Link Google Calendar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
+}

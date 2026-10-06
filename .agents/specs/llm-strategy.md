@@ -1,7 +1,7 @@
 # Chiến lược AI (LLM) và bảo vệ dữ liệu
 
-> File này chốt: dùng mô hình ngôn ngữ nào, gửi gì cho nó, chặn tấn công ra sao, lỗi thì xử lý thế nào. Dev đọc để code phần "Hỏi An Tâm".
-> Trạng thái 📐 — code trong tuần 04/10–10/10 ([project-timeline.md](../project-timeline.md)).
+> File này chốt: dùng mô hình ngôn ngữ nào, gửi gì cho nó, chặn tấn công ra sao, lỗi thì xử lý thế nào, và AI Workspace đa agent + MCP server chạy ra sao. Dev đọc để code phần AI (trước đây gọi là "Hỏi An Tâm", nay là màn **AI Workspace** `/ai-workspace`).
+> Trạng thái 📐 — AI Workspace code ở Wave 3 (08/10–12/10), MCP server ở Wave 4 (13/10–14/10) ([project-timeline.md](../project-timeline.md)).
 
 ## 1. Nguyên tắc
 
@@ -48,7 +48,7 @@ Trước 16/10: chạy 50 câu hỏi mẫu có đáp án (tiếng Việt, Trung,
     shared/agent/intent.ts      amountRef: "AMT_1", horizonRef: "DUR_1", shock: "job_loss" }
     quá 3 giây / sai khuôn / có chữ số → bỏ, dùng [2b] phân loại bằng từ khóa
    │
-[3] Lập kế hoạch (code)      → [đọc hồ sơ, tính khả năng đạt mục tiêu, thử mất việc, tính runway]
+[3] Lập kế hoạch (code)      → [đọc hồ sơ, tính khả năng đạt mục tiêu, thử mất việc, tính số tháng an toàn]
     shared/agent/planner.ts
    │
 [4] Chạy hàm tính (code)     → shared/engine/*; chỉ có hàm đọc và hàm đề xuất, không có hàm ghi
@@ -110,7 +110,53 @@ Không bao giờ trả lỗi 500. Không lưu câu hỏi gốc: `agent_steps` ch
 - Mô hình gợi ý: Qwen3 8B hoặc Gemma 4 bản nhỏ, chạy được trên laptop 16GB RAM.
 - Giới hạn: bản triển khai trên Cloudflare không gọi được `localhost`; chế độ này dùng khi chạy `wrangler dev` hoặc khi ngân hàng tự cài engine.
 
-## 8. Nguồn
+## 8. AI Workspace đa agent 📐 — Wave 3 (08/10–12/10)
+
+Quyết định giữ nguyên: **Workers AI (Qwen3-30B)**, LLM chỉ phân loại ý định và lập kế hoạch trên dữ liệu đã che số; mọi con số do engine tính; LLM lỗi thì rơi về từ khóa/mẫu (`shared/engine/narrate.ts`). "Đa agent" là **vai trò do planner (code) phân bước**, không phải 5 LLM tự do nói chuyện với nhau.
+
+| Agent | Phụ trách | Tool engine (chỉ đọc) | Hành động có thể đề xuất (phân công dự kiến, chốt khi code Wave 3) |
+|---|---|---|---|
+| **Planner** | Nhận lệnh, chia bước cho các agent còn lại | `shared/agent/planner.ts` | — |
+| **Calendar** | Khung trống, sắp lịch tuần | `scheduler.ts` (`freeSlots`, `autoSchedule`) | Tạo sự kiện trong lịch phụ "An Tâm", gửi email xác nhận (Gmail) |
+| **Cashflow** | Ngân sách, hóa đơn, dòng tiền | `budget.ts`, `bills.ts`, `spending.ts` | Cập nhật Sheet "An Tâm – Ngân sách", nhắc hóa đơn |
+| **Skill** | Kế hoạch học, cơ hội thu nhập | `humanCapital.ts`, `earn.ts` | Chặn giờ học, ghi Notion |
+| **Goal** | Mục tiêu, quỹ an toàn, lựa chọn cuộc đời | `safety.ts`, `goals.ts`, `lifeChoice.ts` | Cập nhật mục tiêu, báo cáo tổng kết |
+
+```text
+Lệnh tự nhiên (POST /api/agent/runs) | lời gọi MCP | cron automation
+   → agent_runs (running)
+[1] Che số & PII             shared/agent/sanitize.ts
+[2] Ý định                   shared/agent/intent.ts (zod) — WorkersAIParser, quá 3 giây → RuleParser
+[3] Planner sinh các bước    shared/agent/planner.ts   → mỗi bước ghi agent_steps
+[4] Tool engine chỉ đọc      shared/agent/tools.ts → shared/engine/*
+[5] Đề xuất hành động        shared/agent/actions.ts (ACTION_TYPES: payloadSchema, preview, risk, integration)
+                             kiểm payload, tạo preview trước/sau → agent_actions (pending, hết hạn 24h)
+   → agent_runs (awaiting_approval) + audit
+[6] Người dùng duyệt         POST /api/agent/actions/:id/approve + Idempotency-Key
+                             UPDATE … WHERE status='pending' (không đổi dòng nào → 409), batch chung với audit
+[7] Executor                 worker/agents/executor.ts: executing → lấy token → Google/Notion/nội bộ
+                             sự kiện lịch ghi calendar_events kèm action_id, google_event_id
+[8] Kết quả                  done + audit + afterChange() | failed + audit + hoàn tác phần ghi nội bộ
+```
+
+- **Từ chối / Yêu cầu điều chỉnh:** ghi audit; yêu cầu điều chỉnh thì chạy lại planner kèm ghi chú.
+- **Tự duyệt:** chỉ hành động nội bộ rủi ro thấp mà quy tắc automation có `requires_approval=0` (approver = `auto`), vẫn ghi audit.
+- **Giao diện:** 5 agent card, ô ra lệnh, timeline (poll `GET /api/agent/runs/:id`), kế hoạch tuần, công cụ & MCP, danh sách chờ phê duyệt — [redesign-ui.md](redesign-ui.md) §4.8.
+- **File worker:** `worker/agents/{llm,runner,executor}.ts` (`WorkersAIParser` timeout 3s → rules, `runAgent`, `executeAction`); binding `ai: {binding: "AI"}`, biến `INTENT_PROVIDER` (mục 7).
+- **Test:** prompt gửi tới LLM không chứa số tiền; duyệt 2 lần chỉ thực thi 1 lần; audit append-only.
+
+## 9. An Tâm MCP server 📐 — Wave 4 (13/10–14/10)
+
+An Tâm tự làm **một remote MCP server** trên chính Worker để "thân thiện với AI": cùng một URL `/mcp` dùng được cho Claude (Custom Connector, kèm plugin Claude Code `.claude-plugin/plugin.json` + `.mcp.json`), ChatGPT (Apps/Connectors ở developer mode), Gemini CLI (`settings.json` mcpServers).
+
+- Cloudflare Agents SDK `createMcpHandler` + `@cloudflare/workers-oauth-provider` (KV `OAUTH_KV`), đăng nhập bằng phiên An Tâm. Route `/mcp`, `/oauth/*`, `/.well-known/*` chạy worker trước (`run_worker_first`).
+- **Tool đọc** (chạy trực tiếp): `get_overview`, `get_ledger`, `get_goals`, `get_calendar_week`, `evaluate_life_choice`, `what_if_allocate`, `list_pending_actions`.
+- **Tool ghi:** **chỉ có `propose_action`** → tạo bản ghi `pending` với source `mcp`. **Không có tool approve** — không agent ngoài nào tự ý thay đổi dữ liệu; người dùng vẫn duyệt trong An Tâm.
+- *Lưu ý khi pitch:* vì agent ngoài (Claude/ChatGPT/Gemini) là LLM của bên thứ ba do **người dùng tự chọn kết nối**, dữ liệu trả qua MCP là dữ liệu người dùng chủ động chia sẻ với trợ lý của họ; LLM của chính An Tâm vẫn theo nguyên tắc ở mục 1–2.
+- **Test:** tool ghi chỉ tạo pending.
+- Nếu trễ: cắt MCP cho Gemini/ChatGPT trước, giữ Claude.
+
+## 10. Nguồn
 
 - Cloudflare — [Your Data and Workers AI](https://developers.cloudflare.com/workers-ai/platform/data-usage/)
 - Cloudflare — [Workers AI Pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/)

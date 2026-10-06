@@ -3,6 +3,17 @@
 > File này mô tả chi tiết 4 tính năng tạo khác biệt cho An Tâm: vấn đề, cách làm, người dùng thấy gì, API, test. Dev đọc để code; người pitch đọc để trả lời giám khảo.
 > Tất cả đều 📐 (đã chốt, chưa code). Tổng quan sản phẩm: [ba.md](ba.md).
 
+## Gắn với màn hình và module (kế hoạch redesign 27/09/2026)
+
+| Mã | Màn hình | Engine | API | Wave |
+|---|---|---|---|:-:|
+| **B1** | Mục tiêu & Lựa chọn `/lua-chon` (+ thẻ "Lựa chọn cuộc đời" trên Tổng quan) | `shared/engine/lifeChoice.ts`: `evaluateLifeChoice`, `compareOptions`, `freedomMonths` | `/api/life-choices` (templates, list, CRUD, `POST /evaluate`, `POST /compare`, prereqs, tasks) | 2 (04–07/10) |
+| **B2** | Tăng thu nhập `/tang-thu-nhap` — ring "Giá trị nghề nghiệp" + thang "Mức độ tiếp xúc AI" | `shared/engine/humanCapital.ts` (HC, mức tiếp xúc AI, `careerScore`), `shared/data/ilo-exposure.ts` | `GET /api/human-capital` | 1 (30/09–03/10) |
+| **B3** | Mô phỏng `/mo-phong` | `montecarlo.ts` (dự kiến) | — | Chưa xếp wave |
+| **B4** | Danh mục `/danh-muc` — gauge rủi ro tập trung, bar theo ngành, "Cổ phiếu công ty", "Thử trước khi đầu tư" | `shared/engine/concentration.ts`: `hhi`, `sectorExposure` (gộp nghề nghiệp + tài sản), `concentrationIndex`, `employerStockWeight`, `whatIfAllocate` | `GET /api/portfolio/risk` · `POST /api/portfolio/what-if` | 1 (30/09–03/10) |
+
+Tên file và route trong các mục bên dưới đã được cập nhật theo bảng này (bản trước dùng `life-options.ts`, `human-capital.ts`, `career-overlap.ts`, `/api/life-options`, `/api/career-overlap`). Đặc tả màn: [redesign-ui.md](redesign-ui.md).
+
 ## Vì sao cần 4 tính năng này
 
 Soi code ngày 27/09: bậc 1–2 (dòng tiền, an toàn) đã vững nhưng app nào cũng có. Bậc 3–5 mới là nơi tạo khác biệt, và đang yếu:
@@ -34,10 +45,21 @@ Cả 4 tính năng **dùng lại engine sẵn có** (`applyShock`, `goalProbabil
 ```text
 Lựa chọn → tham số mô phỏng → applyShock()     (shared/engine/simulate.ts ✅)
                             → goalProbability() (shared/engine/goals.ts ✅)
-                            → Runway mới        (ba.md §5.1)
+                            → Số tháng an toàn (bản mới)        (ba.md §5.1)
                             → Vốn con người     (B2)
                             → Kết luận + điều kiện để kham nổi
 ```
+
+**Điểm khả thi (0–100)** — hiện trên gauge khi so sánh 2 phương án (mockup: 72 vs 68):
+
+| Thành phần | Điểm tối đa |
+|---|:-:|
+| Số tháng an toàn trong và sau lựa chọn | 40 |
+| Giữ được các mục tiêu hiện có | 30 |
+| Thay đổi vốn con người (ΔHC, từ B2) | 20 |
+| Điều kiện tiên quyết đã đạt (checklist, vd 5/6) | 10 |
+
+Kết quả tính khi đọc, không lưu. Ngưỡng đổi điểm sang nhãn trạng thái ("Khả thi" / "Cần thêm điều kiện") chốt khi code Wave 2.
 
 Kết luận có 3 mức:
 - **Kham nổi:** số tháng trụ được ≥ thời gian lựa chọn + 3 tháng, và không mục tiêu ưu tiên 1 nào tụt dưới 50% khả năng đạt.
@@ -50,7 +72,7 @@ Hai con số cho bậc 5:
 
 **Người dùng thấy.** *"Nghỉ việc học thạc sĩ 18 tháng: kham nổi nếu để dành thêm ¥1.200/tháng trong 10 tháng tới."* Bấm xem chi tiết: trụ được 21 tháng trong lúc học, mục tiêu mua nhà lùi 14 tháng, giá trị nghề sau khi học tăng khoảng 12% (ước tính). Trên Tổng quan: *"Bạn đã mở khóa 2/5 lựa chọn cuộc đời."*
 
-**API và file.** `GET /api/life-options/templates` · `POST /api/life-options/evaluate` → `{ verdict, unlockCondition, runwayMonths, goalImpacts, hcBefore, hcAfter, explain }` · `GET /api/life-options/summary`. File `shared/engine/life-options.ts`. Loại câu hỏi AI: `life_decision`. Không cần bảng mới.
+**API và file.** `/api/life-choices`: templates, list, CRUD, `POST /evaluate`, `POST /compare`, prereqs, tasks. Trường trả về của `evaluate` gợi ý: `{ verdict, feasibility, unlockCondition, runwayMonths, goalImpacts, hcBefore, hcAfter, explain }` (chốt khi code). File `shared/engine/lifeChoice.ts`. Loại câu hỏi AI: `life_decision`; tool MCP `evaluate_life_choice`. Bảng mới `life_choices`, `life_choice_options`, `life_choice_prereqs`, `life_choice_tasks` (`migrations/0014_life_choices`) để lưu tình huống, phương án, checklist và kế hoạch hành động 5 bước.
 
 **Test.** Cùng đầu vào cho cùng kết luận; áp dụng điều kiện mở khóa thì kết luận chuyển sang "kham nổi"; số tháng tự do ≥ 0; chi tiêu thiết yếu = 0 không gây lỗi chia.
 
@@ -80,7 +102,9 @@ Dữ liệu: ILO Working Paper 140 (5/2025) chấm mức phơi nhiễm AI tạo 
 
 **Người dùng thấy.** *"5 giờ/tuần trong 12 tháng (khoảng 260 giờ) có thể làm giá trị nghề của bạn tăng khoảng 8% (ước tính). Đây không phải lời hứa tăng lương."*
 
-**API và file.** `GET /api/human-capital` → `{ hc, exposureLevel, pi, g, skillDelta, explain }`. File `shared/engine/human-capital.ts`, `shared/data/ilo-exposure.ts`. Cột mới: `income_profiles.isco_code`, `financial_profiles.birth_year`, `financial_profiles.retirement_age` (hiện chỉ có `users.life_stage`, chưa đủ để tính $T$).
+**Trên màn Tăng thu nhập.** Ring "Giá trị nghề nghiệp" hiện `careerScore` (vd 72/100) và thang "Mức độ tiếp xúc AI"; khối "Lộ trình kỹ năng → thu nhập" và "Kế hoạch học tuần" (`skill_plan_items`) nối giờ học với giá trị tăng thêm.
+
+**API và file.** `GET /api/human-capital` → `{ hc, exposureLevel, careerScore, pi, g, skillDelta, explain }`. File `shared/engine/humanCapital.ts`, `shared/data/ilo-exposure.ts`. Cột mới (`migrations/0009_profile_career`): `income_profiles.isco_code`, `income_profiles.sector`, `financial_profiles.birth_year`, `financial_profiles.retirement_age` (hiện chỉ có `users.life_stage`, chưa đủ để tính $T$). ΔHC được B1 dùng cho 20 điểm khả thi.
 
 **Test.** $\pi$ tăng thì HC giảm; $T \le 0$ thì HC = 0; cùng đầu vào cùng kết quả.
 
@@ -105,7 +129,7 @@ Dữ liệu: ILO Working Paper 140 (5/2025) chấm mức phơi nhiễm AI tạo 
 
 Cú sốc thu nhập **chỉ áp dụng khi ngành của người dùng trùng ngành bị ảnh hưởng** — minh họa trực tiếp cho rủi ro tiền và nghề cùng lúc.
 
-Khoảng P10/P50/P90 của Runway dùng phân phối Student-t (ν = 4) thay cho phân phối chuẩn, để các cú sốc cực đoan xuất hiện gần với thực tế hơn. Seed cố định theo người dùng và tham số, nên kết quả vẫn lặp lại được. File `shared/engine/montecarlo.ts`.
+Khoảng P10/P50/P90 của Số tháng an toàn dùng phân phối Student-t (ν = 4) thay cho phân phối chuẩn, để các cú sốc cực đoan xuất hiện gần với thực tế hơn. Seed cố định theo người dùng và tham số, nên kết quả vẫn lặp lại được. File `shared/engine/montecarlo.ts`.
 
 > ⚠️ Các con số khủng hoảng trên được ghi theo số liệu phổ biến, **cần tra lại nguồn gốc trước khi đưa lên slide**.
 
@@ -122,14 +146,15 @@ Khoảng P10/P50/P90 của Runway dùng phân phối Student-t (ν = 4) thay cho
 **Vấn đề.** Người dùng hay đầu tư vào đúng ngành mình làm vì "hiểu ngành", và nhận cổ phiếu thưởng của chính công ty. Khi ngành gặp khó, họ mất cả lương lẫn tiền để dành.
 
 **Cách làm.**
-- `whatIfAllocate()` trong `shared/engine/career-overlap.ts`: người dùng nhập "bỏ thêm X vào nhóm ngành Y". Engine so sánh trước và sau: chỉ số tập trung rủi ro $C_s$ ([ba.md](ba.md) §5.2), khả năng đạt mục tiêu (`goalProbability` ✅), số tháng trụ được nếu lấy từ tiền mặt.
+- `shared/engine/concentration.ts`: `sectorExposure` gộp nghề nghiệp và tài sản thành $C_s$ theo ngành ([ba.md](ba.md) §5.2); `hhi` (chỉ số Herfindahl–Hirschman trên tỷ trọng); `concentrationIndex` ra điểm rủi ro tập trung 0–100 cho gauge (mockup: 70/100); `employerStockWeight` cho thẻ "Cổ phiếu công ty" (mockup: 35%).
+- `whatIfAllocate()`: người dùng nhập loại tài sản / số tiền / thời gian ("bỏ thêm X vào nhóm ngành Y"). Engine trả cặp trước/sau cho: rủi ro tập trung, số tháng an toàn (nếu lấy từ tiền mặt), xác suất/tiến độ mục tiêu (`goalProbability` ✅).
 - Chỉ ở mức nhóm ngành × loại tài sản. Hỏi mã cổ phiếu cụ thể sẽ bị từ chối.
 - Cột `holdings.is_employer_stock`: cổ phiếu công ty mình làm có $\beta = 1$ với ngành hiện tại, kèm cảnh báo riêng *"Lương và cổ phiếu thưởng của bạn đến từ cùng một công ty."*
 - Khi người dùng đổi nghề, thu nhập hoặc ngành (`PUT /api/earn`): dùng lại `afterChange` (`worker/lib/refresh.ts` ✅) để tính lại vốn con người, $C_s$ và tạo cảnh báo mới trong `ai_alerts` ✅.
 
 **Người dùng thấy.** *"Sau khoản này, 71% tổng tài sản của bạn — tính cả công việc — phụ thuộc ngành công nghệ (hiện 58%). Quỹ dự phòng giảm từ 6 xuống 3,5 tháng."*
 
-**API.** `GET /api/career-overlap` · `POST /api/career-overlap/what-if` → `{ before, after, deltas, explain }`. Loại câu hỏi AI: `what_if_allocate`.
+**API.** `GET /api/portfolio/risk` · `POST /api/portfolio/what-if` → `{ before, after, deltas, explain }`. Loại câu hỏi AI: `what_if_allocate`; tool MCP `what_if_allocate`.
 
 **Test.** $C_s$ luôn trong [0, 1]; thêm tài sản khác ngành thì $C_s$ ngành mình giảm; đánh dấu cổ phiếu thưởng thì $C_s$ tăng đúng bằng tỷ trọng của nó.
 
@@ -156,14 +181,14 @@ Khoảng P10/P50/P90 của Runway dùng phân phối Student-t (ν = 4) thay cho
 
 | Ưu tiên | Hạng mục | Hạn | Nếu trễ |
 |:-:|---|:-:|---|
-| P0 | B4 lõi: $C_s$, `whatIfAllocate`, cổ phiếu thưởng | 07/10 | Không cắt |
-| P0 | B2 lõi: vốn con người với bảng ILO | 08/10 | Không cắt |
-| P0 | B1 lõi: `study`, `care`, `startup` + số tháng tự do + kết luận | 10/10 | Không cắt — là cao trào demo |
-| P1 | B3: khoảng cách hành vi | 12/10 | Cắt được, vẫn kể trong pitch |
-| P2 | B3: kịch bản khủng hoảng + Student-t | 13/10 | Cắt được, dùng phân phối chuẩn có seed |
-| P2 | B2: giờ học thành giá trị | 13/10 | Cắt được, giữ `incomeGrowthPlan` như cũ |
-| P3 | B4: tự tính lại khi đổi việc | 14/10 | Cắt đầu tiên |
-| P3 | B1: `switch`, `sabbatical` | 14/10 | Cắt được |
+| P0 | B4 lõi: `concentration.ts` ($C_s$, HHI, `whatIfAllocate`, cổ phiếu thưởng) | 03/10 (Wave 1) | Không cắt |
+| P0 | B2 lõi: `humanCapital.ts` với bảng ILO, `careerScore` | 03/10 (Wave 1) | Không cắt |
+| P0 | B1 lõi: `lifeChoice.ts` — điểm khả thi, so sánh 2 phương án, điều kiện tiên quyết, số tháng tự do | 07/10 (Wave 2) | Không cắt — là cao trào demo |
+| P1 | B3: khoảng cách hành vi | Chưa xếp wave | Cắt được, vẫn kể trong pitch |
+| P2 | B3: kịch bản khủng hoảng + Student-t | Chưa xếp wave | Cắt được, dùng phân phối chuẩn có seed |
+| P2 | B2: giờ học thành giá trị | Chưa xếp wave (Kế hoạch học tuần có ở Wave 1) | Cắt được, giữ `incomeGrowthPlan` như cũ |
+| P3 | B4: tự tính lại khi đổi việc | Chưa xếp wave | Cắt đầu tiên |
+| P3 | B1: `switch`, `sabbatical` | Chưa xếp wave | Cắt được |
 
 ---
 

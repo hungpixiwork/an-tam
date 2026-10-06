@@ -25,12 +25,14 @@ Hướng làm: **tái cấu trúc giao diện, giữ engine/API đang chạy và
 
 | Vai | GitHub | Nhiệm vụ chính |
 |---|---|---|
-| **Hung** — Dev chính, Backend & AI | `hungpixi` | Engine tính toán, API, AI agents (Cloudflare Agents SDK), MCP integrations, Google Calendar API, database, CI/CD |
-| **Uyên** — Frontend & Domain Expert | `HoangHaUyen` | Giao diện React theo ref UI, responsive, i18n, logic tài chính, demo flow, pitch content. Background: Finance FTU (GPA 3.9), CFA L1, Python/SQL/Power BI |
+| **Hưng** — Dev chính, tích hợp sản phẩm | `hungpixi` | Frontend, API, database, AI, CI/CD; review code và merge PR của Uyên |
+| **Uyên** — Engine đầu tư và chuyên môn tài chính | `HoangHaUyen` | Thiết kế công thức, trực tiếp làm engine đầu tư/mô phỏng và test; xác nhận nguồn dữ liệu, phép tính, kết luận tư vấn. Có thể đề xuất thay đổi trải nghiệm trong issue; Hưng tích hợp UI |
 
 **Quy tắc code cùng nhau:**
-- Mọi thay đổi vào `main` phải qua Pull Request + 1 approval (trừ hungpixi bypass khi cần gấp).
-- Branch naming: `feat/ten-feature`, `fix/ten-bug`, `ui/ten-trang`.
+- Mỗi issue của Uyên dùng một branch và một PR. Uyên làm và xác nhận engine/tính đúng tài chính; Hưng review code, tích hợp API/DB/UI và merge. Mockup chỉ là ví dụ; Uyên được đề xuất đổi chỉ số, kết quả mô phỏng, câu chữ và tương tác trong issue để Hưng tích hợp. Uyên có thể bắt đầu engine/test khi UI còn đang hoàn thiện.
+- PR của Uyên chỉ sửa `shared/data`, `shared/engine`, `tests`, `.agents/tasks` và `docs/finance`; không sửa `client`, route, bố cục hoặc design spec. Mỗi issue ghi đầu vào mẫu, kết quả hiện tại, kết quả đúng kèm phép tính, nguồn và ngày tham khảo, trường hợp thiếu dữ liệu, tiêu chí nghiệm thu. Không đưa hồ sơ tài chính thật lên GitHub.
+- Team áp dụng quy trình PR + review trước khi merge. Repo private trên tài khoản cá nhân hiện không bật được branch protection/rulesets; CI và approval chưa thể cưỡng chế trên `main`. Người có quyền `write` vẫn có thể push/merge trực tiếp, nên Hưng giữ trách nhiệm merge theo quy trình team.
+- Branch naming: `feat/ten-feature`, `fix/ten-bug`, `ui/ten-trang`, `data/ten-issue`.
 - Commit message tiếng Việt hoặc tiếng Anh đều được, miễn rõ ràng.
 
 ## Đọc theo thứ tự

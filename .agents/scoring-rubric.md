@@ -39,11 +39,14 @@ Trạng thái ngày 27/09/2026. Chỉ đánh dấu [x] khi chỉ ra được fil
 - [x] Database thật: Cloudflare D1 — `migrations/0001`–`0007`
 - [x] Lỗi trả về JSON có cấu trúc — `app.onError` trong `worker/index.ts`
 - [x] Unit test: 95/95 chạy qua, 13 file — `tests/`
-- [ ] AI hiểu câu hỏi (hiện mới có quy tắc) — hạn 10/10
-- [ ] Một luồng tài chính hoàn chỉnh có bước xác nhận và mã chống trùng — hạn 10/10
-- [ ] Nhật ký kiểm toán không sửa được — hạn 03/10
-- [ ] Tài khoản demo và dữ liệu mẫu tái lập được — hạn 17/10
-- [ ] Test hợp đồng cho mọi route và test đầu-cuối luồng demo — hạn 16/10
+- [ ] AI hiểu câu hỏi (hiện mới có quy tắc) — AI Workspace, hạn 12/10 (Wave 3)
+- [ ] Một luồng tài chính hoàn chỉnh có bước phê duyệt và mã chống trùng (duyệt 2 lần chỉ thực thi 1 lần, lần 2 trả 409) — hạn 12/10
+- [ ] Nhật ký kiểm toán append-only (trigger chặn UPDATE/DELETE, chuỗi hash `prev_hash`/`row_hash`) — nền ở Wave 0, hạn 29/09
+- [ ] Tích hợp thật: Google Calendar/Gmail/Sheets (OAuth Testing), Notion, webhook SePay — hạn 03/10 (backend), 12/10 (UI)
+- [ ] Remote MCP server `/mcp`, tool ghi chỉ tạo đề xuất chờ duyệt — hạn 14/10
+- [ ] Xuất/xóa dữ liệu có tombstone (`erasure_requests`), token không có trong bản xuất — hạn 12/10
+- [ ] Tài khoản demo và dữ liệu mẫu tái lập được (`seeds/demo-user.sql` khớp mockup) — hạn 16/10
+- [ ] Test hợp đồng cho mọi route mới (không 500, zod 400) và test đầu-cuối luồng demo — hạn 16/10
 
 ## 4. Máy chấm tự động thường quét gì
 
@@ -52,9 +55,9 @@ Cuộc thi chưa công bố chi tiết máy chấm; đây là mức tối thiể
 | # | Tiêu chí | Ở đâu | Trạng thái | Hạn |
 |:-:|---|---|:-:|:-:|
 | 1 | README chạy lại được bằng lệnh | `README.md`, `npm run setup` | 🟡 | 17/10 |
-| 2 | Kiểm tra sống, có ping database | `GET /api/health` | 🔴 | 03/10 |
-| 3 | Mô tả API máy đọc được | `GET /api/openapi.json` | 🔴 | 03/10 |
-| 4 | Dữ liệu mẫu và tài khoản demo | `seeds/demo-user.sql` | 🟡 | 17/10 |
+| 2 | Kiểm tra sống, có ping database | `GET /api/health` | 🔴 | 29/09 (Wave 0) |
+| 3 | Mô tả API máy đọc được | `GET /api/openapi.json` | 🔴 | 14/10 (Wave 4) |
+| 4 | Dữ liệu mẫu và tài khoản demo | `seeds/demo-user.sql` | 🟡 | 16/10 (Wave 5) |
 | 5 | File mẫu biến môi trường | `.dev.vars.example` | 🔴 | 03/10 |
 | 6 | Kiểm tra kiểu, test, độ phủ | `npm run typecheck`, `npm test`, `vitest --coverage` | 🟡 | 13/10 |
 | 7 | CI tự động | `.github/workflows/ci.yml` | 🔴 | 03/10 |
@@ -63,16 +66,21 @@ Cuộc thi chưa công bố chi tiết máy chấm; đây là mức tối thiể
 | 10 | Giới hạn số lần gọi (đăng nhập, AI) | Cloudflare Rate Limiting | 🔴 | 13/10 |
 | 11 | Không lộ bí mật | `.gitignore`, rà lịch sử commit | 🟢 | — |
 | 12 | Giấy phép | `LICENSE` (MIT) | 🔴 | 03/10 |
+| 13 | Webhook có xác thực, chống trùng | `POST /api/webhooks/sepay`: sai HMAC → 401, trùng `referenceCode` bị bỏ qua | 🔴 | 03/10 |
+| 14 | Rà soát bảo mật OAuth, webhook, MCP, mã hóa token | `/security-review` | 🔴 | 16/10 |
+
+> Mục 5, 7, 10, 12 chưa được xếp vào wave nào của kế hoạch redesign ([project-timeline.md](project-timeline.md)); hạn cũ giữ làm mục tiêu.
 
 ## 5. Bộ test cần viết (theo thứ tự ưu tiên)
 
 1. **Hợp đồng mọi route:** không đăng nhập → 401; dữ liệu sai → 400; id không có hoặc của người khác → 404. **Không route nào trả 500.** Sinh tự động từ danh sách route.
 2. **Đầu vào xấu:** `null`, mảng rỗng, chuỗi 10.000 ký tự, số âm, `1e308`, ký tự Unicode lạ vào mọi POST/PUT/PATCH.
 3. **Tính chất engine:** với đầu vào ngẫu nhiên hợp lệ — số tháng trụ được ≥ 0; điểm trong [0, 100]; cùng đầu vào cùng kết quả; không ra `NaN`/`Infinity`.
-4. **Chống trùng:** gửi cùng mã hai lần cùng lúc → chỉ một bản ghi.
-5. **AI:** bộ câu lừa tiếng Việt/Trung/Anh; LLM chậm → chuyển sang từ khóa; sai khuôn → bị loại.
-6. **Nhật ký:** mỗi lần xác nhận sinh đúng một dòng; sửa/xóa bị chặn.
-7. **Đầu-cuối luồng demo** (Playwright): đăng ký → khởi đầu → hỏi → xác nhận → xem nhật ký.
+4. **Chống trùng:** gửi cùng mã hai lần cùng lúc → chỉ một bản ghi; duyệt một hành động 2 lần chỉ thực thi 1 lần.
+5. **AI:** bộ câu lừa tiếng Việt/Trung/Anh; LLM chậm → chuyển sang từ khóa; sai khuôn → bị loại; prompt gửi tới LLM không chứa số tiền.
+6. **Nhật ký:** mỗi lần đổi trạng thái hành động sinh đúng một dòng; sửa/xóa bị chặn.
+7. **Đầu-cuối luồng demo:** kết nối Google (test user) → Lịch AI "Đồng bộ ngay" hiện sự kiện thật; AI Workspace ra lệnh → Duyệt → sự kiện trên Google Calendar thật + dòng mới ở Nhật ký AI; chuyển khoản nhỏ qua SePay → giao dịch ở Sổ thu chi; connector `/mcp` trong Claude → đề xuất nằm trong hàng chờ. Responsive bằng `playwright-cli` ở 1440 / 1024 / 768 / 390.
+7b. **Tích hợp và MCP:** webhook SePay sai HMAC → 401, trùng bị bỏ qua; tool ghi MCP chỉ tạo `pending`.
 8. **4 tính năng đột phá:** test riêng từng cái, liệt kê ở [breakthroughs.md](specs/breakthroughs.md).
 
 ## 6. Nguồn chính thức

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "an-tam-ai": {
+      "command": "npx",
+      "args": ["-y", "antam-ai", "mcp"],
+      "env": {
+        "ANTAM_API_KEY": "YOUR_ANTAM_API_KEY",
+        "ANTAM_BASE_URL": "https://an-tam.ai"
+      }
+    }
+  }
+}

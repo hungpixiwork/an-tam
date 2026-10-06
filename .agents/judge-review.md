@@ -28,10 +28,14 @@
 | Nhật ký kiểm toán không sửa được | Chưa có (`ai_events` chỉ là nhật ký hiển thị) | Bảng `audit_log`, hạn 03/10 |
 | Cảnh báo tiền và nghề cùng rủi ro | Nghề chỉ là ô chữ tự do; chưa có phép tính | B4, hạn 07/10 |
 | Tính toán nhạy cảm ở máy người dùng | Engine chạy được ở trình duyệt, nhưng dữ liệu vẫn lưu trên D1 | Đổi cách nói: *"không gửi dữ liệu cho bên thứ ba; AI không thấy con số"* |
-| Thử tải chuẩn xác | `simulate.ts` có hằng số ẩn `INCOME_PAUSE_COVERAGE = 0.5` (ngầm cho rằng gia đình gánh 50% chi tiêu) | Runway mới, hạn 10/10 |
+| Thử tải chuẩn xác | `simulate.ts` có hằng số ẩn `INCOME_PAUSE_COVERAGE = 0.5` (ngầm cho rằng gia đình gánh 50% chi tiêu) | Số tháng an toàn (bản mới), hạn 10/10 |
 | Tầng 5 "tự do lựa chọn" | Không có tính năng nào đo | B1, hạn 10/10 |
 | API `/api/agent/consult`, `/api/transaction/commit` | Không khớp route thật | [ba.md](specs/ba.md) §10 đã viết lại theo route thật |
-| Healthcheck, OpenAPI | Chỉ có `/api/version` | Hạn 03/10 |
+| Healthcheck, OpenAPI | Chỉ có `/api/version` | `/api/health` hạn 29/09 (Wave 0), `/api/openapi.json` hạn 14/10 (Wave 4) |
+| Tích hợp Google Calendar, Gmail, Sheets, Notion, ngân hàng | Chưa có | 📐 Tích hợp **thật** (OAuth trực tiếp, Google ở chế độ Testing; SePay webhook) — không demo bằng dữ liệu giả. Ghi rõ giới hạn: tối đa 100 test user, refresh token hết hạn sau 7 ngày |
+| "Plugin cho Claude/ChatGPT/Gemini" | Chưa có | 📐 Remote MCP server `/mcp`, hạn 14/10; tool ghi chỉ tạo đề xuất chờ duyệt |
+
+> Cập nhật theo kế hoạch redesign 27/09/2026: hạn `idempotency_keys` và `audit_log` dời về Wave 0 (29/09); B4, B2 về 03/10; B1 về 07/10; AI Workspace (thay "Hỏi An Tâm") 12/10. Route mới: [ba.md](specs/ba.md) §10.
 
 ## 3. Độ mới lạ và "gu" WeBank
 
@@ -57,14 +61,18 @@ Vai hacker và vai kiểm toán viên ngân hàng:
 | 6 | Bấm xác nhận hai lần / gửi lại request | Mã chống trùng + ràng buộc duy nhất | `tests/idempotency.test.ts` |
 | 7 | Đổi `id` trên URL để xem dữ liệu người khác | Mọi truy vấn lọc theo `user_id` ✅ | contract test → 404 |
 | 8 | Xin gợi ý mã cổ phiếu | Loại `ticker_request` → câu trả lời mẫu | agent test |
-| 9 | "Giả định gia đình gánh 50% ở đâu ra?" | Bỏ hằng số ẩn, người dùng tự khai, mặc định 0 | test Runway |
+| 9 | "Giả định gia đình gánh 50% ở đâu ra?" | Bỏ hằng số ẩn, người dùng tự khai, mặc định 0 | test Số tháng an toàn |
 | 10 | "Ai duyệt hành động này, lúc nào?" | `audit_log` + trigger chặn sửa/xóa | test sửa `audit_log` → lỗi |
 | 11 | Dò mật khẩu | Giới hạn số lần thử; mật khẩu băm PBKDF2-SHA256 100.000 vòng ✅ (`worker/lib/password.ts`) | test trả 429 |
 | 12 | LLM sập / trả sai | Quá 3 giây → phân loại bằng từ khóa; không bao giờ 500 | test giả lập LLM chậm |
+| 13 | "Claude/ChatGPT nối vào qua MCP có tự sửa dữ liệu được không?" | Tool ghi duy nhất `propose_action` → `pending`; không có tool approve | test MCP chỉ tạo pending |
+| 14 | Giả webhook ngân hàng để chèn giao dịch | Xác thực API key/HMAC; chống trùng theo `external_id` | test sai HMAC → 401 |
+| 15 | "AI gửi email / tạo lịch thay tôi mà tôi không biết?" | Mọi ghi ra Google/Notion đều chờ duyệt; sự kiện nằm trong lịch phụ "An Tâm" (`calendar.app.created`), thu hồi được ở Nhật ký AI | test executor chỉ chạy khi `approved` |
+| 16 | "Xóa tài khoản thì nhật ký kiểm toán ra sao?" | `audit_log` không FK tới user (không cascade); chỉ xóa được khi có `erasure_requests` (tombstone); token không có trong bản xuất | test xóa `audit_log` khi không có yêu cầu → lỗi |
 
 Một câu cho pitch: *"AI của chúng tôi có thể bị lừa, nhưng không thể gây hại: nó không thấy con số, không tự tính tiền, và không có quyền ghi."*
 
-**Bằng chứng để máy chấm công nhận là agent thật, không phải "vỏ bọc LLM":** `POST /api/agent/consult` trả về `traceId`, `intent`, `plan[]`, `toolCalls[]`, `explain`, `proposedActions[]`; dấu vết lưu ở `agent_runs` / `agent_steps`, xem lại qua `GET /api/agent/runs/:id`. Chi tiết: [ba.md](specs/ba.md) §4.
+**Bằng chứng để máy chấm công nhận là agent thật, không phải "vỏ bọc LLM":** `POST /api/agent/runs` (thay cho `/api/agent/consult` cũ) tạo một lượt chạy; timeline từng bước (ý định, kế hoạch của Planner, tool engine đã gọi, hành động đề xuất kèm preview trước/sau) lưu ở `agent_runs` / `agent_steps` / `agent_actions`, xem lại qua `GET /api/agent/runs/:id`; mỗi lần duyệt/từ chối/thực thi có một dòng `audit_log` hiện ở Nhật ký AI. Chi tiết: [ba.md](specs/ba.md) §4, §7 và [llm-strategy.md](specs/llm-strategy.md) §8.
 
 **Khi giám khảo hỏi sâu về con số "trụ được 5 tháng":**
 > *"5 tháng là mức thường gặp trong 1.000 lần mô phỏng có seed cố định. Tử số là tài sản dễ rút sau khi trừ hao khủng hoảng, mẫu số là chi tiêu thiết yếu trừ thu nhập còn lại. Mọi giả định đều hiện ra và người dùng sửa được. Chúng tôi nói bằng 'tháng' thay vì VaR vì con người ra quyết định theo thời gian."*
