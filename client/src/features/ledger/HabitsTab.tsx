@@ -242,8 +242,8 @@ function InsightsCard({ profile }: { profile: HabitsProfile }) {
 /* ───────── Gợi ý + ranh giới AI ───────── */
 
 const TIPS = [
-  { icon: Target, tone: 'blue', title: 'Đặt trước giới hạn rủi ro', body: 'Quy định mức giảm tối đa bạn có thể chấp nhận trước khi hành động.', to: '/ke-hoach' },
-  { icon: Wallet, tone: 'green', title: 'Giữ quỹ dự phòng rõ ràng', body: 'Có sẵn khoản tiền mặt cho các tình huống bất ngờ trong cuộc sống.', to: '/muc-tieu' },
+  { icon: Target, tone: 'blue', title: 'Đặt trước giới hạn rủi ro', body: 'Quy định mức giảm tối đa bạn có thể chấp nhận trước khi hành động.', to: '/quy-an-toan' },
+  { icon: Wallet, tone: 'green', title: 'Giữ quỹ dự phòng rõ ràng', body: 'Có sẵn khoản tiền mặt cho các tình huống bất ngờ trong cuộc sống.', to: '/quy-an-toan' },
   { icon: CalendarDays, tone: 'blue', title: 'Xem lại danh mục mỗi quý, không quyết định theo cảm xúc hằng ngày', body: 'Dành thời gian nhìn lại bức tranh tổng thể thay vì phản ứng với tin tức ngắn hạn.', to: '/danh-muc' },
 ] as const;
 

@@ -85,7 +85,19 @@ export default function WorkspacePage() {
             <EmptyState icon={Bot} tone="teal" title={t('workspace.command.title')} body={t('workspace.empty')} />
           )}
         </div>
-        <div className="min-w-0 xl:col-span-4">{run && <ActivityLog run={run} />}</div>
+        <div className="min-w-0 xl:col-span-4">
+          {run ? (
+            <ActivityLog run={run} />
+          ) : (
+            <EmptyState
+              icon={Bot}
+              tone="blue"
+              title="Nhật ký hoạt động"
+              body="Khi bạn ra lệnh hoặc phê duyệt kế hoạch, các bước thực thi của AI Agent sẽ xuất hiện tại đây."
+              compact
+            />
+          )}
+        </div>
       </div>
     </div>
   );

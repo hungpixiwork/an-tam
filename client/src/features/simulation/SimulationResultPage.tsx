@@ -158,7 +158,7 @@ function Result({ report }: { report: SimulationReport }) {
             <Improve label="Mức an tâm" before={String(report.improvement.peaceBefore)} after={String(report.improvement.peaceAfter)} />
           </div>
           <div className="mt-auto flex flex-wrap gap-3 pt-4">
-            <ButtonLink to="/ke-hoach" arrow className="flex-1">
+            <ButtonLink to="/quy-an-toan" arrow className="flex-1">
               Tạo kế hoạch an toàn hơn
             </ButtonLink>
             <ButtonLink to="/mo-phong" variant="outline" className="flex-1">
