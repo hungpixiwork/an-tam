@@ -5,6 +5,18 @@
 > **Triết lý nhân bản:** **"Giá trị của an tâm chính là AN TÂM!"** — Xây dựng theo **Thang Chống Chịu Tài Chính 5 bậc (Financial Resilience Ladder)**, lấy cảm hứng từ Tháp Nhu Cầu Maslow.  
 > **Nguyên tắc sản phẩm:** **COMPLEXITY INSIDE. CLARITY OUTSIDE.** *(Viết đề tài có căn cứ lý thuyết vững chắc — Khi code thì bình dân, gần gũi, dễ tiếp cận để mang lại cuộc sống tốt đẹp hơn cho người dân).*
 
+<div align="center">
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Stack: Cloudflare Workers](https://img.shields.io/badge/Backend-Cloudflare_Workers-F38020?logo=cloudflare)](https://workers.cloudflare.com/)
+[![Database: Cloudflare D1](https://img.shields.io/badge/Database-Cloudflare_D1-orange)](https://developers.cloudflare.com/d1/)
+[![Frontend: React 19](https://img.shields.io/badge/Frontend-React_19_|_Vite-61DAFB?logo=react)](https://react.dev/)
+[![Status](https://img.shields.io/badge/Status-International_Track_Candidate-success)](#)
+
+<img src="docs/hero-landing.png" alt="An Tâm AI - Landing Page Hero" width="920" style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);" />
+
+</div>
+
 ---
 
 ## 🎯 CÁC CAM KẾT CỐT LÕI (CORE CLAIMS)
